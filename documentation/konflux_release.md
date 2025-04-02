@@ -59,10 +59,19 @@ releaseVersion=$(echo $applicationName| sed  's/operator//g')
 
 Retrieve the names of the components that match the controller and bundle based on the prefixed compoment names as we know them `controller-rhel9-operator` and `operator-bundle`:
 ```console
-controller_rhel9_operator=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}}'|grep controller-rhel9-operator)
-operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}}'|grep operator-bundle)
+controller_rhel9_operator=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep controller-rhel9-operator)
+operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep bundle)
 echo "Controller compoment registered as $controller_rhel9_operator"
 echo "Bundle compoment registered as $operator_bundle"
+```
+
+Capture all components in an array for later usage
+```console
+unset components
+declare -A components
+componentNames=($(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'))
+for name in $componentNames; do genericName=$(echo $name | sed 's/'$releaseVersion'//g'); components[$genericName]=$name; done
+
 ```
 
 ### Staging release
@@ -78,38 +87,56 @@ oc get snapshots --sort-by .metadata.creationTimestamp \
 -l appstudio.openshift.io/component=$operator_bundle  \
 -l pac.test.appstudio.openshift.io/event-type=push \
 -ojsonpath='{range .items[*]}{@.metadata.name}{"\t"}{@.status.conditions[?(@.type=="AppStudioTestSucceeded")].status}{"\t"}{@.metadata.annotations.pac\.test\.appstudio\.openshift\.io/sha-title}{"\n"}{end}' \
-| grep rhdhorchestrator/konflux/component-updates
+| grep konflux/component-updates
 ```
 Example:
 ```console
-helm-operator-1-2-n9n6h	True	Merge pull request #262 from rhdhorchestrator/konflux/component-updates/controller-rhel9-operator-1-2
-helm-operator-1-2-cf7qp	True	Merge pull request #267 from rhdhorchestrator/konflux/component-updates/controller-rhel9-operator-1-2
+operator-1-0-sjkm7	True	Merge pull request #140 from openshift-storage-scale/konflux/component-updates/component-update-must-gather-1-0
+operator-1-0-7hf57	True	Merge pull request #128 from openshift-storage-scale/konflux/component-updates/component-update-controller-rhel9-operator-1-0
+operator-1-0-8p4tz	True	Merge pull request #141 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
+operator-1-0-6l49x	True	Merge pull request #142 from openshift-storage-scale/konflux/component-updates/component-update-console-plugin-1-0
+operator-1-0-4lz8r	True	Merge pull request #144 from openshift-storage-scale/konflux/component-updates/component-update-console-plugin-1-0
+operator-1-0-9j8pz	True	Merge pull request #148 from openshift-storage-scale/konflux/component-updates/component-update-controller-rhel9-operator-1-0
+operator-1-0-qd2pr	True	Merge pull request #149 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
 ```
 
 If you're releasing from a controller's update nudge, which is the most probable case, check the last snapshot that has passed the integration tests:
 ```console
-helm-operator-1-2-cf7qp	True	Merge pull request #267 from rhdhorchestrator/konflux/component-updates/controller-rhel9-operator-1-2
+operator-1-0-qd2pr	True	Merge pull request #149 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
 ```
 Capture the snapshot in an environment variable:
 ```console
-snapshot=helm-operator-1-2-cf7qp
+snapshot=operator-1-0-qd2pr
 ```
 
 * Ensure that the bundle's controller pullspec matches the one in the snapshot. The bundle's container image contains a label with the image pullspec of the controller used in the bundle. Use the following commands to extract the controller from the bundle of the snapshot `helm-operator-1-2-cf7qp`:
 ```console
-bundle=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$orchestrator_operator_bundle'")].containerImage}')
-controllerInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.controller}}")
-controllerSHAInBundle=$(awk -F'@' '{print $2}' <<< "$controllerInBundle")
-controllerInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$controller_rhel9_operator'")].containerImage}')
-controllerSHAInSnapshot=$(awk -F'@' '{print $2}' <<< "$controllerInSnapshot")
-if [ -n "$controllerInBundle" ] && [ "$controllerSHAInBundle" = "$controllerSHAInSnapshot" ]; then echo "controller image pullspec matches";else echo "controller image pullspec does not match. This snapshot is not a good candidate for release";fi
+bundle=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$operator_bundle'")].containerImage}')
+
+for genericName versionedName in ${(kv)components}; do
+if [[ "$versionedName" != "$operator_bundle" ]]; then
+echo Checking $genericName...
+imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+imageSHAInSnapshot=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInSnapshot")
+imagePullSpecInBundle=$(skopeo inspect docker://$bundle --format '{{ index .Labels "'$genericName'" }}')
+imageSHAInBundle=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInBundle")
+if [ -n "$imagePullSpecInSnapshot" ] && [ "$imageSHAInBundle" = "$imageSHAInSnapshot" ]; then echo $versionedName "image pullspec matches";else echo $versionedName" image pullspec does not match. This snapshot is not a good candidate for a release";fi
+fi
+done
 ```
 
-* Verify that the bundle and controller release label also matches. Run the following command to extract and compare the release label for the bundle and controller images.
+* Verify that the bundle release version matches for all the other compoments. Run the following command to extract and compare the release label for the bundle and controller images.
 ```console
 releaseLabelInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.release}}")
-releaseLabelInController=$(skopeo inspect docker://$controllerInSnapshot --format "{{.Labels.release}}")
-if [ -n "$controllerInBundle" ] && [ "$releaseLabelInBundle" = "$releaseLabelInController" ]; then echo "bundle and controller release label matches";else echo "bundle and controller release label does not match. This snapshot is not a good candidate for release";fi
+
+for genericName versionedName in ${(kv)components}; do
+if [[ "$versionedName" != "$operator_bundle" ]]; then
+echo Checking $genericName...
+imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+releaseLabelInComponent=$(skopeo inspect docker://$imagePullSpecInSnapshot --format "{{.Labels.release}}")
+if [ -n "$imagePullSpecInSnapshot" ] && [ "$releaseLabelInBundle" = "$releaseLabelInComponent" ]; then echo "bundle and $genericName release label matches";else echo "bundle and $genericName release label does not match. This snapshot is not a good candidate for release";fi
+fi
+done
 ```
 
 * Create a new Release manifest for staging
