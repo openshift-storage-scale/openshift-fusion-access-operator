@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-spectrum-scale
+    app.kubernetes.io/name: cluster
+  name: buildgpl
+  namespace: ibm-spectrum-scale
+data:
+  buildgpl: |
+    #!/bin/bash
+    echo ASD
+    exit 1
+  hostPathDirectories: |
+    /
