@@ -59,9 +59,7 @@ releaseVersion=$(echo $applicationName| sed  's/operator//g')
 
 Retrieve the names of the components that match the controller and bundle based on the prefixed compoment names as we know them `controller-rhel9-operator` and `operator-bundle`:
 ```console
-controller_rhel9_operator=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep controller-rhel9-operator)
 operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep bundle)
-echo "Controller compoment registered as $controller_rhel9_operator"
 echo "Bundle compoment registered as $operator_bundle"
 ```
 
@@ -81,7 +79,7 @@ Initiating a staging release requires both a successful build and subsequent int
 * Filter the latest snapshot. Keep in mind that we need to filter based on the bundle push event since that will most probably contain the nudged update from the controller. But first, let's capture the component names based on the application, since each release has it's own component name associated to it.
 
 
-Now we're ready to retrieve the snapshots and filter by those that were triggered by a nudge. The following commands sorts all the snapshots for the helm-operator application that were created as a result of a nudge, by timestamp in ascending order and displays the name, integration tests success status and the merge PR number and remote branch used in the commit.
+Now we're ready to retrieve the snapshots and filter by those that were triggered by a nudge. The following commands sorts all the snapshots for the operator application that were created as a result of a nudge, by timestamp in ascending order and displays the name, integration tests success status and the merge PR number and remote branch used in the commit.
 ```console
 oc get snapshots --sort-by .metadata.creationTimestamp \
 -l appstudio.openshift.io/component=$operator_bundle  \
@@ -109,34 +107,47 @@ Capture the snapshot in an environment variable:
 snapshot=operator-1-0-qd2pr
 ```
 
-* Ensure that the bundle's controller pullspec matches the one in the snapshot. The bundle's container image contains a label with the image pullspec of the controller used in the bundle. Use the following commands to extract the controller from the bundle of the snapshot `helm-operator-1-2-cf7qp`:
+* Ensure that the bundle's controller pullspec and release labels matches the ones in the snapshot. The bundle's container image contains a label with the image pullspec of the components used in the bundle. Use the following commands to validate the snapshot `operator-1-0-qd2pr`:
 ```console
 bundle=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$operator_bundle'")].containerImage}')
 
+unset errors
+declare -A errors
 for genericName versionedName in ${(kv)components}; do
-if [[ "$versionedName" != "$operator_bundle" ]]; then
-echo Checking $genericName...
-imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
-imageSHAInSnapshot=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInSnapshot")
-imagePullSpecInBundle=$(skopeo inspect docker://$bundle --format '{{ index .Labels "'$genericName'" }}')
-imageSHAInBundle=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInBundle")
-if [ -n "$imagePullSpecInSnapshot" ] && [ "$imageSHAInBundle" = "$imageSHAInSnapshot" ]; then echo $versionedName "image pullspec matches";else echo $versionedName" image pullspec does not match. This snapshot is not a good candidate for a release";fi
-fi
+  if [[ "$versionedName" == "$operator_bundle" ]]; then
+    continue
+  fi
+  print -n "Checking component $versionedName..."
+  print -n -a "\tImage digest: "
+  imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+  imageSHAInSnapshot=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInSnapshot")
+  imagePullSpecInBundle=$(skopeo inspect docker://$bundle --format '{{ index .Labels "'$genericName'" }}')
+  imageSHAInBundle=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInBundle")
+  if [ -n "$imagePullSpecInSnapshot" ] && [ "$imageSHAInBundle" = "$imageSHAInSnapshot" ]; then
+    print -n Match! 👍;
+  else
+    errors+="$versionedName has digest $imageSHAInBundle in bundle but in snapshot it is $imageSHAInSnapshot \n";
+    print -n Mismatch 👎;
+  fi
+  print -n -a "\tRelease version: "
+  imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+  releaseLabelInComponent=$(skopeo inspect docker://$imagePullSpecInSnapshot --format "{{.Labels.release}}")
+  if [ -n "$imagePullSpecInSnapshot" ] && [ "$releaseLabelInBundle" = "$releaseLabelInComponent" ]; then
+    print Match! 👍;
+  else
+    errors+="$versionedName has release $releaseLabelInBundle in bundle but in snapshot it is $releaseLabelInComponent \n";
+    print Mismatch 👎;
+  fi
 done
-```
-
-* Verify that the bundle release version matches for all the other compoments. Run the following command to extract and compare the release label for the bundle and controller images.
-```console
-releaseLabelInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.release}}")
-
-for genericName versionedName in ${(kv)components}; do
-if [[ "$versionedName" != "$operator_bundle" ]]; then
-echo Checking $genericName...
-imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
-releaseLabelInComponent=$(skopeo inspect docker://$imagePullSpecInSnapshot --format "{{.Labels.release}}")
-if [ -n "$imagePullSpecInSnapshot" ] && [ "$releaseLabelInBundle" = "$releaseLabelInComponent" ]; then echo "bundle and $genericName release label matches";else echo "bundle and $genericName release label does not match. This snapshot is not a good candidate for release";fi
+print "\n\n"
+if [[ ${#errors[@]} == 0 ]];then
+  print  🦄🦄🦄 snapshot $snapshot image pullspecs matches with bundle\'s labels. Launch is a GO! 🚀🚀🚀;
+else
+  print 🛑🛑🛑 This snapshot is not a good candidate for a release:
+  for error in ${(v)errors}; do
+    print -a $error
+  done
 fi
-done
 ```
 
 * Create a new Release manifest for staging
@@ -145,10 +156,10 @@ releaseName=$(bash -c "oc create -f - <<EOF
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  generateName: helm-operator-staging$releaseVersion-
+  generateName: operator-staging$releaseVersion-
   namespace: orchestrator-releng-tenant
 spec:
-  releasePlan: helm-operator-staging$releaseVersion
+  releasePlan: operator-staging$releaseVersion
   snapshot: $snapshot
 EOF" | awk '{print $1}')
 ```
