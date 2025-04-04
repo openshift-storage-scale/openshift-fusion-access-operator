@@ -110,6 +110,7 @@ snapshot=operator-1-0-qd2pr
 * Ensure that the bundle's controller pullspec and release labels matches the ones in the snapshot. The bundle's container image contains a label with the image pullspec of the components used in the bundle. Use the following commands to validate the snapshot `operator-1-0-qd2pr`:
 ```console
 bundle=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$operator_bundle'")].containerImage}')
+releaseLabelInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.release}}")
 
 unset errors
 declare -A errors
@@ -141,7 +142,7 @@ for genericName versionedName in ${(kv)components}; do
 done
 print "\n\n"
 if [[ ${#errors[@]} == 0 ]];then
-  print  🦄🦄🦄 snapshot $snapshot image pullspecs matches with bundle\'s labels. Launch is a GO! 🚀🚀🚀;
+  print  🦄🦄🦄 snapshot $snapshot image pullspecs and release versions match with bundle\'s labels. Launch is a GO! 🚀🚀🚀;
 else
   print 🛑🛑🛑 This snapshot is not a good candidate for a release:
   for error in ${(v)errors}; do
@@ -151,22 +152,37 @@ fi
 ```
 
 * Create a new Release manifest for staging
+
+Before triggering the release, we need to populate a few fields in the releaseNotes that are mandatory for passing the security advisory checks. For more information check [this page](https://konflux.pages.redhat.com/docs/users/releasing/releasing-with-an-advisory.html#release from the Konflux documentation, and this [knowledge page](https://access.redhat.com/webassets/avalon/j/includes/session/scribe/?redirectTo=https://access.redhat.com/articles/explaining_redhat_errata) that explains the types of erratas:
+| Field Name   | Description      |
+| ------------- | ------------- |
+| type | Advisory type: RHBA, RHEA or RHSA |
+| issues| list of issues fixed by this release |
+| cves | list of CVEs fixed in this release, broken down by component|
+| references | advisory references |
+
+
+The following example creates a Release for the advisory type RHEA, which translates to enhancement or new features and contains no CVEs or bugs fixed.
+
 ```console
 releaseName=$(bash -c "oc create -f - <<EOF
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
   generateName: operator-staging$releaseVersion-
-  namespace: orchestrator-releng-tenant
+  namespace: storage-scale-releng-tenant
 spec:
   releasePlan: operator-staging$releaseVersion
   snapshot: $snapshot
+  data:
+    releaseNotes:
+      type: RHEA
 EOF" | awk '{print $1}')
 ```
 
 * Wait for the release to be validated:
 ```console
-while [ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ];do sleep 5;done
+while [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ]];do sleep 5;done
 [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Failed" ]] && echo Release failed: $(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].message}') || echo "Release successful"
 ```
 
