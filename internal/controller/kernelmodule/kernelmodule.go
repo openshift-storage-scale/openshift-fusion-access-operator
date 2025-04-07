@@ -18,10 +18,12 @@ package kernelmodule
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,49 +31,66 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	// ServiceAccountName is the name of the service account that will be used for the DS to load the kernel module
 	// this will be the same as the operator service account for now
-	ServiceAccountName  = "storage-scale-operator-controller-manager"
-	ConfigMapName       = "kmm-dockerfile"
-	KMMModuleName       = "gpfs-module"
-	ImageRepoSecretName = "ibm-entitlement-key"
+	ServiceAccountName     = "storage-scale-operator-controller-manager"
+	ConfigMapName          = "kmm-dockerfile"
+	KMMModuleName          = "gpfs-module"
+	ImageRepoSecretName    = "ibm-entitlement-key"
+	IBMCNSANamespace       = "ibm-spectrum-scale"
+	MergedDockerSecretName = "kmm-build-secret"
 )
 
-// CreateOrUpdatePlugin creates or updates the resources needed for the remediation console plugin.
+// CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
 // HEADS UP: consider cleanup of old resources in case of name changes or removals!
 func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
-	if err := createOrUpdateConfigmap(ctx, cl); err != nil {
-		return err
-	}
-	if err := createOrUpdateKMMModule(ctx, cl); err != nil {
-		return err
-	}
-	// if err := makeImageSecrets(ctx, cl, "openshift-operators"); err != nil {
-	// 	return err
-	// }
-	return nil
-}
-
-func createOrUpdateConfigmap(ctx context.Context, cl client.Client) error {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
 		return err
 	}
-	cm := newConfigmap(ns)
+	dockerConfigmap := newDockerConfigmap(ns)
+
+	if err := createOrUpdateConfigmap(ctx, cl, dockerConfigmap); err != nil {
+		return err
+	}
+	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
+
+	kernelModule := NewKMMModule(ns, ibmScaleImage)
+
+	if err := createOrUpdateKMMModule(ctx, cl, kernelModule); err != nil {
+		return err
+	}
+
+	buildConfigmap := newBuildConfigmap(IBMCNSANamespace)
+
+	if err := createOrUpdateConfigmap(ctx, cl, buildConfigmap); err != nil {
+		return err
+	}
+
+	if secret, err := newImageSecrets(ctx, cl, ns); err != nil {
+		return err
+	} else {
+		if err := createOrUpdateSecret(ctx, cl, secret); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createOrUpdateConfigmap(ctx context.Context, cl client.Client, configmap *corev1.ConfigMap) error {
 	oldCM := &corev1.ConfigMap{}
-	if err := cl.Get(ctx, client.ObjectKeyFromObject(cm), oldCM); apierrors.IsNotFound(err) {
-		if err := cl.Create(ctx, cm); err != nil {
+	if err := cl.Get(ctx, client.ObjectKeyFromObject(configmap), oldCM); apierrors.IsNotFound(err) {
+		if err := cl.Create(ctx, configmap); err != nil {
 			return errors.Wrap(err, "could not create kmm configmap")
 		}
 	} else if err != nil {
 		return errors.Wrap(err, "could not check for existing kmm configmap")
 	} else {
-		oldCM.OwnerReferences = cm.OwnerReferences
-		oldCM.Data = cm.Data
+		oldCM.OwnerReferences = configmap.OwnerReferences
+		oldCM.Data = configmap.Data
 		if err := cl.Update(ctx, oldCM); err != nil {
 			return errors.Wrap(err, "could not update kmm configmap")
 		}
@@ -79,12 +98,25 @@ func createOrUpdateConfigmap(ctx context.Context, cl client.Client) error {
 	return nil
 }
 
-func createOrUpdateKMMModule(ctx context.Context, cl client.Client) error {
-	ns, err := utils.GetDeploymentNamespace()
-	if err != nil {
-		return err
+func createOrUpdateSecret(ctx context.Context, cl client.Client, secret *corev1.Secret) error {
+	oldSecret := &corev1.Secret{}
+	if err := cl.Get(ctx, client.ObjectKeyFromObject(secret), oldSecret); apierrors.IsNotFound(err) {
+		if err := cl.Create(ctx, secret); err != nil {
+			return errors.Wrap(err, "could not create secret")
+		}
+	} else if err != nil {
+		return errors.Wrap(err, "could not check for existing secret")
+	} else {
+		oldSecret.OwnerReferences = secret.OwnerReferences
+		oldSecret.Data = secret.Data
+		if err := cl.Update(ctx, oldSecret); err != nil {
+			return errors.Wrap(err, "could not update secret")
+		}
 	}
-	km := NewKMMModule(ns)
+	return nil
+}
+
+func createOrUpdateKMMModule(ctx context.Context, cl client.Client, km *kmmv1beta1.Module) error {
 	oldKM := &kmmv1beta1.Module{}
 	if err := cl.Get(ctx, client.ObjectKeyFromObject(km), oldKM); apierrors.IsNotFound(err) {
 		if err := cl.Create(ctx, km); err != nil {
@@ -102,7 +134,7 @@ func createOrUpdateKMMModule(ctx context.Context, cl client.Client) error {
 	return nil
 }
 
-func NewKMMModule(namespace string) *kmmv1beta1.Module {
+func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 	return &kmmv1beta1.Module{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      KMMModuleName,
@@ -123,16 +155,28 @@ func NewKMMModule(namespace string) *kmmv1beta1.Module {
 								DockerfileConfigMap: &corev1.LocalObjectReference{
 									Name: ConfigMapName,
 								},
-								KanikoParams: &kmmv1beta1.KanikoParams{},
+								BuildArgs: []kmmv1beta1.BuildArg{
+									kmmv1beta1.BuildArg{
+										Name:  "IBM_SCALE",
+										Value: ibmScaleImage,
+									},
+								},
 							},
+							// Sign: &kmmv1beta1.Sign{
+							// 	FilesToSign: []string{
+							// 		"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko",
+							// 	},
+							// 	KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
+							// 	CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
+							// },
 						},
 					},
 				},
 				ServiceAccountName: ServiceAccountName,
 			},
-			// ImageRepoSecret: &corev1.LocalObjectReference{
-			// 	Name: ImageRepoSecretName,
-			// },
+			ImageRepoSecret: &corev1.LocalObjectReference{
+				Name: MergedDockerSecretName,
+			},
 			Selector: map[string]string{
 				"kubernetes.io/arch": "amd64",
 			},
@@ -140,39 +184,62 @@ func NewKMMModule(namespace string) *kmmv1beta1.Module {
 	}
 }
 
-func makeImageSecrets(ctx context.Context, cl client.Client, namespace string) error {
-	ibm_secret := types.NamespacedName{
-		Namespace: namespace,
-		Name:      ImageRepoSecretName,
-	}
-	oldIBMSecret := &corev1.Secret{}
-	if err := cl.Get(ctx, ibm_secret, oldIBMSecret); apierrors.IsNotFound(err) {
-		return errors.Wrap(err, "secret not found, but it should exist at this point")
-	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing kernel module")
-	} else {
-		log.Log.Info(string(oldIBMSecret.Data[".dockerconfigjson"]))
-	}
-	dockerconfig := types.NamespacedName{
-		Namespace: namespace,
-		Name:      "builder-dockerconfig-*",
-	}
-	dockerConfigSecret := &corev1.Secret{}
-
-	// list := &corev1.Secret{}
-	// cl.List(ctx, list, &client.ListOptions{Namespace: namespace})
-
-	if err := cl.Get(ctx, dockerconfig, dockerConfigSecret); apierrors.IsNotFound(err) {
-		return errors.Wrap(err, "secret not found, but it should exist at this point")
-	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing kernel module")
-	} else {
-		log.Log.Info(string(dockerConfigSecret.Data[".dockercfg"]))
-	}
-	return nil
+type dockerConfigJson struct {
+	Auths map[string]map[string]string `json:"auths"`
 }
 
-func newConfigmap(namespace string) *corev1.ConfigMap {
+// newImageSecrets will fetch the ibm pull secret and the docker pull secret of the SA and return a merged secret (dockercofigjson)
+func newImageSecrets(ctx context.Context, cl client.Client, namespace string) (*corev1.Secret, error) {
+	serviceAccount := &corev1.ServiceAccount{}
+	cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ServiceAccountName}, serviceAccount)
+
+	internalPullSecret := &corev1.Secret{}
+	cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceAccount.Secrets[0].Name}, internalPullSecret)
+
+	ibmPullSecret := &corev1.Secret{}
+	cl.Get(ctx, types.NamespacedName{Namespace: IBMCNSANamespace, Name: ImageRepoSecretName}, ibmPullSecret)
+
+	mergedDockerCfg := dockerConfigJson{}
+	json.Unmarshal(ibmPullSecret.Data[".dockerconfigjson"], &mergedDockerCfg)
+
+	var objmap map[string]map[string]string
+	if err := json.Unmarshal([]byte(internalPullSecret.Data[".dockercfg"]), &objmap); err != nil {
+		return nil, err
+	}
+
+	for k, v := range objmap {
+		mergedDockerCfg.Auths[k] = v
+	}
+
+	raw, err := json.Marshal(mergedDockerCfg.Auths)
+	if err != nil {
+		return nil, err
+	}
+	secretData := map[string][]byte{
+		".dockerconfigjson": raw,
+	}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      MergedDockerSecretName,
+			Namespace: namespace,
+		},
+		Data: secretData,
+		Type: "kubernetes.io/dockerconfigjson",
+	}, nil
+}
+
+// getIBMCoreImage gets the core init image with the source code in them
+func getIBMCoreImage(ctx context.Context, cl client.Client) (string, error) {
+	cm := &corev1.ConfigMap{}
+	cl.Get(ctx, types.NamespacedName{Namespace: "ibm-spectrum-scale-operator", Name: "ibm-spectrum-scale-manager-config"}, cm)
+	var objmap map[string]interface{}
+	if err := yaml.Unmarshal([]byte(cm.Data["controller_manager_config.yaml"]), &objmap); err != nil {
+		return "", err
+	}
+	return objmap["images"].(map[string]interface{})["coreInit"].(string), nil
+}
+
+func newDockerConfigmap(namespace string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ConfigMapName,
@@ -193,6 +260,30 @@ func newConfigmap(namespace string) *corev1.ConfigMap {
 				COPY --from=builder /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
 				RUN microdnf install kmod -y && microdnf clean all
 				RUN depmod -b /opt`,
+		},
+	}
+}
+
+func newBuildConfigmap(namespace string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "buildgpl",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/instance": "ibm-spectrum-scale",
+				"app.kubernetes.io/name":     "cluster",
+			},
+		},
+		Data: map[string]string{
+			"buildgpl": `
+				#!/bin/bash
+				kerv=$(uname -r)
+				touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+				mkdir -p /lib/modules/$kerv/extra
+				echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
+				exit 0`,
+			"hostPathDirectories": `
+				/`,
 		},
 	}
 }
