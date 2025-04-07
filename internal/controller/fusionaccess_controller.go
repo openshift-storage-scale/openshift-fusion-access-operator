@@ -399,6 +399,14 @@ func (r *FusionAccessReconciler) Reconcile(
 	}
 	log.Log.Info("Successfully enabled console plugin")
 
+	log.Log.Info("Creating kernel module resources")
+
+	if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	log.Log.Info("Successfully created kernel module resources")
+
 	if fusionaccess.Spec.LocalVolumeDiscovery.Create {
 		// Create Device discovery
 

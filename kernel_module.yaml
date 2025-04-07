@@ -11,7 +11,7 @@ metadata:
   namespace: gpfs-kernel-module
 data:
   dockerfile: |
-      ARG IBM_SCALE=quay.io/rhsysdeseng/cp/spectrum/scale/ibm-spectrum-scale-core-init@sha256:fde69d67fddd2e4e0b7d7d85387a221359daf332d135c9b9f239fb31b9b82fe0
+      ARG IBM_SCALE=quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:5.2.3.0.rc1
       ARG DTK_AUTO=quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:01e0e07cc6c41638f8e9022fb9aa36a7984efcde2166d8158fb59a6c9f7dbbdf
       ARG KERNEL_FULL_VERSION
       FROM ${IBM_SCALE} as src_image
@@ -42,13 +42,13 @@ spec:
           build:
             dockerfileConfigMap:
               name: kmm-ci-dockerfile
-          sign:
-            keySecret:
-              name: my-signing-key
-            certSecret:
-              name: my-signing-key-pub
-            filesToSign:
-              - /opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko
+          # sign:
+          #   keySecret:
+          #     name: my-signing-key
+          #   certSecret:
+          #     name: my-signing-key-pub
+          #   filesToSign:
+          #     - /opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko
   selector: # top-level selector
     kubernetes.io/arch: amd64
 ---

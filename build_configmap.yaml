@@ -9,7 +9,8 @@ metadata:
 data:
   buildgpl: |
     #!/bin/bash
-    echo ASD
-    exit 1
+    kerv=$(uname -r)
+    touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+    exit 0
   hostPathDirectories: |
     /
