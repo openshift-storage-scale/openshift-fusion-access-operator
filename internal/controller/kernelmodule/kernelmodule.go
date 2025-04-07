@@ -37,7 +37,7 @@ const (
 	// this will be the same as the operator service account for now
 	ServiceAccountName  = "storage-scale-operator-controller-manager"
 	ConfigMapName       = "kmm-dockerfile"
-	KMMModuleName       = "gpfs-compat-module"
+	KMMModuleName       = "gpfs-module"
 	ImageRepoSecretName = "ibm-entitlement-key"
 )
 
@@ -50,9 +50,9 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err := createOrUpdateKMMModule(ctx, cl); err != nil {
 		return err
 	}
-	if err := makeImageSecrets(ctx, cl, "openshift-operators"); err != nil {
-		return err
-	}
+	// if err := makeImageSecrets(ctx, cl, "openshift-operators"); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
