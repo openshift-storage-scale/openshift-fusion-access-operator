@@ -52,6 +52,7 @@ var _ = Describe("FusionAccess Controller", func() {
 		clusterConsole    = &operatorv1.Console{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
 		testTimeout       = 5 * time.Second
 	)
+
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -68,7 +69,7 @@ var _ = Describe("FusionAccess Controller", func() {
 			os.Setenv("DEPLOYMENT_NAMESPACE", "ibm-fusion-access-operator")
 			fakeClientBuilder = fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithRuntimeObjects(version, namespace, clusterConsole).
+				WithRuntimeObjects(version, namespace, clusterConsole, clusterPullSecret).
 				WithStatusSubresource(&fusionv1alpha.FusionAccess{})
 
 		})

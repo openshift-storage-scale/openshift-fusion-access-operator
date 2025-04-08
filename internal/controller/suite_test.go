@@ -27,6 +27,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	consolev1 "github.com/openshift/api/console/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -100,6 +101,7 @@ func createFakeScheme() *kruntime.Scheme {
 		configv1.AddToScheme,
 		consolev1.AddToScheme,
 		operatorv1.AddToScheme,
+		kmmv1beta1.AddToScheme,
 	)
 	Expect(builder.AddToScheme(s)).To(Succeed())
 	return s
