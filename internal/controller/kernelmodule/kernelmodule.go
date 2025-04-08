@@ -46,7 +46,7 @@ const (
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
 // HEADS UP: consider cleanup of old resources in case of name changes or removals!
-func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
+func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecret string) error {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return err
 	}
 
-	if secret, err := newImageSecrets(ctx, cl, ns); err != nil {
+	if secret, err := patchGlobalPullSecret(ctx, cl, ns, pullSecret); err != nil {
 		return err
 	} else {
 		if err := createOrUpdateSecret(ctx, cl, secret); err != nil {
@@ -174,9 +174,9 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 				},
 				ServiceAccountName: ServiceAccountName,
 			},
-			ImageRepoSecret: &corev1.LocalObjectReference{
-				Name: MergedDockerSecretName,
-			},
+			// ImageRepoSecret: &corev1.LocalObjectReference{
+			// 	Name: MergedDockerSecretName,
+			// },
 			Selector: map[string]string{
 				"kubernetes.io/arch": "amd64",
 			},
@@ -184,44 +184,39 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 	}
 }
 
-type dockerConfigJson struct {
-	Auths map[string]map[string]string `json:"auths"`
-}
-
-// newImageSecrets will fetch the ibm pull secret and the docker pull secret of the SA and return a merged secret (dockercofigjson)
-func newImageSecrets(ctx context.Context, cl client.Client, namespace string) (*corev1.Secret, error) {
-	serviceAccount := &corev1.ServiceAccount{}
-	cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ServiceAccountName}, serviceAccount)
-
-	internalPullSecret := &corev1.Secret{}
-	cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceAccount.Secrets[0].Name}, internalPullSecret)
-
-	ibmPullSecret := &corev1.Secret{}
-	cl.Get(ctx, types.NamespacedName{Namespace: IBMCNSANamespace, Name: ImageRepoSecretName}, ibmPullSecret)
-
-	mergedDockerCfg := dockerConfigJson{}
-	json.Unmarshal(ibmPullSecret.Data[".dockerconfigjson"], &mergedDockerCfg)
-
-	var objmap map[string]map[string]string
-	if err := json.Unmarshal([]byte(internalPullSecret.Data[".dockercfg"]), &objmap); err != nil {
+// patchGlobalPullSecret will patch the global pull secret with the ibm pull secrets
+func patchGlobalPullSecret(ctx context.Context, cl client.Client, namespace string, pullsecret string) (*corev1.Secret, error) {
+	var secrets map[string]map[string]map[string]string
+	if err := json.Unmarshal([]byte(pullsecret), &secrets); err != nil {
 		return nil, err
 	}
 
-	for k, v := range objmap {
-		mergedDockerCfg.Auths[k] = v
+	globalPullSecret := &corev1.Secret{}
+
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: "openshift-config", Name: "pull-secret"}, globalPullSecret); err != nil {
+		return nil, err
 	}
 
-	raw, err := json.Marshal(mergedDockerCfg.Auths)
+	var dockerConfigJSON map[string]map[string]map[string]string
+	if err := json.Unmarshal([]byte(globalPullSecret.Data[".dockerconfigjson"]), &dockerConfigJSON); err != nil {
+		return nil, err
+	}
+
+	for k, v := range secrets["auths"] {
+		dockerConfigJSON["auths"][k] = v
+	}
+
+	rawDockerConfigJSON, err := json.Marshal(dockerConfigJSON)
 	if err != nil {
 		return nil, err
 	}
 	secretData := map[string][]byte{
-		".dockerconfigjson": raw,
+		".dockerconfigjson": rawDockerConfigJSON,
 	}
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      MergedDockerSecretName,
-			Namespace: namespace,
+			Name:      "pull-secret",
+			Namespace: "openshift-config",
 		},
 		Data: secretData,
 		Type: "kubernetes.io/dockerconfigjson",
