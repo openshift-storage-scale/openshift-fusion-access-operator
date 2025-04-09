@@ -272,7 +272,6 @@ if ! lsmod | grep -q "^mmfslinux"; then echo "Kernel module is not loaded"; exit
 mkdir -p /lib/modules/$kerv/extra
 echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
 echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
-sed -i 's/^myopt=""/myopt="SKIP_UNLOADING_THE_MODULE"/' /usr/lpp/mmfs/bin/mmfsenv
 
 exit 0
 `
