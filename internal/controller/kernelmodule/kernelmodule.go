@@ -36,7 +36,7 @@ import (
 const (
 	// ServiceAccountName is the name of the service account that will be used for the DS to load the kernel module
 	// this will be the same as the operator service account for now
-	ServiceAccountName     = "storage-scale-operator-controller-manager"
+	ServiceAccountName     = "fusion-access-operator-controller-manager"
 	ConfigMapName          = "kmm-dockerfile"
 	KMMModuleName          = "gpfs-module"
 	ImageRepoSecretName    = "ibm-entitlement-key"
@@ -263,6 +263,7 @@ func newBuildConfigmap(namespace string) *corev1.ConfigMap {
 	buildGplValue := `#!/bin/sh
 kerv=$(uname -r)
 touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+if ! lsmod | grep -q "^mmfslinux"; then echo "Kernel module is not loaded"; exit 1; fi
 mkdir -p /lib/modules/$kerv/extra
 echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
 exit 0
