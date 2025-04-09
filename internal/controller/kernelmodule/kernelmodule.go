@@ -146,6 +146,11 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					Modprobe: kmmv1beta1.ModprobeSpec{
 						ModuleName: "mmfslinux",
+						ModulesLoadingOrder: []string{
+							"mmfslinux",
+							"mmfs26",
+							"tracedev",
+						},
 					},
 					KernelMappings: []kmmv1beta1.KernelMapping{
 						kmmv1beta1.KernelMapping{
@@ -267,6 +272,7 @@ touch /usr/lpp/mmfs/bin/lxtrace-$kerv
 if ! lsmod | grep -q "^mmfslinux"; then echo "Kernel module is not loaded"; exit 1; fi
 mkdir -p /lib/modules/$kerv/extra
 echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
+echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
 exit 0
 `
 	hostPathValue := `/
