@@ -260,6 +260,16 @@ func newDockerConfigmap(namespace string) *corev1.ConfigMap {
 }
 
 func newBuildConfigmap(namespace string) *corev1.ConfigMap {
+	buildGplValue := `#!/bin/sh
+kerv=$(uname -r)
+touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+mkdir -p /lib/modules/$kerv/extra
+echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
+exit 0
+`
+	hostPathValue := `/
+`
+
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "buildgpl",
@@ -270,15 +280,8 @@ func newBuildConfigmap(namespace string) *corev1.ConfigMap {
 			},
 		},
 		Data: map[string]string{
-			"buildgpl": `
-				#!/bin/bash
-				kerv=$(uname -r)
-				touch /usr/lpp/mmfs/bin/lxtrace-$kerv
-				mkdir -p /lib/modules/$kerv/extra
-				echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
-				exit 0`,
-			"hostPathDirectories": `
-				/`,
+			"buildgpl":            buildGplValue,
+			"hostPathDirectories": hostPathValue,
 		},
 	}
 }
