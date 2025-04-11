@@ -25,6 +25,14 @@ import (
 // +kubebuilder:validation:Enum=v5.2.1.1;v5.2.2.0;v5.2.2.1;v5.2.3.0.rc1
 type CNSAVersions string
 
+type ExternalImagePullStatus int
+
+const (
+	CheckNotRun ExternalImagePullStatus = iota
+	CheckSuccess
+	CheckFailed
+)
+
 // FusionAccessSpec defines the desired state of FusionAccess
 type FusionAccessSpec struct {
 	// MachineConfig labeling for the installation of kernel-devel package
@@ -80,6 +88,10 @@ type FusionAccessStatus struct {
 	// observedGeneration is the last generation change the operator has dealt with
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// Show the status of pulling an external test image
+	ExternalImagePullStatus ExternalImagePullStatus `json:"externalImagePullStatus,omitempty"`
+	// Show the error in case of failure of pulling external image
+	ExternalImagePullError string `json:"externalImagePullError,omitempty"`
 }
 
 //+kubebuilder:object:root=true

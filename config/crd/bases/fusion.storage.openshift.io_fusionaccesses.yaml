@@ -127,6 +127,13 @@ spec:
                   - type
                   type: object
                 type: array
+              externalImagePullError:
+                description: Show the error in case of failure of pulling external
+                  image
+                type: string
+              externalImagePullStatus:
+                description: Show the status of pulling an external test image
+                type: integer
               observedGeneration:
                 description: observedGeneration is the last generation change the
                   operator has dealt with

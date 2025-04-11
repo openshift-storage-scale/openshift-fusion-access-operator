@@ -147,11 +147,7 @@ func main() {
 		setupLog.Error(err, "unable to create LocalVolumeDiscovery controller")
 		os.Exit(1)
 	}
-
-	if err = (&controller.FusionAccessReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = (controller.NewFusionAccessReconciler(mgr.GetClient(), mgr.GetScheme())).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FusionAccess")
 		os.Exit(1)
 	}

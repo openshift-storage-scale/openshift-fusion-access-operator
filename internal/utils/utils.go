@@ -17,12 +17,27 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path"
 	"strings"
+	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/Masterminds/semver/v3"
 	configv1 "github.com/openshift/api/config/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	CheckPodMaxImagePullTimeout = 180 * time.Second
+	CheckPodPullInterval        = 2 * time.Second
+	CheckPodName                = "image-check-fusion-access"
+	CheckPodContainerName       = "check"
 )
 
 // Taken from https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=planning-software-requirements
@@ -129,4 +144,183 @@ func GetDeploymentNamespace() (string, error) {
 		return "", fmt.Errorf("%s must be set", deployNamespaceEnvVar)
 	}
 	return ns, nil
+}
+
+type ConfigMap struct {
+	Kind     string            `yaml:"kind"`
+	Metadata map[string]any    `yaml:"metadata"`
+	Data     map[string]string `yaml:"data"`
+}
+
+type ControllerManagerConfig struct {
+	Images map[string]string `yaml:"images"`
+}
+
+// ParseYAMLAndExtractCoreInit takes multi-doc YAML and returns coreInit value
+func ParseYAMLAndExtractTestImage(yamlContent string) (string, error) {
+	decoder := yaml.NewDecoder(strings.NewReader(yamlContent))
+	for {
+		var node yaml.Node
+		if err := decoder.Decode(&node); err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return "", fmt.Errorf("failed to decode YAML: %w", err)
+		}
+		var kindNode struct {
+			Kind     string `yaml:"kind"`
+			Metadata struct {
+				Name string `yaml:"name"`
+			} `yaml:"metadata"`
+		}
+		if err := node.Decode(&kindNode); err != nil {
+			continue // not a valid K8s resource, skip
+		}
+		if kindNode.Kind == "ConfigMap" && kindNode.Metadata.Name == "ibm-spectrum-scale-manager-config" {
+			var cm ConfigMap
+			if err := node.Decode(&cm); err != nil {
+				return "", fmt.Errorf("failed to decode ConfigMap: %w", err)
+			}
+
+			embeddedYAML, ok := cm.Data["controller_manager_config.yaml"]
+			if !ok {
+				return "", fmt.Errorf("controller_manager_config.yaml not found in ConfigMap")
+			}
+
+			var config ControllerManagerConfig
+			if err := yaml.Unmarshal([]byte(embeddedYAML), &config); err != nil {
+				return "", fmt.Errorf("failed to parse embedded YAML: %w", err)
+			}
+
+			coreInit, ok := config.Images["coreInit"]
+			if !ok {
+				return "", fmt.Errorf("coreInit not found in images")
+			}
+
+			return coreInit, nil
+		}
+	}
+
+	return "", fmt.Errorf("ConfigMap object in install yaml not found")
+}
+
+// GetExternalTestImage returns the image to be used for testing external image pull.
+// FIXME(bandini): For now this is hardcoded, we should make sure this is
+func GetExternalTestImage(cnsaVersion string) (string, error) {
+	manifestFile, err := GetInstallPath(cnsaVersion)
+	if err != nil {
+		return "", err
+	}
+	manifest, err := os.ReadFile(manifestFile)
+	if err != nil {
+		return "", err
+	}
+
+	image, err := ParseYAMLAndExtractTestImage(string(manifest))
+	if err != nil {
+		return "", err
+	}
+	return image, nil
+}
+
+// CreateImageCheckPod creates a pod with the specified image and returns its name.
+func CreateImageCheckPod(ctx context.Context, client kubernetes.Interface, namespace, image string) (string, error) {
+	existingPod, err := client.CoreV1().Pods(namespace).Get(ctx, CheckPodName, metav1.GetOptions{})
+	if err == nil {
+		return existingPod.Name, nil // Pod already exists
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CheckPodName,
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    CheckPodContainerName,
+					Image:   image,
+					Command: []string{"/bin/sh", "-c", "exit", "0"},
+				},
+			},
+		},
+	}
+
+	createdPod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	return createdPod.Name, nil
+}
+
+// PollPodPullStatus checks if a pod successfully pulled its image or hit an error.
+func PollPodPullStatus(ctx context.Context, client kubernetes.Interface, namespace, podName string) (bool, error) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return false, fmt.Errorf("timeout while checking image pull status")
+		case <-ticker.C:
+			pod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to get pod: %w", err)
+			}
+
+			if len(pod.Status.ContainerStatuses) == 0 {
+				continue
+			}
+
+			state := pod.Status.ContainerStatuses[0].State
+			if state.Waiting != nil {
+				switch state.Waiting.Reason {
+				case "ErrImagePull", "ImagePullBackOff":
+					return false, fmt.Errorf("image pull failed: %s", state.Waiting.Message)
+				}
+			} else if state.Running != nil || state.Terminated != nil {
+				return true, nil
+			}
+		}
+	}
+}
+
+var createPodFunc = CreateImageCheckPod
+var pollStatusFunc = PollPodPullStatus
+
+// CanPullImage is a wrapper combining both steps.
+func CanPullImage(ctx context.Context, client kubernetes.Interface, namespace, image string) (bool, error) {
+	podName, err := createPodFunc(ctx, client, namespace, image)
+	if err != nil {
+		return false, err
+	}
+
+	// Ensure cleanup
+	defer func() {
+		_ = client.CoreV1().Pods(namespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+	}()
+
+	return pollStatusFunc(ctx, client, namespace, podName)
+}
+
+func GetInstallPath(cnsaVersion string) (string, error) {
+	// Install path when running tests
+	var err error
+	install_path := path.Join("../../files/", cnsaVersion, "install.yaml")
+	if _, err := os.Stat(install_path); err == nil {
+		return install_path, nil
+	}
+	// Install path when running locally
+	install_path = path.Join("files/", cnsaVersion, "install.yaml")
+	if _, err := os.Stat(install_path); err == nil {
+		return install_path, nil
+	}
+	// Install path when running in container
+	install_path = path.Join("/files/", cnsaVersion, "install.yaml")
+	if _, err := os.Stat(install_path); err == nil {
+		return install_path, nil
+	}
+
+	return "", fmt.Errorf("could not find/open install file with version %s: %w", cnsaVersion, err)
 }

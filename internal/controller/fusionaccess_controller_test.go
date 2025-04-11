@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,11 +27,14 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	kubeclient "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -49,11 +53,13 @@ var _ = Describe("FusionAccess Controller", func() {
 		namespace         = newNamespace("openshift-fusion-access-operator")
 		version           = newOCPVersion(oscinitVersion)
 		clusterConsole    = &operatorv1.Console{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+		testTimeout       = 5 * time.Second
 	)
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+		defer cancel()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
@@ -107,15 +113,54 @@ var _ = Describe("FusionAccess Controller", func() {
 				Client:     k8sClient,
 				Scheme:     k8sClient.Scheme(),
 				fullClient: kubeclient.NewSimpleClientset(),
-				// dynamicClient: k8sClient,
+				CanPullImage: func(ctx context.Context, client kubernetes.Interface, ns, image string) (bool, error) {
+					return true, nil
+				},
 			}
 
 			_, err := FusionAccessReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
+			Expect(err).ToNot(HaveOccurred())
+			updated := &fusionv1alpha.FusionAccess{}
+			err = k8sClient.Get(ctx, typeNamespacedName, updated)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(err).To(Not(HaveOccurred()))
-
+			Expect(updated.Status.ExternalImagePullError).To(BeEmpty())
+			Expect(updated.Status.ExternalImagePullStatus).To(Equal(fusionv1alpha.CheckSuccess))
 		})
+	})
+})
+
+var _ = Describe("FusionAccessReconciler Setup", func() {
+	var (
+		k8sMgr     manager.Manager
+		reconciler *FusionAccessReconciler
+		scheme     = createFakeScheme()
+	)
+
+	BeforeEach(func(ctx context.Context) {
+		var err error
+
+		scheme = createFakeScheme()
+		_ = clientgoscheme.AddToScheme(scheme)
+		_ = fusionv1alpha.AddToScheme(scheme)
+
+		k8sMgr, err = manager.New(cfg, manager.Options{
+			Scheme: scheme,
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should initialize the reconciler without errors", func() {
+		reconciler = &FusionAccessReconciler{}
+
+		err := reconciler.SetupWithManager(k8sMgr)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(reconciler.config).ToNot(BeNil())
+		Expect(reconciler.dynamicClient).ToNot(BeNil())
+		Expect(reconciler.fullClient).ToNot(BeNil())
 	})
 })
 
@@ -134,3 +179,6 @@ func newOCPVersion(version string) *configv1.ClusterVersion {
 		},
 	}
 }
+
+var _ = Describe("FusionAccessReconciler Setup", func() {
+})
