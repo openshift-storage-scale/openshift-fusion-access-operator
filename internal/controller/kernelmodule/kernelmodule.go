@@ -36,12 +36,10 @@ import (
 const (
 	// ServiceAccountName is the name of the service account that will be used for the DS to load the kernel module
 	// this will be the same as the operator service account for now
-	ServiceAccountName     = "fusion-access-operator-controller-manager"
-	ConfigMapName          = "kmm-dockerfile"
-	KMMModuleName          = "gpfs-module"
-	ImageRepoSecretName    = "ibm-entitlement-key"
-	IBMCNSANamespace       = "ibm-spectrum-scale"
-	MergedDockerSecretName = "kmm-build-secret"
+	ServiceAccountName = "fusion-access-operator-controller-manager"
+	ConfigMapName      = "kmm-dockerfile"
+	KMMModuleName      = "gpfs-module"
+	IBMCNSANamespace   = "ibm-spectrum-scale"
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -57,7 +55,9 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		return err
 	}
 	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
-
+	if err != nil {
+		return err
+	}
 	kernelModule := NewKMMModule(ns, ibmScaleImage)
 
 	if err := createOrUpdateKMMModule(ctx, cl, kernelModule); err != nil {
@@ -70,7 +70,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		return err
 	}
 
-	if secret, err := patchGlobalPullSecret(ctx, cl, ns, pullSecret); err != nil {
+	if secret, err := getPatchedGlobalPullSecret(ctx, cl, pullSecret); err != nil {
 		return err
 	} else {
 		if err := createOrUpdateSecret(ctx, cl, secret); err != nil {
@@ -152,36 +152,32 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 							"tracedev",
 						},
 					},
-					KernelMappings: []kmmv1beta1.KernelMapping{
-						kmmv1beta1.KernelMapping{
-							Regexp:         "^.*\\.x86_64$",
-							ContainerImage: fmt.Sprintf("image-registry.openshift-image-registry.svc:5000/%s/gpfs_compat_kmod:${KERNEL_FULL_VERSION}", namespace),
-							Build: &kmmv1beta1.Build{
-								DockerfileConfigMap: &corev1.LocalObjectReference{
-									Name: ConfigMapName,
-								},
-								BuildArgs: []kmmv1beta1.BuildArg{
-									kmmv1beta1.BuildArg{
-										Name:  "IBM_SCALE",
-										Value: ibmScaleImage,
-									},
+					KernelMappings: []kmmv1beta1.KernelMapping{{
+						Regexp:         "^.*\\.x86_64$",
+						ContainerImage: fmt.Sprintf("image-registry.openshift-image-registry.svc:5000/%s/gpfs_compat_kmod:${KERNEL_FULL_VERSION}", namespace),
+						Build: &kmmv1beta1.Build{
+							DockerfileConfigMap: &corev1.LocalObjectReference{
+								Name: ConfigMapName,
+							},
+							BuildArgs: []kmmv1beta1.BuildArg{
+								{
+									Name:  "IBM_SCALE",
+									Value: ibmScaleImage,
 								},
 							},
-							// Sign: &kmmv1beta1.Sign{
-							// 	FilesToSign: []string{
-							// 		"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko",
-							// 	},
-							// 	KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
-							// 	CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
-							// },
 						},
+						// Sign: &kmmv1beta1.Sign{
+						// 	FilesToSign: []string{
+						// 		"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko",
+						// 	},
+						// 	KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
+						// 	CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
+						// },
+					},
 					},
 				},
 				ServiceAccountName: ServiceAccountName,
 			},
-			// ImageRepoSecret: &corev1.LocalObjectReference{
-			// 	Name: MergedDockerSecretName,
-			// },
 			Selector: map[string]string{
 				"kubernetes.io/arch": "amd64",
 			},
@@ -189,8 +185,8 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 	}
 }
 
-// patchGlobalPullSecret will patch the global pull secret with the ibm pull secrets
-func patchGlobalPullSecret(ctx context.Context, cl client.Client, namespace string, pullsecret string) (*corev1.Secret, error) {
+// getPatchedGlobalPullSecret will return the patched global pull secret with the ibm pull secrets
+func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, pullsecret string) (*corev1.Secret, error) {
 	var secrets map[string]map[string]map[string]string
 	if err := json.Unmarshal([]byte(pullsecret), &secrets); err != nil {
 		return nil, err
@@ -203,7 +199,7 @@ func patchGlobalPullSecret(ctx context.Context, cl client.Client, namespace stri
 	}
 
 	var dockerConfigJSON map[string]map[string]map[string]string
-	if err := json.Unmarshal([]byte(globalPullSecret.Data[".dockerconfigjson"]), &dockerConfigJSON); err != nil {
+	if err := json.Unmarshal(globalPullSecret.Data[".dockerconfigjson"], &dockerConfigJSON); err != nil {
 		return nil, err
 	}
 
@@ -231,12 +227,15 @@ func patchGlobalPullSecret(ctx context.Context, cl client.Client, namespace stri
 // getIBMCoreImage gets the core init image with the source code in them
 func getIBMCoreImage(ctx context.Context, cl client.Client) (string, error) {
 	cm := &corev1.ConfigMap{}
-	cl.Get(ctx, types.NamespacedName{Namespace: "ibm-spectrum-scale-operator", Name: "ibm-spectrum-scale-manager-config"}, cm)
-	var objmap map[string]interface{}
+	err := cl.Get(ctx, types.NamespacedName{Namespace: "ibm-spectrum-scale-operator", Name: "ibm-spectrum-scale-manager-config"}, cm)
+	if err != nil {
+		return "", err
+	}
+	var objmap map[string]any
 	if err := yaml.Unmarshal([]byte(cm.Data["controller_manager_config.yaml"]), &objmap); err != nil {
 		return "", err
 	}
-	return objmap["images"].(map[string]interface{})["coreInit"].(string), nil
+	return objmap["images"].(map[string]any)["coreInit"].(string), nil
 }
 
 func newDockerConfigmap(namespace string) *corev1.ConfigMap {
