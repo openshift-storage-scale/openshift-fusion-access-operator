@@ -244,14 +244,16 @@ ARG DTK_AUTO=quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:01e0e07cc6c41
 ARG KERNEL_FULL_VERSION
 FROM ${IBM_SCALE} as src_image
 FROM ${DTK_AUTO} as builder
+ARG KERNEL_FULL_VERSION
 COPY --from=src_image /usr/lpp/mmfs /usr/lpp/mmfs
 RUN /usr/lpp/mmfs/bin/mmbuildgpl
+RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
+RUN cp -avf /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
+RUN depmod -b /opt
 FROM registry.redhat.io/ubi9/ubi-minimal
 ARG KERNEL_FULL_VERSION
-RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}
-COPY --from=builder /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
-RUN microdnf install kmod -y && microdnf clean all
-RUN depmod -b /opt`
+RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
+COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/extra`
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
