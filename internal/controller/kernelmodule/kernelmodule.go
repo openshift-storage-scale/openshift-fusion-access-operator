@@ -247,13 +247,14 @@ FROM ${DTK_AUTO} as builder
 ARG KERNEL_FULL_VERSION
 COPY --from=src_image /usr/lpp/mmfs /usr/lpp/mmfs
 RUN /usr/lpp/mmfs/bin/mmbuildgpl
-RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
-RUN cp -avf /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
+RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/
+RUN cp -avf /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
 RUN depmod -b /opt
 FROM registry.redhat.io/ubi9/ubi-minimal
 ARG KERNEL_FULL_VERSION
-RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/extra
-COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/extra`
+RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/
+COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
+COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/modules* /opt/lib/modules/${KERNEL_FULL_VERSION}/`
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

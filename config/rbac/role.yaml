@@ -274,6 +274,18 @@ rules:
   - patch
   - update
 - apiGroups:
+  - kmm.sigs.x-k8s.io
+  resources:
+  - modules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - machineconfiguration.openshift.io
   resources:
   - machineconfigpools
