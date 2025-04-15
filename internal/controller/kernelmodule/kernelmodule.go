@@ -21,13 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
-	"github.com/pkg/errors"
+
 	"gopkg.in/yaml.v3"
 
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,7 +51,10 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 	}
 	dockerConfigmap := newDockerConfigmap(ns)
 
-	if err := createOrUpdateConfigmap(ctx, cl, dockerConfigmap); err != nil {
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, dockerConfigmap, func(existing, desired *corev1.ConfigMap) error {
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
 		return err
 	}
 	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
@@ -60,77 +63,35 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 	}
 	kernelModule := NewKMMModule(ns, ibmScaleImage)
 
-	if err := createOrUpdateKMMModule(ctx, cl, kernelModule); err != nil {
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return err
 	}
 
 	buildConfigmap := newBuildConfigmap(IBMCNSANamespace)
 
-	if err := createOrUpdateConfigmap(ctx, cl, buildConfigmap); err != nil {
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, buildConfigmap, func(existing, desired *corev1.ConfigMap) error {
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
 		return err
 	}
 
 	if secret, err := getPatchedGlobalPullSecret(ctx, cl, pullSecret); err != nil {
 		return err
 	} else {
-		if err := createOrUpdateSecret(ctx, cl, secret); err != nil {
+		if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
+			existing.Type = desired.Type
+			existing.Data = desired.Data
+			return nil
+		}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func createOrUpdateConfigmap(ctx context.Context, cl client.Client, configmap *corev1.ConfigMap) error {
-	oldCM := &corev1.ConfigMap{}
-	if err := cl.Get(ctx, client.ObjectKeyFromObject(configmap), oldCM); apierrors.IsNotFound(err) {
-		if err := cl.Create(ctx, configmap); err != nil {
-			return errors.Wrap(err, "could not create kmm configmap")
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing kmm configmap")
-	} else {
-		oldCM.OwnerReferences = configmap.OwnerReferences
-		oldCM.Data = configmap.Data
-		if err := cl.Update(ctx, oldCM); err != nil {
-			return errors.Wrap(err, "could not update kmm configmap")
-		}
-	}
-	return nil
-}
-
-func createOrUpdateSecret(ctx context.Context, cl client.Client, secret *corev1.Secret) error {
-	oldSecret := &corev1.Secret{}
-	if err := cl.Get(ctx, client.ObjectKeyFromObject(secret), oldSecret); apierrors.IsNotFound(err) {
-		if err := cl.Create(ctx, secret); err != nil {
-			return errors.Wrap(err, "could not create secret")
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing secret")
-	} else {
-		oldSecret.OwnerReferences = secret.OwnerReferences
-		oldSecret.Data = secret.Data
-		if err := cl.Update(ctx, oldSecret); err != nil {
-			return errors.Wrap(err, "could not update secret")
-		}
-	}
-	return nil
-}
-
-func createOrUpdateKMMModule(ctx context.Context, cl client.Client, km *kmmv1beta1.Module) error {
-	oldKM := &kmmv1beta1.Module{}
-	if err := cl.Get(ctx, client.ObjectKeyFromObject(km), oldKM); apierrors.IsNotFound(err) {
-		if err := cl.Create(ctx, km); err != nil {
-			return errors.Wrap(err, "could not create kernel module")
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing kernel module")
-	} else {
-		oldKM.OwnerReferences = km.OwnerReferences
-		oldKM.Spec = km.Spec
-		if err := cl.Update(ctx, oldKM); err != nil {
-			return errors.Wrap(err, "could not update kernel module")
-		}
-	}
+func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
+	existing.Spec = desired.Spec
 	return nil
 }
 
