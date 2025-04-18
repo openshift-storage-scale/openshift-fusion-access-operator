@@ -23,7 +23,7 @@ This document is aimed for those who need to release a new version of the Orches
 For further reading on Konflux, visit their [documentation website](https://konflux-ci.dev/docs/releasing/) to get acquainted with it and understand the release process as described in it.
 
 ## Prerequisites:
-To be able to release the operator, you will need first to have access to the orchestrator-releng workspace in konflux via the [Red Hat Console](https://console.redhat.com/application-pipeline/workspaces/orchestrator-releng/applications). If you don't, please reach out to @jordigilh, @masayag, @rgolangh or @pkliczewski to request access. You'll also need to be able to create PRs to the [operator](https://github.com/openshift-storage-scale/openshift-storage-scale-operator) and [fbc](https://github.com/openshift-storage-scale/openshift-storage-scale-fbc) repositories.
+To be able to release the operator, you will need first to have access to the orchestrator-releng workspace in konflux via the [Red Hat Console](https://console.redhat.com/application-pipeline/workspaces/storage-scale-releng/applications). If you don't, please reach out to @jordigilh, @mbaldessari or @darkdoc to request access. You'll also need to be able to create PRs to the [operator](https://github.com/openshift-storage-scale/openshift-fusion-access-operator) and [fbc](https://github.com/openshift-storage-scale/openshift-fusion-access-fbc) repositories.
 
 Accessing the Konflux cluster via oc CLI requires an auth token from the OCP. Once you've been added to the workspace, head to [this URL](https://oauth-openshift.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/oauth/token/request) to obtain a new token and login to the
 Konflux cluster.
@@ -85,26 +85,31 @@ oc get snapshots --sort-by .metadata.creationTimestamp \
 -l appstudio.openshift.io/component=$operator_bundle  \
 -l pac.test.appstudio.openshift.io/event-type=push \
 -ojsonpath='{range .items[*]}{@.metadata.name}{"\t"}{@.status.conditions[?(@.type=="AppStudioTestSucceeded")].status}{"\t"}{@.metadata.annotations.pac\.test\.appstudio\.openshift\.io/sha-title}{"\n"}{end}' \
-| grep konflux/component-updates
+| grep "Konflux nudge"
 ```
 Example:
 ```console
-operator-1-0-sjkm7	True	Merge pull request #140 from openshift-storage-scale/konflux/component-updates/component-update-must-gather-1-0
-operator-1-0-7hf57	True	Merge pull request #128 from openshift-storage-scale/konflux/component-updates/component-update-controller-rhel9-operator-1-0
-operator-1-0-8p4tz	True	Merge pull request #141 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
-operator-1-0-6l49x	True	Merge pull request #142 from openshift-storage-scale/konflux/component-updates/component-update-console-plugin-1-0
-operator-1-0-4lz8r	True	Merge pull request #144 from openshift-storage-scale/konflux/component-updates/component-update-console-plugin-1-0
-operator-1-0-9j8pz	True	Merge pull request #148 from openshift-storage-scale/konflux/component-updates/component-update-controller-rhel9-operator-1-0
-operator-1-0-qd2pr	True	Merge pull request #149 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
+operator-0-1-sdrjp	True	[Konflux nudge]: Update console-plugin-0-1 to 7a49908
+operator-0-1-xqgz9	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 0c53ba4
+operator-0-1-6wlcl	True	[Konflux nudge]: Update must-gather-0-1 to e53dce4
+operator-0-1-n2kj2	True	[Konflux nudge]: Update devicefinder-0-1 to b003ba7
+operator-0-1-gndwm	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 73c76a2
+operator-0-1-n885g	True	[Konflux nudge]: Update console-plugin-0-1 to 3a8732a
+operator-0-1-vsq4s	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to fd0c38e
+operator-0-1-td552	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 8538a87
+operator-0-1-6qd4c	True	[Konflux nudge]: Update must-gather-0-1 to 9cf742d
+operator-0-1-nlk97	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 92aa455
+operator-0-1-mgqwn	True	[Konflux nudge]: Update devicefinder-0-1 to 0cc47b2
+operator-0-1-k7zzw	True	[Konflux nudge]: Update console-plugin-0-1 to 99e0851
 ```
 
 If you're releasing from a controller's update nudge, which is the most probable case, check the last snapshot that has passed the integration tests:
 ```console
-operator-1-0-qd2pr	True	Merge pull request #149 from openshift-storage-scale/konflux/component-updates/component-update-devicefinder-1-0
+operator-0-1-k7zzw	True	[Konflux nudge]: Update console-plugin-0-1 to 99e0851
 ```
 Capture the snapshot in an environment variable:
 ```console
-snapshot=operator-1-0-qd2pr
+snapshot=operator-0-1-k7zzw
 ```
 
 * Ensure that the bundle's controller pullspec and release labels matches the ones in the snapshot. The bundle's container image contains a label with the image pullspec of the components used in the bundle. Use the following commands to validate the snapshot `operator-1-0-qd2pr`:
@@ -151,6 +156,17 @@ else
 fi
 ```
 
+Example:
+
+```
+Checking component console-plugin-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component must-gather-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component devicefinder-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component controller-rhel9-operator-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+
+🦄🦄🦄 snapshot operator-0-1-k7zzw image pullspecs and release versions match with bundle's labels. Launch is a GO! 🚀🚀🚀
+```
+
 * Create a new Release manifest for staging
 
 Before triggering the release, we need to populate a few fields in the releaseNotes that are mandatory for passing the security advisory checks. For more information check [this page](https://konflux.pages.redhat.com/docs/users/releasing/releasing-with-an-advisory.html#release from the Konflux documentation, and this [knowledge page](https://access.redhat.com/webassets/avalon/j/includes/session/scribe/?redirectTo=https://access.redhat.com/articles/explaining_redhat_errata) that explains the types of erratas:
@@ -193,7 +209,7 @@ If the release fails, follow the [troubleshooting](#release-pipeline-failed) gui
 ```console
 advisoryURL=$(oc get $releaseName -ojsonpath='{.status.artifacts.advisory.url}' | sed  's/blob/raw/')
 controllerPullSpec=$(curl $advisoryURL | yq -r  '.spec.content.images[] | select(.component=="'$controller_rhel9_operator'") | .containerImage')
-bundlePullSpec=$(curl $advisoryURL | yq -r  '.spec.content.images[] | select(.component=="'$orchestrator_operator_bundle'") | .containerImage')
+bundlePullSpec=$(curl $advisoryURL | yq -r  '.spec.content.images[] | select(.component=="'$operator_bundle'") | .containerImage')
 skopeo inspect docker://$controllerPullSpec >/dev/null && echo "Controller image found in $controllerPullSpec" || echo "Controller image not found in $controllerPullSpec"
 skopeo inspect docker://$bundlePullSpec >/dev/null && echo "Bundle image found in $bundlePullSpec" || echo "Controller image not found in $bundlePullSpec"
 ```
@@ -214,7 +230,7 @@ git clone https://github.com/rhdhorchestrator/orchestrator-fbc.git
 ```
 
 * Update the graph.yaml in the OCP version following the FBC documentation to ensure that each each version published has an upgrade path. Check [this page](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html#olm-channel-schema_fbc) to understand the different options when updating the fragment.
-  The most common case is when updating the [z-stream version](https://github.com/rhdhorchestrator/orchestrator-fbc/pull/92), in which case you will have to amend the original fragment (graph.yaml) and define the linkage between releases, so that the newest one is marked as a replacement to the previous one, and so on. So if we wanted to add the new release as `1.2.0-rc11` to the current graph.yaml, we'd be adding a value in the `entries:` section, and another pair for the `image` and `schema` with the pullspec of the bundle. Note that you should have the digest of the bundle image in `$bundlePullSpec`.
+  The most common case is when updating the [z-stream version](https://github.com/openshift-storage-scale/openshift-fusion-access-fbc/pull/92), in which case you will have to amend the original fragment (graph.yaml) and define the linkage between releases, so that the newest one is marked as a replacement to the previous one, and so on. So if we wanted to add the new release as `1.2.0-rc11` to the current graph.yaml, we'd be adding a value in the `entries:` section, and another pair for the `image` and `schema` with the pullspec of the bundle. Note that you should have the digest of the bundle image in `$bundlePullSpec`.
 
 ```console
 ---
