@@ -207,11 +207,11 @@ If the release fails, follow the [troubleshooting](#release-pipeline-failed) gui
 * Validate that the container images are in the staging registry by inspecting them with skopeo. The pullspec of the images are defined in the advisory manifest:
 
 ```console
-advisoryURL=$(oc get $releaseName -ojsonpath='{.status.artifacts.advisory.url}' | sed  's/blob/raw/')
-controllerPullSpec=$(curl $advisoryURL | yq -r  '.spec.content.images[] | select(.component=="'$controller_rhel9_operator'") | .containerImage')
-bundlePullSpec=$(curl $advisoryURL | yq -r  '.spec.content.images[] | select(.component=="'$operator_bundle'") | .containerImage')
-skopeo inspect docker://$controllerPullSpec >/dev/null && echo "Controller image found in $controllerPullSpec" || echo "Controller image not found in $controllerPullSpec"
-skopeo inspect docker://$bundlePullSpec >/dev/null && echo "Bundle image found in $bundlePullSpec" || echo "Controller image not found in $bundlePullSpec"
+advisoryContents=$(curl $advisoryURL |yq '.spec.content' )
+for  genericName versionedName in ${(kv)components}; do
+	imagePullspec=$( print $advisoryContents | yq  -r  '.images[]| select(.component=="'$versionedName'") | .containerImage')
+	skopeo inspect docker://$imagePullspec >/dev/null && print $genericName" image found in "$imagePullspec || echo $genericName" image not found in "$imagePullspec
+done
 ```
 
 At this point we can confirm that we have a successful release of the images and that they are ready to be used to release a new FBC version.
@@ -226,7 +226,7 @@ Note, if you haven't yet released the operator in production, you'll need to fol
 * Clone the orchestrator-fbc repository:
 
 ```console
-git clone https://github.com/rhdhorchestrator/orchestrator-fbc.git
+git clone https://github.com/openshift-storage-scale/openshift-fusion-access-fbc.git
 ```
 
 * Update the graph.yaml in the OCP version following the FBC documentation to ensure that each each version published has an upgrade path. Check [this page](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html#olm-channel-schema_fbc) to understand the different options when updating the fragment.
