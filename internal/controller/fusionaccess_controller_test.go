@@ -50,7 +50,25 @@ var _ = Describe("FusionAccess Controller", func() {
 		namespace         = newNamespace("ibm-fusion-access-operator")
 		version           = newOCPVersion(oscinitVersion)
 		clusterConsole    = &operatorv1.Console{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
-		testTimeout       = 5 * time.Second
+		clusterPullSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pull-secret",
+				Namespace: "openshift-config",
+			},
+			Data: map[string][]byte{".dockerconfigjson": []byte(`
+					{
+		  				"auths": {
+							"quay.io/repo1": {
+								"auth": "authkey",
+								"email": ""
+		    				},
+							"quay.io/repo2": {
+								"auth": "authkey",
+								"email": ""
+		    				}
+						}
+					}`)}}
+		testTimeout = 5 * time.Second
 	)
 
 	Context("When reconciling a resource", func() {

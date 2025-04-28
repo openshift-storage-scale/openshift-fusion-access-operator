@@ -363,6 +363,14 @@ func (r *FusionAccessReconciler) Reconcile(
 			return reconcile.Result{}, err
 		}
 		log.Log.Info("Entitlement secrets created")
+
+		// Since the kernel module requires the pull secret, we only create that if the secret is found
+		log.Log.Info("Creating kernel module resources")
+		if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client, string(secret)); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		log.Log.Info("Successfully created kernel module resources")
 	}
 
 	// Check if can pull the image if we have not already or if it failed previously
@@ -398,14 +406,6 @@ func (r *FusionAccessReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 	log.Log.Info("Successfully enabled console plugin")
-
-	log.Log.Info("Creating kernel module resources")
-
-	if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client, secretstring); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	log.Log.Info("Successfully created kernel module resources")
 
 	if fusionaccess.Spec.LocalVolumeDiscovery.Create {
 		// Create Device discovery
