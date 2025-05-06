@@ -20,7 +20,7 @@ ENTRYPOINT ["/usr/bin/devicefinder"]
 
 LABEL \
     com.redhat.component="Device Finder image for OpenShift Fusion Access Operator" \
-    description="" \
+    description="Device Finder image for OpenShift Fusion Access Operator" \
     io.k8s.display-name="Device Finder image for OpenShift Fusion Access Operator" \
     io.k8s.description="" \
     io.openshift.tags="openshift,fusion,access,san" \
