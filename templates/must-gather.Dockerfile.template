@@ -16,11 +16,11 @@ LABEL \
     io.openshift.tags="openshift,fusion,access,san" \
     distribution-scope="public" \
     name="openshift-fusion-access-must-gather-rhel9" \
-    vendor="Red Hat, Inc." \
+    vendor="IBM" \
     release="v${VERSION}" \
     version="v${VERSION}" \
     summary="Must gather image" \
-    description="" \
-    maintainer="Red Hat jgil@redhat.com" \
+    description="Must gather image for the OpenShift Fusion Access Operator" \
+    maintainer="michele@acksyn.org" \
     url="https://github.com/openshift-storage-scale/openshift-fusion-access-operator.git" \
     License="Apache License 2.0"

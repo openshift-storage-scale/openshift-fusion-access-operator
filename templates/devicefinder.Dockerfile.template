@@ -29,7 +29,7 @@ LABEL \
     summary="Device Finder" \
     release="v${VERSION}" \
     version="v${VERSION}" \
-    maintainer="Red Hat jgil@redhat.com" \
+    maintainer="michele@acksyn.org" \
     url="https://github.com/openshift-storage-scale/openshift-fusion-access-operator.git" \
-    vendor="Red Hat, Inc." \
+    vendor="IBM" \
     License="Apache License 2.0"
