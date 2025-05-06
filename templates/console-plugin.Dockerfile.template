@@ -7,6 +7,8 @@ COPY console/ .
 # replace version in package.json
 RUN sed -r -i "s|\"version\": \"0.0.1\"|\"version\": \"${VERSION}\"|;" ./package.json
 RUN npm ci --ignore-scripts && npm run build
+RUN mkdir licenses
+COPY LICENSE licenses/
 
 FROM registry.access.redhat.com/ubi9/nginx-120:latest
 LABEL \
@@ -25,6 +27,7 @@ LABEL \
     vendor="Red Hat, Inc." \
     License="Apache License 2.0"
 
+COPY --from=builder /opt/app-root/src/licenses/ /licenses/
 COPY --from=builder /opt/app-root/src/docker/etc/default.conf "${NGINX_CONFIGURATION_PATH}"
 COPY --from=builder /opt/app-root/src/dist .
 USER 1001

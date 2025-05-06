@@ -6,6 +6,8 @@ WORKDIR /workspace
 COPY . .
 
 RUN make build-devicefinder
+RUN mkdir licenses
+COPY LICENSE licenses/
 
 FROM registry.redhat.io/ubi10/ubi:latest
 
@@ -13,6 +15,7 @@ ARG VERSION=1.0
 
 COPY --from=builder /workspace/_output/bin/devicefinder /usr/bin/
 RUN dnf install -y udev && dnf clean all
+COPY --from=builder /workspace/licenses/ /licenses/
 ENTRYPOINT ["/usr/bin/devicefinder"]
 
 LABEL \
