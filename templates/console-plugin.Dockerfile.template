@@ -13,7 +13,7 @@ COPY LICENSE licenses/
 FROM registry.access.redhat.com/ubi9/nginx-120:latest
 LABEL \
     com.redhat.component="Console plugin image for OpenShift Fusion Access Operator" \
-    description="" \
+    description="This is the console plugin for the OpenShift Fusion Access for SAN Operator" \
     io.k8s.display-name="Console plugin image for OpenShift Fusion Access Operator" \
     io.k8s.description="" \
     io.openshift.tags="openshift,fusion,access,san" \
