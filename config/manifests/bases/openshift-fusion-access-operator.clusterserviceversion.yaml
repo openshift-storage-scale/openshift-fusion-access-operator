@@ -27,7 +27,7 @@ metadata:
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/initialization-resource: '{"apiVersion":"fusion.storage.openshift.io/v1alpha1","kind":"FusionAccess","metadata":{"name":"fusionaccess-object"},"spec":{"ibm_cnsa_version":"v5.2.3.0"}}'
-    operatorframework.io/suggested-namespace: openshift-fusion-access
+    operatorframework.io/suggested-namespace: ibm-fusion-access
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.openshift.io/valid-subscription: '["Openshift Container Platform","OpenShift
       Virtualization Engine"]'

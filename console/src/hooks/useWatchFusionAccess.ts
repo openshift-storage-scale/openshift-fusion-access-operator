@@ -12,7 +12,7 @@ export const useWatchFusionAccess: UseK8sWatchResourceWithInferedList<
   return useK8sWatchResource({
     ...options,
     namespaced: true,
-    namespace: "openshift-fusion-access",
+    namespace: "ibm-fusion-access",
     groupVersionKind: {
       group: "fusion.storage.openshift.io",
       version: "v1alpha1",

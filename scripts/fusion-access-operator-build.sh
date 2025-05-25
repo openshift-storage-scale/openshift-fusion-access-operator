@@ -2,7 +2,7 @@
 set -x -e -o pipefail
 
 CATALOGSOURCE="test-openshift-fusion-access-operator"
-NS="openshift-fusion-access"
+NS="ibm-fusion-access"
 OPERATOR="openshift-fusion-access-operator"
 VERSION="${VERSION:-6.6.6}"
 REGISTRY="${REGISTRY:-kuemper.int.rhx/bandini}"

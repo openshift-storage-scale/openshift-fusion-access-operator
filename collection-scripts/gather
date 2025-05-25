@@ -8,6 +8,6 @@ version >> /must-gather/version # imageVersion  - Build version
 imageId >> /must-gather/version # imageID  -  repository@digest          
 
 # Run the Collection of Resources using inspect
-oc adm inspect --dest-dir must-gather --rotated-pod-logs --all-namespaces "ns/openshift-fusion-access"
+oc adm inspect --dest-dir must-gather --rotated-pod-logs --all-namespaces "ns/ibm-fusion-access"
 
 exit 0
