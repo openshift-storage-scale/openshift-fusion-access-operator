@@ -35,9 +35,9 @@ import (
 const (
 	// PluginName is the name of the plugin and used at several places
 	// this has to be the same as in the package.json in the plugin
-	PluginName = "openshift-fusion-access-console"
+	PluginName = "fusion-access-console"
 	// ServiceName is the name of the console plugin Service and must match the name of the Service in /bundle/manifests!
-	ServiceName = "openshift-fusion-access-operator-console-plugin"
+	ServiceName = "fusion-access-operator-console-plugin"
 	// ServicePort is the port of the console plugin Service and must match the port of the Service in /bundle/manifests!
 	ServicePort = 9443
 )

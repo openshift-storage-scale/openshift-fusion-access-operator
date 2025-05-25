@@ -4,8 +4,8 @@ metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: fusion-access-plugin-cert
   labels:
-    app.kubernetes.io/component: openshift-fusion-access-operator-console-plugin
-  name: openshift-fusion-access-operator-console-plugin
+    app.kubernetes.io/component: fusion-access-operator-console-plugin
+  name: fusion-access-operator-console-plugin
   namespace: openshift-operators
 spec:
   ports:
@@ -14,6 +14,6 @@ spec:
     protocol: TCP
     targetPort: pscp-server
   selector:
-    app.kubernetes.io/component: openshift-fusion-access-operator-console-plugin
+    app.kubernetes.io/component: fusion-access-operator-console-plugin
   sessionAffinity: None
   type: ClusterIP

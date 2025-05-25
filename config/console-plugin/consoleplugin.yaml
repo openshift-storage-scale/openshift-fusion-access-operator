@@ -6,7 +6,7 @@ spec:
   backend:
     service:
       basePath: /
-      name: openshift-fusion-access-operator-console-plugin
+      name: fusion-access-operator-console-plugin
       namespace: openshift-operators
       port: 9443
     type: Service

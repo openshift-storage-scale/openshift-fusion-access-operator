@@ -3,21 +3,21 @@ kind: Deployment
 metadata:
   labels:
     app.kubernetes.io/component: openshift-fusion-access-operator-console-plugin
-  name: openshift-fusion-access-operator-console-plugin
+  name: fusion-access-operator-console-plugin
   namespace: openshift-operators
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: openshift-fusion-access-operator-console-plugin
+      app.kubernetes.io/component: fusion-access-operator-console-plugin
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: openshift-fusion-access-operator-console-plugin
+        app.kubernetes.io/component: fusion-access-operator-console-plugin
     spec:
       containers:
       - image: ${CONSOLE_PLUGIN_IMAGE}
-        name: openshift-fusion-access-operator-console-plugin
+        name: fusion-access-operator-console-plugin
         ports:
         - containerPort: 9443
           name: pscp-server
