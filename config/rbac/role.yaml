@@ -533,7 +533,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: manager-role
-  namespace: openshift-fusion-access
+  namespace: ibm-fusion-access
 rules:
 - apiGroups:
   - ""
