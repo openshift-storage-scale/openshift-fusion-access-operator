@@ -197,6 +197,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 clean: ## Remove build artifacts and downloaded tools
 	find bin/ -exec chmod +w "{}" \;
 	rm -rf ./manager ./bin/* ./cover.out ./coverage.html
+	rm -f ./config/samples/fusionaccess-catalog-*.yaml
 
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
 .PHONY: generate-dockerfile-operator
