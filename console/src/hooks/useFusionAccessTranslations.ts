@@ -3,7 +3,7 @@ import { getI18n, useTranslation } from "react-i18next";
 
 export const useFusionAccessTranslations = () =>
   // MUST be a string literal. DON'T EXTRACT IT TO A VARIABLE!
-  useTranslation("plugin__openshift-fusion-access-console");
+  useTranslation("plugin__fusion-access-console");
 
 /**
  * Translates text within the plugin namespace
@@ -23,6 +23,6 @@ export const t = (value: string, options?: TOptions) =>
 
   getI18n().t(value, {
     // MUST be a string literal. DON'T EXTRACT IT TO A VARIABLE!
-    ns: "plugin__openshift-fusion-access-console",
+    ns: "plugin__fusion-access-console",
     ...options,
   });

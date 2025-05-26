@@ -47,7 +47,7 @@ var _ = Describe("FusionAccess Controller", func() {
 	var (
 		fakeClientBuilder *fake.ClientBuilder
 		scheme            = createFakeScheme()
-		namespace         = newNamespace("openshift-fusion-access-operator")
+		namespace         = newNamespace("ibm-fusion-access-operator")
 		version           = newOCPVersion(oscinitVersion)
 		clusterConsole    = &operatorv1.Console{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
 		testTimeout       = 5 * time.Second
@@ -65,7 +65,7 @@ var _ = Describe("FusionAccess Controller", func() {
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind FusionAccess")
-			os.Setenv("DEPLOYMENT_NAMESPACE", "openshift-fusion-access-operator")
+			os.Setenv("DEPLOYMENT_NAMESPACE", "ibm-fusion-access-operator")
 			fakeClientBuilder = fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithRuntimeObjects(version, namespace, clusterConsole).

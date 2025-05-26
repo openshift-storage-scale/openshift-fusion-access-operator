@@ -1,5 +1,5 @@
 {
-  "name": "openshift-fusion-access-console",
+  "name": "fusion-access-console",
   "version": "0.0.1",
   "description": "Console plugin for OpenShift Fusion Access Operator",
   "private": true,
