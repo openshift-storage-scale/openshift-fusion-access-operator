@@ -47,6 +47,7 @@ spec:
                 enum:
                 - v5.2.3.0
                 - v5.2.3.0.rc1
+                - v5.2.3.0.1
                 type: string
               storagedevicediscovery:
                 properties:
