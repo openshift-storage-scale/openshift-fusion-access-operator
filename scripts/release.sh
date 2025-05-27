@@ -3,7 +3,7 @@ set -e -o pipefail
 
 VERSION=$(cat VERSION.txt)
 
-make USE_IMAGE_DIGESTS="" bundle generate manifests docker-build docker-push \
+make USE_IMAGE_DIGESTS="" clean bundle generate manifests docker-build docker-push \
     bundle-build bundle-push \
     console-build console-push devicefinder-docker-build devicefinder-docker-push \
     must-gather-docker-build must-gather-docker-push
