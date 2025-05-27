@@ -195,6 +195,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: clean
 clean: ## Remove build artifacts and downloaded tools
+	rm -rf ./bundle
 	find bin/ -exec chmod +w "{}" \;
 	rm -rf ./manager ./bin/* ./cover.out ./coverage.html
 	rm -f ./config/samples/fusionaccess-catalog-*.yaml
