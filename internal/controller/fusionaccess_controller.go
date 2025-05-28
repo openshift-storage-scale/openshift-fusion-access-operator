@@ -361,9 +361,14 @@ func (r *FusionAccessReconciler) Reconcile(
 	}
 
 	// Check if can pull the image if we have not already or if it failed previously
-	err = r.runPullImageCheck(ctx, ns, fusionaccess)
-	if err != nil {
-		return ctrl.Result{}, err
+	// Only do this check if we have a set cnsa version
+	if fusionaccess.Spec.IbmCnsaVersion != "" {
+		err = r.runPullImageCheck(ctx, ns, fusionaccess)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		log.Log.Info("Skipping image pull check as we are not using a CNSA version in the spec")
 	}
 
 	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
