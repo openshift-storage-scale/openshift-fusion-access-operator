@@ -309,16 +309,22 @@ func (r *FusionAccessReconciler) Reconcile(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	// Load and install manifests from ibm (from the repo)
-	install_path, err := utils.GetInstallPath(string(fusionaccess.Spec.IbmCnsaVersion))
-	if err != nil {
-		return ctrl.Result{}, err
-	}
 
+	var install_path string
 	// Load and install manifests from external url if defined
 	if fusionaccess.Spec.ExternalManifestURL != "" {
 		// TODO add additional validation for external manifest/url before applying it blindly
+		log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", fusionaccess.Spec.ExternalManifestURL))
 		install_path = fusionaccess.Spec.ExternalManifestURL
+	} else if fusionaccess.Spec.IbmCnsaVersion != "" {
+		// Load and install manifests from ibm (from the repo)
+		log.Log.Info(fmt.Sprintf("Using IBM repo manifest: %s", fusionaccess.Spec.IbmCnsaVersion))
+		install_path, err = utils.GetInstallPath(string(fusionaccess.Spec.IbmCnsaVersion))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		return ctrl.Result{}, fmt.Errorf("no CNSA manifest version and no external manifest specified")
 	}
 
 	installManifest, err := manifestival.NewManifest(
