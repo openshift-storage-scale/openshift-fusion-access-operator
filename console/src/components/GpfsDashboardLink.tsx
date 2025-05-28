@@ -48,7 +48,7 @@ const GpfsDashboardLink: React.FC<GpfsDashboardLinkProps> = ({
       iconPosition="end"
       isInline
     >
-      {href}
+      {fileSystem.metadata?.name || ""}
     </Button>
   );
 };
