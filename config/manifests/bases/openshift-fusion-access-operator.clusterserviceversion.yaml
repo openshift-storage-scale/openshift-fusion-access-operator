@@ -44,7 +44,7 @@ spec:
       name: fusionaccesses.fusion.storage.openshift.io
       specDescriptors:
       - description: Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
-        displayName: Ibm Cnsa Version
+        displayName: IBM CNSA Version
         path: ibm_cnsa_version
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0
