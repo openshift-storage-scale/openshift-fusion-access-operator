@@ -23,7 +23,7 @@ export interface GlobalSlice {
 
 export type AlertsSlice = Array<
   Pick<AlertProps, "key" | "variant" | "title"> & {
-    description?: string;
+    description?: string | string[];
     isDismissable?: boolean;
   }
 >;

@@ -5,14 +5,10 @@ import type {
   SuffixBinarySI,
   SuffixDecimalSI,
 } from "./IoK8sApimachineryPkgApiResourceQuantity";
-import {
-  BinarySI,
-  parseQuantity,
-} from "./IoK8sApimachineryPkgApiResourceQuantity";
+import { parseQuantity } from "./IoK8sApimachineryPkgApiResourceQuantity";
 import {
   CPLANE_NODE_ROLE_LABEL,
   MASTER_NODE_ROLE_LABEL,
-  MINIMUM_AMOUNT_OF_MEMORY,
   STORAGE_ROLE_LABEL,
   VALUE_NOT_AVAILABLE,
   WORKER_NODE_ROLE_LABEL,
@@ -43,64 +39,44 @@ export const getRole = (node: IoK8sApiCoreV1Node): NodeRoles => {
 
 export const getMemory = (
   node: IoK8sApiCoreV1Node,
-  displayUnit: Extract<
-    "B" | `${SuffixBinarySI | SuffixDecimalSI}B`,
-    Unit
-  > = "GiB"
-): [string, null] | [null, Error] => {
+  displayUnit: Extract<"B" | `${SuffixBinarySI | SuffixDecimalSI}B`, Unit>
+): [number, null] | [null, Error] => {
   if (!node.status?.capacity?.memory) {
     return [null, new Error("node's memory is not available")];
   }
 
-  const [q, qError] = parseQuantity(node.status.capacity.memory);
-  if (qError) {
-    return [null, qError];
+  const [quantity, parseQuantityError] = parseQuantity(node.status.capacity.memory);
+  if (parseQuantityError) {
+    return [null, parseQuantityError];
   }
 
-  let adaptedValue: number = q.value;
+  let adaptedValue: number = quantity.value;
   let adaptedUnit: Extract<"B" | `${SuffixBinarySI | SuffixDecimalSI}B`, Unit>;
-  switch (q.unit) {
+  switch (quantity.unit) {
     case "B":
-      adaptedUnit = q.unit;
+      adaptedUnit = quantity.unit;
       break;
     case "E": // unsupported by "convert"
       adaptedUnit = "PB";
-      adaptedValue = q.value * 1000;
+      adaptedValue = quantity.value * 1000;
       break;
     case "Ei": // unsupported by "convert"
       adaptedUnit = "PiB";
-      adaptedValue = q.value * 1024;
+      adaptedValue = quantity.value * 1024;
       break;
     default:
-      adaptedUnit = (q.unit + "B") as `${Exclude<
+      adaptedUnit = (quantity.unit + "B") as `${Exclude<
         "Ei" | "E",
         SuffixBinarySI | SuffixDecimalSI
       >}B`;
       break;
   }
 
-  const quantity = convert(adaptedValue, adaptedUnit).to(displayUnit);
-  return [`${quantity.toFixed(2)} ${displayUnit}`, null];
+  const value = convert(adaptedValue, adaptedUnit).to(displayUnit);
+  return [value, null];
 };
 
 export const getCpu = (node: IoK8sApiCoreV1Node) => node.status?.capacity?.cpu;
 
 export const getSelectedNodes = (nodes: IoK8sApiCoreV1Node[]) =>
   nodes.filter((n) => hasLabel(n, STORAGE_ROLE_LABEL));
-
-const [minQuantity, minUnits] = MINIMUM_AMOUNT_OF_MEMORY.split(" ");
-const minUnitsInBytes =
-  BinarySI[minUnits.slice(0, -1) as keyof typeof BinarySI];
-export const getNodesWithMinimumAmountOfMemory = (
-  nodes: IoK8sApiCoreV1Node[]
-) =>
-  nodes.filter((node) => {
-    const [memory] = getMemory(node);
-    const [quantity, units] = memory?.split(" ") ?? [];
-    const unitsInBytes = BinarySI[units.slice(0, -1) as keyof typeof BinarySI];
-
-    return (
-      minUnitsInBytes * parseFloat(minQuantity) <=
-      unitsInBytes * parseFloat(quantity)
-    );
-  });

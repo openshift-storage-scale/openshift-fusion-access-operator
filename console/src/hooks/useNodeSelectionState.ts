@@ -1,5 +1,9 @@
 import { useState, useMemo } from "react";
-import { STORAGE_ROLE_LABEL, VALUE_NOT_AVAILABLE } from "@/constants";
+import {
+  MINIMUM_AMOUNT_OF_MEMORY_GIB,
+  STORAGE_ROLE_LABEL,
+  VALUE_NOT_AVAILABLE,
+} from "@/constants";
 import type {
   IoK8sApimachineryPkgApiResourceQuantity,
   IoK8sApiCoreV1Node,
@@ -18,6 +22,7 @@ export interface NodeSelectionState {
   role: NodeRoles;
   cpu: IoK8sApimachineryPkgApiResourceQuantity;
   memory: IoK8sApimachineryPkgApiResourceQuantity;
+  hasMemoryWarning: boolean;
   isSelected: boolean;
   isSelectionPending: boolean;
 }
@@ -32,14 +37,25 @@ export const useNodeSelectionState = (
   node: IoK8sApiCoreV1Node
 ): [NodeSelectionState, NodeSelectionActions] => {
   const isSelected = hasLabel(node, STORAGE_ROLE_LABEL);
-  const [memoryValue] = getMemory(node);
+  const [memoryValue] = getMemory(node, "GiB");
+  let memory = "";
+  let hasMemoryWarning = true;
+  
+  if (!memoryValue) {
+    memory = VALUE_NOT_AVAILABLE;
+    hasMemoryWarning = true;
+  } else {
+    memory = memoryValue.toFixed(2);
+    hasMemoryWarning = memoryValue < MINIMUM_AMOUNT_OF_MEMORY_GIB;
+  }
 
   const [state, setState] = useState<NodeSelectionState>({
     uid: getUid(node) ?? VALUE_NOT_AVAILABLE,
     name: getName(node) ?? VALUE_NOT_AVAILABLE,
     role: getRole(node) ?? VALUE_NOT_AVAILABLE,
     cpu: getCpu(node) ?? VALUE_NOT_AVAILABLE,
-    memory: memoryValue ? memoryValue : VALUE_NOT_AVAILABLE,
+    memory,
+    hasMemoryWarning,
     isSelected,
     isSelectionPending: false,
   });

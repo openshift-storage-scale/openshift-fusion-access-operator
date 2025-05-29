@@ -22,12 +22,6 @@
       "overrideConfigFile": "./config/eslint.config.mjs",
     },
     "files.autoSave": "afterDelay",
-    "eslint.workingDirectories": [
-      {
-        "!cwd": true,
-        "directory": "${workspaceFolder}",
-      },
-    ],
   },
   "extensions": {
     "recommendations": [

@@ -9,6 +9,8 @@ import {
   AlertActionCloseButton,
   Stack,
   StackItem,
+  List,
+  ListItem,
 } from "@patternfly/react-core";
 import type { AlertsSlice } from "@/contexts/store/types";
 import { useLayoutEffect } from "react";
@@ -29,7 +31,7 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
     actions,
     alerts = [],
     children,
-    description,
+    description = <br />,
     documentTitle,
     listPageBodyStyle = {},
     onDismissAlert,
@@ -51,10 +53,8 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
 
       <ListPageBody>
         <Stack hasGutter>
-          <StackItem>
-            {children}
-          </StackItem>
-          <StackItem>
+          <StackItem>{children}</StackItem>
+          <StackItem isFilled style={{ alignContent: "flex-end" }}>
             <AlertGroup isLiveRegion>
               {alerts.map((alert) => (
                 <Alert
@@ -74,14 +74,21 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
                     ) : null
                   }
                 >
-                  {alert.description}
+                  {alert.description &&
+                  typeof alert.description !== "string" ? (
+                    <List>
+                      {alert.description.map((desc, idx) => (
+                        <ListItem key={idx}>{desc}</ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    alert.description
+                  )}
                 </Alert>
               ))}
             </AlertGroup>
           </StackItem>
-          <StackItem>
-            {footer}
-          </StackItem>
+          <StackItem>{footer}</StackItem>
         </Stack>
       </ListPageBody>
     </>

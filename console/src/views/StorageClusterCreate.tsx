@@ -9,7 +9,8 @@ import { CreateStorageClusterButton } from "@/components/CreateStorageClusterBut
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
 import { useWatchSpectrumScaleCluster } from "@/hooks/useWatchSpectrumScaleCluster";
 import { useCreateStorageClusterHandler } from "@/hooks/useCreateStorageClusterHandler";
-import { MINIMUM_AMOUNT_OF_NODES } from "@/constants";
+import { Split } from "@patternfly/react-core";
+import { CancelButton } from "@/components/CancelButton";
 
 const StorageClusterCreate: React.FC = () => {
   const [cluster] = useWatchSpectrumScaleCluster({ isList: true, limit: 1 });
@@ -36,20 +37,18 @@ const ConnectedStorageClusterCreate: React.FC = () => {
   return (
     <FusionAccessListPage
       documentTitle={t("Fusion Access for SAN")}
-      title={t("Fusion Access for SAN")}
-      description={t(
-        "To create a storage cluster select at least {{MINIMUM_AMOUNT_OF_NODES}} nodes that share the same amount of disks.",
-        { MINIMUM_AMOUNT_OF_NODES }
-      )}
-      // actions={[<DownloadLogsButton key="download-logs" />]}
+      title={t("Create storage cluster")}
       alerts={store.alerts}
       footer={
-        <CreateStorageClusterButton
-          key="create-storagecluster"
-          isDisabled={store.ctas.createStorageCluster.isDisabled}
-          isLoading={store.ctas.createStorageCluster.isLoading}
-          onCreateStorageCluster={handleCreateStorageCluster}
-        />
+        <Split hasGutter>
+          <CreateStorageClusterButton
+            key="create-button"
+            isDisabled={store.ctas.createStorageCluster.isDisabled}
+            isLoading={store.ctas.createStorageCluster.isLoading}
+            onCreateStorageCluster={handleCreateStorageCluster}
+          />
+          <CancelButton key="cancel-button" onCancel={() => {}} />
+        </Split>
       }
     >
       <NodesSelectionTable />
