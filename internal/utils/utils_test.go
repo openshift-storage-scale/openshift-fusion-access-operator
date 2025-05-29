@@ -464,7 +464,7 @@ data:
 	})
 })
 
-var _ = Describe("HasPrefix", func() {
+var _ = Describe("IsExternalManifestURLAllowed", func() {
 	It("should match exact prefix", func() {
 		url := "https://raw.githubusercontent.com/openshift-storage-scale"
 		Expect(IsExternalManifestURLAllowed(url)).To(BeTrue())

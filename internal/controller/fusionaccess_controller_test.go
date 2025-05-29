@@ -222,3 +222,53 @@ func newOCPVersion(version string) *configv1.ClusterVersion {
 
 var _ = Describe("FusionAccessReconciler Setup", func() {
 })
+
+// Replace these with your actual mocking setup
+var _ = Describe("getIbmManifest", func() {
+	Context("when ExternalManifestURL is valid", func() {
+		It("should return the external URL if allowed", func() {
+			fusionObj := fusionv1alpha.FusionAccessSpec{
+				ExternalManifestURL: "https://raw.githubusercontent.com/openshift-storage-scale/openshift-fusion-access-manifests/refs/heads/main/manifests/5.2.3.1.dev2/install.yaml",
+				IbmCnsaVersion:      "",
+			}
+
+			url, err := getIbmManifest(fusionObj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(url).To(Equal("https://raw.githubusercontent.com/openshift-storage-scale/openshift-fusion-access-manifests/refs/heads/main/manifests/5.2.3.1.dev2/install.yaml"))
+		})
+
+		It("should return an error if external URL is disallowed", func() {
+			fusionObj := fusionv1alpha.FusionAccessSpec{
+				ExternalManifestURL: "http://bad-url.com",
+				IbmCnsaVersion:      "",
+			}
+
+			_, err := getIbmManifest(fusionObj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("disallowed URL"))
+		})
+	})
+
+	Context("when IbmCnsaVersion is set and external URL is empty", func() {
+		It("should return the install path", func() {
+			fusionObj := fusionv1alpha.FusionAccessSpec{
+				ExternalManifestURL: "",
+				IbmCnsaVersion:      "v5.2.3.0.1",
+			}
+
+			path, err := getIbmManifest(fusionObj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("../../files/v5.2.3.0.1/install.yaml"))
+		})
+	})
+
+	Context("when neither ExternalManifestURL nor IbmCnsaVersion is set", func() {
+		It("should return an error", func() {
+			fusionObj := fusionv1alpha.FusionAccessSpec{}
+
+			_, err := getIbmManifest(fusionObj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no CNSA manifest version"))
+		})
+	})
+})

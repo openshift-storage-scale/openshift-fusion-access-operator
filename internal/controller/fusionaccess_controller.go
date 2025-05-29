@@ -310,21 +310,9 @@ func (r *FusionAccessReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	var install_path string
-	// Load and install manifests from external url if defined
-	if fusionaccess.Spec.ExternalManifestURL != "" {
-		// TODO add additional validation for external manifest/url before applying it blindly
-		log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", fusionaccess.Spec.ExternalManifestURL))
-		install_path = fusionaccess.Spec.ExternalManifestURL
-	} else if fusionaccess.Spec.IbmCnsaVersion != "" {
-		// Load and install manifests from ibm (from the repo)
-		log.Log.Info(fmt.Sprintf("Using IBM repo manifest: %s", fusionaccess.Spec.IbmCnsaVersion))
-		install_path, err = utils.GetInstallPath(string(fusionaccess.Spec.IbmCnsaVersion))
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		return ctrl.Result{}, fmt.Errorf("no CNSA manifest version and no external manifest specified")
+	install_path, err := getIbmManifest(fusionaccess.Spec)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	installManifest, err := manifestival.NewManifest(
@@ -462,6 +450,26 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 		return err
 	}
 	return nil
+}
+
+func getIbmManifest(fusionobj fusionv1alpha1.FusionAccessSpec) (string, error) {
+	extManifestURL := fusionobj.ExternalManifestURL
+	ibmCnsaVersion := fusionobj.IbmCnsaVersion
+	if extManifestURL != "" {
+		log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", extManifestURL))
+		if utils.IsExternalManifestURLAllowed(extManifestURL) {
+			return extManifestURL, nil
+		}
+		return "", fmt.Errorf("disallowed URL for external manifest: %s", extManifestURL)
+	} else if ibmCnsaVersion != "" {
+		log.Log.Info(fmt.Sprintf("Using IBM repo manifest: %s", ibmCnsaVersion))
+		install_path, err := utils.GetInstallPath(string(ibmCnsaVersion))
+		if err != nil {
+			return "", err
+		}
+		return install_path, nil
+	}
+	return "", fmt.Errorf("no CNSA manifest version and no external manifest specified")
 }
 
 // isItOurPullSecret returns true for Create or changed Update events
