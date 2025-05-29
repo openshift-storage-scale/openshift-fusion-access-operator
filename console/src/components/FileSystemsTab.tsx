@@ -34,7 +34,7 @@ import type { FileSystem } from "@/models/ibm-spectrum-scale/FileSystem";
 import { getName } from "@/utils/console/K8sResourceCommon";
 import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
-import TableDeleteFilesystemModal from "./modals/DeleteFilesystemModal";
+import TableDeleteFilesystemModal from "./DeleteFilesystemModal";
 import { getFilesystemStatus } from "@/utils/status/filesystem";
 import { FileSystemTableContext } from "@/contexts/filesystemctx";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/models/kubernetes/1.30/types";
