@@ -22,7 +22,7 @@ export interface NodeSelectionState {
   role: NodeRoles;
   cpu: IoK8sApimachineryPkgApiResourceQuantity;
   memory: IoK8sApimachineryPkgApiResourceQuantity;
-  hasMemoryWarning: boolean;
+  hasInsufficientMemoryWarning: boolean;
   isSelected: boolean;
   isSelectionPending: boolean;
 }
@@ -39,14 +39,14 @@ export const useNodeSelectionState = (
   const isSelected = hasLabel(node, STORAGE_ROLE_LABEL);
   const [memoryValue] = getMemory(node, "GiB");
   let memory = "";
-  let hasMemoryWarning = true;
+  let hasInsufficientMemoryWarning = true;
   
   if (!memoryValue) {
     memory = VALUE_NOT_AVAILABLE;
-    hasMemoryWarning = true;
+    hasInsufficientMemoryWarning = true;
   } else {
     memory = memoryValue.toFixed(2);
-    hasMemoryWarning = memoryValue < MINIMUM_AMOUNT_OF_MEMORY_GIB;
+    hasInsufficientMemoryWarning = memoryValue < MINIMUM_AMOUNT_OF_MEMORY_GIB;
   }
 
   const [state, setState] = useState<NodeSelectionState>({
@@ -55,7 +55,7 @@ export const useNodeSelectionState = (
     role: getRole(node) ?? VALUE_NOT_AVAILABLE,
     cpu: getCpu(node) ?? VALUE_NOT_AVAILABLE,
     memory,
-    hasMemoryWarning,
+    hasInsufficientMemoryWarning,
     isSelected,
     isSelectionPending: false,
   });

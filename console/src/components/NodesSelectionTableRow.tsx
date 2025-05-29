@@ -29,7 +29,7 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
       role,
       cpu,
       memory,
-      hasMemoryWarning,
+      hasInsufficientMemoryWarning,
       isSelected,
       isSelectionPending,
     },
@@ -59,7 +59,7 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
         <Checkbox
           id={`node-${uid}`}
           isChecked={isSelected}
-          isDisabled={isSelectionPending || hasMemoryWarning}
+          isDisabled={isSelectionPending || hasInsufficientMemoryWarning}
           onChange={handleNodeSelection}
         />
       </TableData>
@@ -86,7 +86,7 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
         id="memory"
       >
         {memory}{" "}
-        {hasMemoryWarning && (
+        {hasInsufficientMemoryWarning && (
           <Tooltip content={"Insufficient"}>
             <Icon status="warning" isInline>
               <ExclamationTriangleIcon />

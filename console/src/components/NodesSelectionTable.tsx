@@ -121,7 +121,13 @@ const useValidateStorageClusterMinimumRequirements = (
       return;
     }
 
-    if (selectedNodes.length < MINIMUM_AMOUNT_OF_NODES) {
+    const conditions: boolean[] = [
+      false,
+      true,
+      selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
+    ];
+
+    if (conditions.some(Boolean)) {
       dispatch({
         type: "updateCtas",
         payload: { createStorageCluster: { isDisabled: true } },
@@ -133,20 +139,26 @@ const useValidateStorageClusterMinimumRequirements = (
           variant: "warning",
           title: t("Storage cluster requirements"),
           description: [
-            t("Each node must have the same number of shared disks"),
-            t(
-              "Each node must have at least {{MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL}} of RAM",
-              {
-                MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL,
-              }
-            ),
-            t(
-              "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
-              {
-                MINIMUM_AMOUNT_OF_NODES_LITERAL,
-              }
-            ),
-          ],
+            conditions[0]
+              ? t("Each node must have the same number of shared disks")
+              : "",
+            conditions[1]
+              ? t(
+                  "Each node must have at least {{MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL}} of RAM",
+                  {
+                    MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL,
+                  }
+                )
+              : "",
+            conditions[2]
+              ? t(
+                  "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
+                  {
+                    MINIMUM_AMOUNT_OF_NODES_LITERAL,
+                  }
+                )
+              : "",
+          ].filter(Boolean),
           isDismissable: false,
         },
       });
