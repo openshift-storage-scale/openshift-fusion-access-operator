@@ -349,3 +349,10 @@ func GetInstallPath(cnsaVersion string) (string, error) {
 
 	return "", fmt.Errorf("could not find/open install file with version %s: %w", cnsaVersion, err)
 }
+
+func IsExternalManifestURLAllowed(url string) bool {
+	const allowedPrefix = "https://raw.githubusercontent.com/openshift-storage-scale"
+	url = strings.TrimSpace(url)
+	url = strings.ToLower(url)
+	return strings.HasPrefix(url, allowedPrefix)
+}

@@ -463,3 +463,45 @@ data:
 		})
 	})
 })
+
+var _ = Describe("HasPrefix", func() {
+	It("should match exact prefix", func() {
+		url := "https://raw.githubusercontent.com/openshift-storage-scale"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeTrue())
+	})
+
+	It("should match with a path after the prefix", func() {
+		url := "https://raw.githubusercontent.com/openshift-storage-scale/project1"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeTrue())
+	})
+
+	It("should match with leading/trailing whitespace", func() {
+		url := "   https://raw.githubusercontent.com/openshift-storage-scale/project1   "
+		Expect(IsExternalManifestURLAllowed(url)).To(BeTrue())
+	})
+
+	It("should match with uppercase URL", func() {
+		url := "HTTPS://RAW.GITHUBUSERCONTENT.COM/OPENSHIFT-STORAGE-SCALE/PROJECT1"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeTrue())
+	})
+
+	It("should not match similar but incorrect prefix", func() {
+		url := "https://raw.githubusercontent.com/openshift/project1"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeFalse())
+	})
+
+	It("should not match similar but incorrect host", func() {
+		url := "https://github.com/openshift-storage-scale/project1"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeFalse())
+	})
+
+	It("should not match if protocol is different", func() {
+		url := "http://raw.githubusercontent.com/openshift-storage-scale"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeFalse())
+	})
+
+	It("should not match random strings", func() {
+		url := "some-random-string"
+		Expect(IsExternalManifestURLAllowed(url)).To(BeFalse())
+	})
+})
