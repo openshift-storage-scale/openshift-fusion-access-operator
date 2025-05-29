@@ -84,17 +84,9 @@ export const NodesSelectionTable: React.FC = () => {
         <Alert
           isInline
           variant="info"
-          title={
-            <>
-              {t(
-                "Make sure all nodes for the storage cluster are selected before you continue (at least three nodes are required)."
-              )}
-              <br />
-              {t(
-                "Worker nodes will be rebooted while creating the storage cluster."
-              )}
-            </>
-          }
+          title={t(
+            "Make sure all nodes for the storage cluster are selected before you continue."
+          )}
         />
       </StackItem>
       <StackItem isFilled>

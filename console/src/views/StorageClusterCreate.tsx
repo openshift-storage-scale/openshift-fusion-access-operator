@@ -1,4 +1,4 @@
-import { Redirect } from "react-router";
+import { Redirect, useHistory } from "react-router";
 import { StoreProvider, useStoreContext } from "@/contexts/store/context";
 import type { State, Actions } from "@/contexts/store/types";
 import { reducer, initialState } from "@/contexts/store/reducer";
@@ -33,6 +33,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
   const { t } = useFusionAccessTranslations();
   const [store] = useStoreContext<State, Actions>();
   const handleCreateStorageCluster = useCreateStorageClusterHandler();
+  const history = useHistory();
 
   return (
     <FusionAccessListPage
@@ -47,7 +48,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
             isLoading={store.ctas.createStorageCluster.isLoading}
             onCreateStorageCluster={handleCreateStorageCluster}
           />
-          <CancelButton key="cancel-button" onCancel={() => {}} />
+          <CancelButton key="cancel-button" onCancel={history.goBack} />
         </Split>
       }
     >
