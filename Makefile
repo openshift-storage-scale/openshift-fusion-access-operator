@@ -79,9 +79,6 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 	BUNDLE_GEN_FLAGS += --use-image-digests
 endif
 
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.39.1
 # Image URL to use all building/pushing image targets
 export OPERATOR_IMG ?= $(IMAGE_TAG_BASE)-operator:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -327,8 +324,22 @@ KUBECTL ?= kubectl
 KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
-YQ = $(LOCALBIN)/yq-$(YQ_VERSION)
+GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+YQ ?= $(LOCALBIN)/yq-$(YQ_VERSION)
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary (ideally with version)
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -351,40 +362,19 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
 .PHONY: yq
-yq: ## Download yq locally if necessary.
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
 	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/${YQ_API_VERSION},${YQ_VERSION})
 
-
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary (ideally with version)
-# $2 - package url which can be installed
-# $3 - specific version of package
-define go-install-tool
-@[ -f $(1) ] || { \
-set -e; \
-package=$(2)@$(3) ;\
-echo "Downloading $${package}" ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
-}
-endef
+# Set the Operator SDK version to use. By default, what is installed on the system is used.
+# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
+OPERATOR_SDK_VERSION ?= v1.39.1
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
 
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
-operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
-ifeq (, $(shell which operator-sdk 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
-	}
-else
-OPERATOR_SDK = $(shell which operator-sdk)
-endif
-endif
+operator-sdk: $(OPERATOR_SDK)
+$(OPERATOR_SDK): $(LOCALBIN) ## Download operator-sdk locally if necessary.
+	$(call go-install-tool,$(OPERATOR_SDK),github.com/operator-framework/operator-sdk/cmd/operator-sdk,${OPERATOR_SDK_VERSION})
 
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
