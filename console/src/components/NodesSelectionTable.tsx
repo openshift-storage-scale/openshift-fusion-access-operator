@@ -24,7 +24,7 @@ import {
   type ExtraRowData,
 } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStoreContext } from "@/contexts/store/context";
+import { useStoreContext } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import { getSelectedNodes } from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
 

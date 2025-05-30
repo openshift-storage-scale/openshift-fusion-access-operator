@@ -8,6 +8,15 @@ type StoreContextValue<TState = any, TActions = any> =
 
 const StoreContext = createContext<StoreContextValue>(null);
 
+export function useStoreContext<TState = unknown, TActions = unknown>() {
+  const context = useContext<StoreContextValue<TState, TActions>>(StoreContext);
+  if (!context) {
+    throw new Error("useStoreContext hook must be used within <StoreProvider>");
+  }
+
+  return context;
+}
+
 interface StoreProviderProps<TState, TActions> {
   reducer: ImmerReducer<TState, TActions>;
   initialState: TState;
@@ -26,12 +35,3 @@ export function StoreProvider<TState, TActions>(
   );
 }
 StoreProvider.displayName = "StoreProvider";
-
-export function useStoreContext<TState = unknown, TActions = unknown>() {
-  const context = useContext<StoreContextValue<TState, TActions>>(StoreContext);
-  if (!context) {
-    throw new Error("useStoreContext hook must be used within <StoreProvider>");
-  }
-
-  return context;
-}

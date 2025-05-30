@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
-import { useStoreContext } from "@/contexts/store/context";
+import { useStoreContext } from "@/contexts/store/provider";
 import { getDigest } from "@/utils/crypto/hash";
 import type { Actions, AlertsSlice, State } from "@/contexts/store/types";
 

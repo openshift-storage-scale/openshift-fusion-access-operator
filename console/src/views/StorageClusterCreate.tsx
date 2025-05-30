@@ -1,5 +1,5 @@
 import { Redirect, useHistory } from "react-router";
-import { StoreProvider, useStoreContext } from "@/contexts/store/context";
+import { StoreProvider, useStoreContext } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import { reducer, initialState } from "@/contexts/store/reducer";
 // import { DownloadLogsButton } from "@/components/DownloadLogsButton";

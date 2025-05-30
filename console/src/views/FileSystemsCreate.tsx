@@ -1,4 +1,4 @@
-import { StoreProvider, useStoreContext } from "@/contexts/store/context";
+import { StoreProvider, useStoreContext } from "@/contexts/store/provider";
 import { reducer, initialState } from "@/contexts/store/reducer";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";

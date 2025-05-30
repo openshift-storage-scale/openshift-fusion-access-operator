@@ -3,7 +3,7 @@ import { k8sCreate, useK8sModel } from "@openshift-console/dynamic-plugin-sdk";
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
 import type { Cluster } from "@/models/ibm-spectrum-scale/Cluster";
 import { STORAGE_ROLE_LABEL } from "@/constants";
-import { useStoreContext } from "@/contexts/store/context";
+import { useStoreContext } from "@/contexts/store/provider";
 import { getDigest } from "@/utils/crypto/hash";
 import { useHistory } from "react-router";
 import type { State, Actions } from "@/contexts/store/types";

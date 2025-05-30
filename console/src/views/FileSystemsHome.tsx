@@ -2,7 +2,7 @@ import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";
 // import { DownloadLogsButton } from "@/components/DownloadLogsButton";
 import { FileSystemsTabbedNav } from "@/components/FileSystemsTabbedNav";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
-import { StoreProvider } from "@/contexts/store/context";
+import { StoreProvider } from "@/contexts/store/provider";
 import { reducer, initialState } from "@/contexts/store/reducer";
 import type { State, Actions } from "@/contexts/store/types";
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";

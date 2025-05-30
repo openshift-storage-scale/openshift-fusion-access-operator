@@ -1,4 +1,4 @@
-import { useStoreContext } from "@/contexts/store/context";
+import { useStoreContext } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import type {
   LocalVolumeDiscoveryResult,

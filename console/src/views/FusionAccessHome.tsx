@@ -9,7 +9,7 @@ import { useWatchSpectrumScaleCluster } from "@/hooks/useWatchSpectrumScaleClust
 import { ReactNodeWithPredefinedFallback } from "@/components/ReactNodeWithPredefinedFallback";
 import { initialState, reducer } from "@/contexts/store/reducer";
 import type { State, Actions } from "@/contexts/store/types";
-import { StoreProvider } from "@/contexts/store/context";
+import { StoreProvider } from "@/contexts/store/provider";
 
 const FusionAccessHome: React.FC = () => {
   return (
