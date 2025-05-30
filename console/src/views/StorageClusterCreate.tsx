@@ -2,7 +2,7 @@ import { Redirect } from "react-router";
 import { StoreProvider, useStoreContext } from "@/contexts/store/context";
 import type { State, Actions } from "@/contexts/store/types";
 import { reducer, initialState } from "@/contexts/store/reducer";
-import { DownloadLogsButton } from "@/components/DownloadLogsButton";
+// import { DownloadLogsButton } from "@/components/DownloadLogsButton";
 import { NodesSelectionTable } from "@/components/NodesSelectionTable";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { CreateStorageClusterButton } from "@/components/CreateStorageClusterButton";
@@ -41,7 +41,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
         "To create a storage cluster select at least {{MINIMUM_AMOUNT_OF_NODES}} nodes that share the same amount of disks.",
         { MINIMUM_AMOUNT_OF_NODES }
       )}
-      actions={[<DownloadLogsButton key="download-logs" />]}
+      // actions={[<DownloadLogsButton key="download-logs" />]}
       alerts={store.alerts}
       footer={
         <CreateStorageClusterButton
