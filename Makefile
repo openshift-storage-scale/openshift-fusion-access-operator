@@ -12,7 +12,7 @@ MUST_GATHER_DOCKERFILE ?= must-gather.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
 # Version of yaml file to generate rbacs from
-RBAC_VERSION ?= v5.2.2.0
+RBAC_VERSION ?= v5.2.3.0.1
 
 PULLFILE ?= internal/controller/pull.txt
 
@@ -311,13 +311,13 @@ $(LOCALBIN):
 
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.17.2
+KUSTOMIZE_VERSION ?= v5.6.0
+CONTROLLER_TOOLS_VERSION ?= v0.17.3
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 GOLANGCI_LINT_VERSION ?= v2.1.6
 # update for major version updates to YQ_VERSION!
 YQ_API_VERSION = v4
-YQ_VERSION = v4.41.1
+YQ_VERSION = v4.45.4
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -326,6 +326,9 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 YQ ?= $(LOCALBIN)/yq-$(YQ_VERSION)
+OPERATOR_SDK_VERSION ?= v1.39.2
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)
@@ -365,11 +368,6 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/${YQ_API_VERSION},${YQ_VERSION})
-
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.39.1
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
 
 .PHONY: operator-sdk
 operator-sdk: $(OPERATOR_SDK)
