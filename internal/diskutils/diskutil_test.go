@@ -59,16 +59,17 @@ var _ = Describe("BlockDevice", func() {
 			Expect(path).To(Equal("/dev/dm-0"))
 		})
 
-		// Need to fix the code first
-		// It("errors out when mpath_member has no children", func() {
-		// 	device := &BlockDevice{
-		// 		FSType:   "mpath_member",
-		// 		Children: []BlockDevice{},
-		// 	}
-		// 	path, err := device.GetDevPath()
-		// 	Expect(err).ToNot(HaveOccurred())
-		// 	Expect(path).To(Equal("/dev/dm-0"))
-		// })
+		It("errors out when mpath_member has no children", func() {
+			device := &BlockDevice{
+				FSType:   "mpath_member",
+				Path:     "/dev/sdd",
+				Children: []BlockDevice{},
+			}
+			path, err := device.GetDevPath()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no multipath members found"))
+			Expect(path).To(Equal(""))
+		})
 
 		It("returns Path otherwise", func() {
 			device := &BlockDevice{
@@ -101,6 +102,17 @@ var _ = Describe("BlockDevice", func() {
 			path, err := device.GetPathByID()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(path).To(Equal("/dev/disk/by-id/wwn-456"))
+		})
+
+		It("errors out when mpath_member has no children", func() {
+			device := &BlockDevice{
+				FSType:   "mpath_member",
+				Path:     "/dev/sdd",
+				Children: []BlockDevice{},
+			}
+			_, err := device.GetPathByID()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no multipath members found"))
 		})
 
 		It("returns error if no PathByID", func() {

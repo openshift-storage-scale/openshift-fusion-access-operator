@@ -81,8 +81,11 @@ func (b *BlockDevice) BiosPartition() bool {
 // GetDevPath for block device (/dev/sdx)
 func (b *BlockDevice) GetDevPath() (path string, err error) {
 	if b.FSType == "mpath_member" {
-		// mpaths always have a single children
-		return fmt.Sprintf("/dev/%s", b.Children[0].KName), nil
+		// correct mpaths always have a single children
+		if len(b.Children) != 0 {
+			return fmt.Sprintf("/dev/%s", b.Children[0].KName), nil
+		}
+		return "", fmt.Errorf("no multipath members found %s", b.KName)
 	}
 	return b.Path, nil
 }
@@ -90,7 +93,11 @@ func (b *BlockDevice) GetDevPath() (path string, err error) {
 // GetPathByID check on BlockDevice
 func (b *BlockDevice) GetPathByID() (string, error) {
 	if b.FSType == "mpath_member" {
-		return fmt.Sprintf("/dev/disk/by-id/%s", b.Children[0].PathByID), nil
+		// correct mpaths always have a single children
+		if len(b.Children) != 0 {
+			return fmt.Sprintf("/dev/disk/by-id/%s", b.Children[0].PathByID), nil
+		}
+		return "", fmt.Errorf("no multipath members found %s", b.KName)
 	}
 
 	if b.PathByID != "" {
