@@ -24,7 +24,7 @@ import {
   type ExtraRowData,
 } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStoreContext } from "@/contexts/store/provider";
+import { useStore } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import { getSelectedNodes } from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
 
@@ -113,7 +113,7 @@ const useValidateStorageClusterMinimumRequirements = (
   selectedNodes: IoK8sApiCoreV1Node[],
   isLoaded: boolean
 ) => {
-  const [, dispatch] = useStoreContext<State, Actions>();
+  const [, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
 
   useEffect(() => {

@@ -8,7 +8,7 @@ type StoreContextValue<TState = any, TActions = any> =
 
 const StoreContext = createContext<StoreContextValue>(null);
 
-export function useStoreContext<TState = unknown, TActions = unknown>() {
+export function useStore<TState = unknown, TActions = unknown>() {
   const context = useContext<StoreContextValue<TState, TActions>>(StoreContext);
   if (!context) {
     throw new Error("useStoreContext hook must be used within <StoreProvider>");

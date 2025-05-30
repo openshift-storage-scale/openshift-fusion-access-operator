@@ -4,7 +4,7 @@ import { getLabels, hasLabel } from "@/utils/console/K8sResourceCommon";
 import { STORAGE_ROLE_LABEL } from "@/constants";
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
 import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import { useStoreContext } from "@/contexts/store/provider";
+import { useStore } from "@/contexts/store/provider";
 import { getDigest } from "@/utils/crypto/hash";
 import type { NodeSelectionActions } from "@/hooks/useNodeSelectionState";
 import type { State, Actions } from "@/contexts/store/types";
@@ -28,7 +28,7 @@ export const useSelectNodeHandler: UseSelectNodeHandler = ({
   isSelectionPending,
   nodeSelectionActions,
 }) => {
-  const [, dispatch] = useStoreContext<State, Actions>();
+  const [, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
   const [nodeModel, _] = useK8sModel({
     version: "v1",

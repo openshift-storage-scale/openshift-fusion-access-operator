@@ -1,4 +1,4 @@
-import { StoreProvider, useStoreContext } from "@/contexts/store/provider";
+import { StoreProvider, useStore } from "@/contexts/store/provider";
 import { reducer, initialState } from "@/contexts/store/reducer";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";
@@ -52,7 +52,7 @@ FileSystemsCreate.displayName = "FileSystemsCreate";
 export default FileSystemsCreate;
 
 const ConnectedCreateFileSystems: React.FC = () => {
-  const [store] = useStoreContext<State, Actions>();
+  const [store] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
 
   return (
@@ -77,7 +77,7 @@ interface Lun {
 }
 
 const FileSystemCreateForm = () => {
-  const [store] = useStoreContext<State, Actions>();
+  const [store] = useStore<State, Actions>();
   const {
     getValue,
     setValue,

@@ -1,4 +1,4 @@
-import { useStoreContext } from "@/contexts/store/provider";
+import { useStore } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import type {
   LocalVolumeDiscoveryResult,
@@ -23,7 +23,7 @@ export const useCreateFileSystemHandler = (
   discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
   selectedDevices: DiscoveredDevice[]
 ) => {
-  const [, dispatch] = useStoreContext<State, Actions>();
+  const [, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
   const history = useHistory();
 

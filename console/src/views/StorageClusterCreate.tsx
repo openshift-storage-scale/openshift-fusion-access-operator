@@ -1,5 +1,5 @@
 import { Redirect, useHistory } from "react-router";
-import { StoreProvider, useStoreContext } from "@/contexts/store/provider";
+import { StoreProvider, useStore } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import { reducer, initialState } from "@/contexts/store/reducer";
 // import { DownloadLogsButton } from "@/components/DownloadLogsButton";
@@ -31,7 +31,7 @@ export default StorageClusterCreate;
 
 const ConnectedStorageClusterCreate: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  const [store] = useStoreContext<State, Actions>();
+  const [store] = useStore<State, Actions>();
   const handleCreateStorageCluster = useCreateStorageClusterHandler();
   const history = useHistory();
 
