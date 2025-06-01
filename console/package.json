@@ -34,6 +34,7 @@
   "dependencies": {
     "@patternfly/react-table": "^5.1.1",
     "@patternfly/react-tokens": "^5.1.1",
+    "@preact/signals-react": "^3.2.0",
     "convert": "^5.9.0",
     "immer": "^10.1.1",
     "use-immer": "^0.11.0"
