@@ -25,14 +25,6 @@ import (
 // +kubebuilder:validation:Enum=v5.2.3.0;v5.2.3.0.rc1;v5.2.3.0.1
 type CNSAVersions string
 
-type ExternalImagePullStatus int
-
-const (
-	CheckNotRun ExternalImagePullStatus = iota
-	CheckSuccess
-	CheckFailed
-)
-
 // FusionAccessSpec defines the desired state of FusionAccess
 type FusionAccessSpec struct {
 	// NOTE(bandini): If you change anything in the following three lines you need to update
