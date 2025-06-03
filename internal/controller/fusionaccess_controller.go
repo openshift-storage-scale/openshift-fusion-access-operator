@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -25,6 +26,9 @@ import (
 	"github.com/manifestival/manifestival"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+
+	meta "k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -326,10 +330,22 @@ func (r *FusionAccessReconciler) Reconcile(
 
 	if err := installManifest.Apply(); err != nil {
 		log.Log.Error(err, "Error applying manifest")
-		return reconcile.Result{}, err
+		fusionaccess.Status.Status = "Error"
+		meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+			v1.Condition{Type: "ManifestApply", Status: v1.ConditionFalse, Reason: "ReconcileCompleted", Message: "CNSA manifest apply failed"})
+		serr := r.Status().Update(ctx, fusionaccess)
+		if serr != nil {
+			return ctrl.Result{}, errors.Join(serr, err)
+		}
+		return ctrl.Result{}, err
 	}
 	log.Log.Info(fmt.Sprintf("Applied manifest from %s", install_path))
-
+	meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+		v1.Condition{Type: "ManifestApply", Status: v1.ConditionTrue, Reason: "ReconcileCompleted", Message: "CNSA manifest was applied"})
+	serr := r.Status().Update(ctx, fusionaccess)
+	if serr != nil {
+		return ctrl.Result{}, serr
+	}
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
 	// If we don't find it, we don't create the entitlement secrets and we keep going as a user might be
 	// patching the global pull secret
@@ -353,7 +369,20 @@ func (r *FusionAccessReconciler) Reconcile(
 	if fusionaccess.Spec.IbmCnsaVersion != "" {
 		err = r.runPullImageCheck(ctx, ns, fusionaccess)
 		if err != nil {
+			fusionaccess.Status.Status = "ErrImagePull"
+			meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+				v1.Condition{Type: "ImagePull", Status: v1.ConditionFalse, Reason: "ImagePullDone", Message: "protected images can't be pulled"})
+			serr := r.Status().Update(ctx, fusionaccess)
+			if serr != nil {
+				return ctrl.Result{}, errors.Join(serr, err)
+			}
 			return ctrl.Result{}, err
+		}
+		meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+			v1.Condition{Type: "ImagePull", Status: v1.ConditionTrue, Reason: "ImagePullDone", Message: "protected images pulled successfully"})
+		serr := r.Status().Update(ctx, fusionaccess)
+		if serr != nil {
+			return ctrl.Result{}, serr
 		}
 	} else {
 		log.Log.Info("Skipping image pull check as we are not using a CNSA version in the spec")
@@ -376,6 +405,12 @@ func (r *FusionAccessReconciler) Reconcile(
 		if err := localvolumediscovery.CreateOrUpdateLocalVolumeDiscovery(ctx, lvd, r.Client); err != nil {
 			return ctrl.Result{}, err
 		}
+	}
+
+	fusionaccess.Status.Status = "Ready"
+	err = r.Status().Update(ctx, fusionaccess)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
@@ -438,16 +473,8 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 	ok, err := r.CanPullImage(ctx, r.fullClient, ns, testImage, IBMENTITLEMENTNAME)
 	if ok {
 		log.Log.Info("Image pull test succeeded", "ns", ns, "testImage", testImage)
-		fusionaccess.Status.ExternalImagePullStatus = fusionv1alpha1.CheckSuccess
-		fusionaccess.Status.ExternalImagePullError = ""
 	} else {
 		log.Log.Error(err, "Image pull test failed", "ns", ns, "testImage", testImage)
-		fusionaccess.Status.ExternalImagePullStatus = fusionv1alpha1.CheckFailed
-		fusionaccess.Status.ExternalImagePullError = err.Error()
-	}
-	err = r.Status().Update(ctx, fusionaccess)
-	if err != nil {
-		return err
 	}
 	return nil
 }

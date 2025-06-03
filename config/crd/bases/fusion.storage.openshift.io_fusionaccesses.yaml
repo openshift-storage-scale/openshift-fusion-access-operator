@@ -65,11 +65,8 @@ spec:
                   Important: Run "make" to regenerate code after modifying this file
                   Conditions is a list of conditions and their status.
                 items:
-                  description: |-
-                    This is a copy from https://github.com/kubernetes/apimachinery/blob/e8a77bd768fd1419e9b3b48a28dd2c6458733a20/pkg/apis/meta/v1/types.go#L1589
-                    Removed the Reason and ObservedGeneration field because we don't use them, and Reason is a mandatory field.
-
-                    Condition contains details for one aspect of the current state of this API Resource.
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -82,6 +79,25 @@ spec:
                         message is a human readable message indicating details about the transition.
                         This may be an empty string.
                       maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                       type: string
                     status:
                       description: status of the condition, one of True, False, Unknown.
@@ -98,22 +114,20 @@ spec:
                   required:
                   - lastTransitionTime
                   - message
+                  - reason
                   - status
                   - type
                   type: object
                 type: array
-              externalImagePullError:
-                description: Show the error in case of failure of pulling external
-                  image
-                type: string
-              externalImagePullStatus:
-                description: Show the status of pulling an external test image
-                type: integer
               observedGeneration:
                 description: observedGeneration is the last generation change the
                   operator has dealt with
                 format: int64
                 type: integer
+              status:
+                description: Show the general status of the fusion access object (this
+                  can be shown nicely on ocp console UI)
+                type: string
               totalProvisionedDeviceCount:
                 description: TotalProvisionedDeviceCount is the count of the total
                   devices over which the PVs has been provisioned

@@ -64,7 +64,7 @@ type LocalVolumeDiscoveryStatus struct {
 	// to the user
 	Phase DiscoveryPhase `json:"phase,omitempty"`
 	// Conditions are the list of conditions and their status.
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// observedGeneration is the last generation change the operator has dealt with
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

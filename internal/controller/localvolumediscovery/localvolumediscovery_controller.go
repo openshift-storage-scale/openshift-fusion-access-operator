@@ -183,13 +183,13 @@ func (r *LocalVolumeDiscoveryReconciler) updateDiscoveryStatus(ctx context.Conte
 	phase localv1alpha1.DiscoveryPhase) error {
 	// avoid frequently updating the same status in the CR
 	if len(instance.Status.Conditions) < 1 || instance.Status.Conditions[0].Message != message {
-		condition := localv1alpha1.Condition{
+		condition := metav1.Condition{
 			Type:               conditionType,
 			Status:             status,
 			Message:            message,
 			LastTransitionTime: metav1.Now(),
 		}
-		newConditions := []localv1alpha1.Condition{condition}
+		newConditions := []metav1.Condition{condition}
 		instance.Status.Conditions = newConditions
 		instance.Status.Phase = phase
 		instance.Status.ObservedGeneration = instance.Generation
