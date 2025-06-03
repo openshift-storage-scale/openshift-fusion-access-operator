@@ -6,18 +6,21 @@ WORKDIR /workspace
 COPY . .
 
 RUN make build-devicefinder
+RUN mkdir licenses
+COPY LICENSE licenses/
 
 FROM registry.redhat.io/ubi10/ubi:latest
 
-ARG VERSION=1.0
-
 COPY --from=builder /workspace/_output/bin/devicefinder /usr/bin/
 RUN dnf install -y udev && dnf clean all
+COPY --from=builder /workspace/licenses/ /licenses/
+ARG VERSION=1.0
+USER 65532:65532
 ENTRYPOINT ["/usr/bin/devicefinder"]
 
 LABEL \
     com.redhat.component="Device Finder image for OpenShift Fusion Access Operator" \
-    description="" \
+    description="Device Finder image for OpenShift Fusion Access Operator" \
     io.k8s.display-name="Device Finder image for OpenShift Fusion Access Operator" \
     io.k8s.description="" \
     io.openshift.tags="openshift,fusion,access,san" \
@@ -26,7 +29,7 @@ LABEL \
     summary="Device Finder" \
     release="v${VERSION}" \
     version="v${VERSION}" \
-    maintainer="Red Hat jgil@redhat.com" \
+    maintainer="michele@acksyn.org" \
     url="https://github.com/openshift-storage-scale/openshift-fusion-access-operator.git" \
-    vendor="Red Hat, Inc." \
+    vendor="IBM" \
     License="Apache License 2.0"
