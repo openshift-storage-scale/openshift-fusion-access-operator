@@ -110,8 +110,6 @@ var _ = Describe("FusionAccess Controller", func() {
 			updated := &fusionv1alpha.FusionAccess{}
 			err = k8sClient.Get(ctx, typeNamespacedName, updated)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updated.Status.ExternalImagePullError).To(BeEmpty())
-			Expect(updated.Status.ExternalImagePullStatus).To(Equal(fusionv1alpha.CheckSuccess))
 		})
 	})
 })

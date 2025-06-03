@@ -58,16 +58,14 @@ type FusionAccessStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// Conditions is a list of conditions and their status.
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// TotalProvisionedDeviceCount is the count of the total devices over which the PVs has been provisioned
 	TotalProvisionedDeviceCount *int32 `json:"totalProvisionedDeviceCount,omitempty"`
 	// observedGeneration is the last generation change the operator has dealt with
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Show the status of pulling an external test image
-	ExternalImagePullStatus ExternalImagePullStatus `json:"externalImagePullStatus,omitempty"`
-	// Show the error in case of failure of pulling external image
-	ExternalImagePullError string `json:"externalImagePullError,omitempty"`
+	// Show the general status of the fusion access object (this can be shown nicely on ocp console UI)
+	Status string `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
