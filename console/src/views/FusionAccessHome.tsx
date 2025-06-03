@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Redirect, useHistory } from "react-router";
-import { DownloadLogsButton } from "@/components/DownloadLogsButton";
+// import { DownloadLogsButton } from "@/components/DownloadLogsButton";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { StorageClusterEmptyState } from "@/components/StorageClusterEmptyState";
 import { useTriggerAlertsOnErrors } from "@/hooks/useTriggerAlertsOnErrors";
@@ -39,7 +39,7 @@ const ConnectedFusionAccessHome: React.FC = () => {
     <FusionAccessListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
-      actions={<DownloadLogsButton />}
+      // actions={<DownloadLogsButton />}
     >
       <ReactNodeWithPredefinedFallback
         loaded={storageClustersLoaded}
