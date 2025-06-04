@@ -1,7 +1,6 @@
 {
   "An error occurred while creating resources": "An error occurred while creating resources",
   "An error occurred while deleting resources.": "An error occurred while deleting resources.",
-  "An error occurred while selecting a node": "An error occurred while selecting a node",
   "An error occurred while watching resources": "An error occurred while watching resources",
   "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.": "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
   "Cancel": "Cancel",
@@ -15,6 +14,8 @@
   "Delete Filesystem?": "Delete Filesystem?",
   "Deleting": "Deleting",
   "Download logs": "Download logs",
+  "Each node must have at least {{MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL}} of RAM": "Each node must have at least {{MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL}} of RAM",
+  "Each node must have the same number of shared disks": "Each node must have the same number of shared disks",
   "Failed to delete the following local disks:": "Failed to delete the following local disks:",
   "File systems": "File systems",
   "Filesystem is in use": "Filesystem is in use",
@@ -28,7 +29,7 @@
   "Loading LUNs": "Loading LUNs",
   "Loading resources...": "Loading resources...",
   "Loading storage classes": "Loading storage classes",
-  "Make sure all nodes for the storage cluster are selected before you continue (at least three nodes are required).": "Make sure all nodes for the storage cluster are selected before you continue (at least three nodes are required).",
+  "Make sure all nodes for the storage cluster are selected before you continue.": "Make sure all nodes for the storage cluster are selected before you continue.",
   "Memory": "Memory",
   "Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}": "Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}",
   "Name": "Name",
@@ -48,7 +49,6 @@
   "Storage cluster requirements": "Storage cluster requirements",
   "StorageClass": "StorageClass",
   "Unknown": "Unknown",
-  "Worker nodes will be rebooted while creating the storage cluster.": "Worker nodes will be rebooted while creating the storage cluster.",
   "You can create one by pressing the button below.": "You can create one by pressing the button below.",
   "You need to create a storage cluster before you'll be able to create file systems.": "You need to create a storage cluster before you'll be able to create file systems.",
   "You will be able to continue once the resources are loaded": "You will be able to continue once the resources are loaded"
