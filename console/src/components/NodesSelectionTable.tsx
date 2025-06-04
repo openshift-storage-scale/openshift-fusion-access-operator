@@ -1,82 +1,53 @@
-import { useEffect } from "react";
 import {
   VirtualizedTable,
   type TableColumn,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Alert, Stack, StackItem } from "@patternfly/react-core";
 import {
-  useFusionAccessTranslations,
   t,
+  useFusionAccessTranslations,
 } from "@/hooks/useFusionAccessTranslations";
-import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import { useWatchNode } from "@/hooks/useWatchNode";
-import {
-  MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-  MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL,
-  MINIMUM_AMOUNT_OF_NODES,
-  MINIMUM_AMOUNT_OF_NODES_LITERAL,
-  WORKER_NODE_ROLE_LABEL,
-} from "@/constants";
-import { useTriggerAlertsOnErrors } from "@/hooks/useTriggerAlertsOnErrors";
-import { useWatchLocalVolumeDiscoveryResult } from "@/hooks/useWatchLocalVolumeDiscoveryResult";
-import {
-  NodesSelectionTableRow,
-  type ExtraRowData,
-} from "./NodesSelectionTableRow";
+import { WORKER_NODE_ROLE_LABEL } from "@/constants";
+import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStore } from "@/contexts/store/provider";
-import type { State, Actions } from "@/contexts/store/types";
-import { getSelectedNodes } from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
-
-const columns: TableColumn<IoK8sApiCoreV1Node>[] = [
-  {
-    id: "checkbox",
-    title: "",
-    props: { className: "pf-v5-c-table__check" },
-  },
-  {
-    id: "name",
-    title: t("Name"),
-  },
-  {
-    id: "role",
-    title: t("Role"),
-    props: { className: "pf-v5-u-text-align-center" },
-  },
-  {
-    id: "cpu",
-    title: t("CPU"),
-    props: { className: "pf-v5-u-text-align-center" },
-  },
-  {
-    id: "memory",
-    title: t("Memory"),
-    props: { className: "pf-v5-u-text-align-center" },
-  },
-  {
-    id: "shared-disks",
-    title: t("Shared disks"),
-    props: { className: "pf-v5-u-text-align-center" },
-  },
-];
+import { useWatchNode } from "@/hooks/useWatchNode";
+import { useWatchLocalVolumeDiscoveryResult } from "@/hooks/useWatchLocalVolumeDiscoveryResult";
+import { useSignals } from "@preact/signals-react/runtime";
+import { useEffect } from "react";
+import {
+  useNodeSelectionChangeHandler,
+  type NodeSelectionChangeHandler,
+} from "@/hooks/useNodeSelectionChangeHandler";
+import { useNodesSelectionTableViewModel } from "@/view-models/NodesSelectionTableViewModel";
+import type { NodesSelectionTableRowViewModel } from "@/view-models/NodesSelectionTableRowViewModel";
 
 export const NodesSelectionTable: React.FC = () => {
+  useSignals();
+  const state = useNodesSelectionTableViewModel();
   const { t } = useFusionAccessTranslations();
-  const [nodes, nodesLoaded, nodesLoadedError] = useWatchNode({
+  const [nodes, nodesLoaded, nodesLoadErrorMessage] = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL],
     isList: true,
   });
-  const [
-    disksDiscoveryResults,
-    disksDiscoveryResultsLoaded,
-    disksDiscoveryResultsError,
-  ] = useWatchLocalVolumeDiscoveryResult({ isList: true });
+  const [lvdrs, lvdrsLoaded, lvdrsLoadErrorMessage] =
+    useWatchLocalVolumeDiscoveryResult({ isList: true });
 
-  useTriggerAlertsOnErrors(nodesLoadedError, disksDiscoveryResultsError);
+  useEffect(() => {
+    state.isLoaded = nodesLoaded && lvdrsLoaded;
+    state.loadErrorMessage = nodesLoadErrorMessage || lvdrsLoadErrorMessage;
+    if (state.isLoaded && !state.loadErrorMessage) {
+      state.setTableRows(nodes);
+    }
+  }, [
+    state,
+    lvdrsLoadErrorMessage,
+    lvdrsLoaded,
+    nodes,
+    nodesLoadErrorMessage,
+    nodesLoaded,
+  ]);
 
-  const isLoaded = nodesLoaded && disksDiscoveryResultsLoaded;
-  const selectedNodes = getSelectedNodes(nodes);
-  useValidateStorageClusterMinimumRequirements(selectedNodes, isLoaded);
+  const handleNodeSelectionChange = useNodeSelectionChangeHandler(nodes);
 
   return (
     <Stack hasGutter>
@@ -90,17 +61,17 @@ export const NodesSelectionTable: React.FC = () => {
         />
       </StackItem>
       <StackItem isFilled>
-        <VirtualizedTable<IoK8sApiCoreV1Node, ExtraRowData>
-          data={nodes}
-          unfilteredData={nodes}
+        <VirtualizedTable<
+          NodesSelectionTableRowViewModel,
+          { onNodeSelectionChange: NodeSelectionChangeHandler }
+        >
           columns={columns}
-          loaded={isLoaded}
-          loadError={nodesLoadedError || disksDiscoveryResultsError}
+          data={state.tableRows}
+          unfilteredData={state.tableRows}
+          loaded={state.isLoaded}
+          loadError={state.loadErrorMessage}
+          rowData={{ onNodeSelectionChange: handleNodeSelectionChange }}
           Row={NodesSelectionTableRow}
-          rowData={{
-            selectedNodes,
-            disksDiscoveryResults,
-          }}
           EmptyMsg={NodesSelectionEmptyState}
         />
       </StackItem>
@@ -109,68 +80,29 @@ export const NodesSelectionTable: React.FC = () => {
 };
 NodesSelectionTable.displayName = "NodesSelectionTable";
 
-const useValidateStorageClusterMinimumRequirements = (
-  selectedNodes: IoK8sApiCoreV1Node[],
-  isLoaded: boolean
-) => {
-  const [, dispatch] = useStore<State, Actions>();
-  const { t } = useFusionAccessTranslations();
-
-  useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-
-    const conditions: boolean[] = [
-      false,
-      true,
-      selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
-    ];
-
-    if (conditions.some(Boolean)) {
-      dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: true } },
-      });
-      dispatch({
-        type: "addAlert",
-        payload: {
-          key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-          variant: "warning",
-          title: t("Storage cluster requirements"),
-          description: [
-            conditions[0]
-              ? t("Each node must have the same number of shared disks")
-              : "",
-            conditions[1]
-              ? t(
-                  "Each node must have at least {{MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL}} of RAM",
-                  {
-                    MINIMUM_AMOUNT_OF_MEMORY_GIB_LITERAL,
-                  }
-                )
-              : "",
-            conditions[2]
-              ? t(
-                  "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
-                  {
-                    MINIMUM_AMOUNT_OF_NODES_LITERAL,
-                  }
-                )
-              : "",
-          ].filter(Boolean),
-          isDismissable: false,
-        },
-      });
-    } else {
-      dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: false } },
-      });
-      dispatch({
-        type: "removeAlert",
-        payload: { key: MIN_AMOUNT_OF_NODES_MSG_DIGEST },
-      });
-    }
-  }, [dispatch, isLoaded, selectedNodes.length, t]);
-};
+const columns: TableColumn<NodesSelectionTableRowViewModel>[] = [
+  {
+    id: "checkbox",
+    title: "",
+    props: { className: "pf-v6-c-table__check" },
+  },
+  {
+    id: "name",
+    title: t("Name"),
+  },
+  {
+    id: "role",
+    title: t("Role"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+  {
+    id: "cpu",
+    title: t("CPU"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+  {
+    id: "memory",
+    title: t("Memory"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+];

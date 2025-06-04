@@ -59,7 +59,7 @@ const QUANTITY_RE =
 
 export const parseQuantity = (
   quantity: IoK8sApimachineryPkgApiResourceQuantity
-): [QuantityDescriptor, null] | [null, Error] => {
+): QuantityDescriptor | Error => {
   const descriptor: QuantityDescriptor = { unit: "B", value: 0 };
 
   // When quantity is expressed as a plain integer, it is interpreted as bytes.
@@ -68,12 +68,9 @@ export const parseQuantity = (
   } else {
     const result = quantity.match(QUANTITY_RE);
     if (!result) {
-      return [
-        null,
-        new Error(
-          "quantities must match the regular expression " + QUANTITY_RE
-        ),
-      ];
+      return new Error(
+        "quantities must match the regular expression " + QUANTITY_RE
+      );
     }
 
     const number = result.groups?.["number"];
@@ -82,16 +79,16 @@ export const parseQuantity = (
         ? parseFloat(number)
         : parseInt(number, 10);
     } else {
-      return [null, new Error("unable to parse numeric part of quantity")];
+      return new Error("unable to parse numeric part of quantity");
     }
 
     const suffix = result.groups?.["suffix"];
     if (suffix) {
       descriptor.unit = suffix as QuantityDescriptorUnit;
     } else {
-      return [null, new Error("unable to parse quantity's suffix")];
+      return new Error("unable to parse quantity's suffix");
     }
   }
 
-  return [descriptor, null];
+  return descriptor;
 };

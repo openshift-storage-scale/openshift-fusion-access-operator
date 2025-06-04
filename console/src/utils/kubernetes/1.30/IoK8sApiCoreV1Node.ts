@@ -1,6 +1,10 @@
-import convert, { type Unit } from "convert";
+import convert, {
+  type Converter,
+  type MeasuresByUnit,
+  type Unit,
+} from "convert";
 import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import { hasLabel } from "@/utils/console/K8sResourceCommon";
+import { getLabels, hasLabel } from "@/utils/console/K8sResourceCommon";
 import type {
   SuffixBinarySI,
   SuffixDecimalSI,
@@ -37,21 +41,52 @@ export const getRole = (node: IoK8sApiCoreV1Node): NodeRoles => {
   return role;
 };
 
-export const getMemory = (
+export const toggleNodeStorageRoleLabel = (
   node: IoK8sApiCoreV1Node,
-  displayUnit: Extract<"B" | `${SuffixBinarySI | SuffixDecimalSI}B`, Unit>
-): [number, null] | [null, Error] => {
-  if (!node.status?.capacity?.memory) {
-    return [null, new Error("node's memory is not available")];
+  shouldBeSelected: boolean
+): Record<string, string> => {
+  const labels = getLabels(node);
+  const result = structuredClone(labels);
+  const [storageRoleLabelKey, storageRoleLabelValue] =
+    STORAGE_ROLE_LABEL.split("=");
+  if (shouldBeSelected) {
+    result[storageRoleLabelKey] = storageRoleLabelValue;
+  } else {
+    if (storageRoleLabelKey in result) {
+      delete result[storageRoleLabelKey];
+    }
   }
 
-  const [quantity, parseQuantityError] = parseQuantity(node.status.capacity.memory);
-  if (parseQuantityError) {
-    return [null, parseQuantityError];
+  return result;
+};
+
+type ConvertableUnit = Extract<
+  "B" | `${SuffixBinarySI | SuffixDecimalSI}B`,
+  Unit
+>;
+
+export type ConvertableMemoryValue = Converter<
+  number,
+  Extract<ConvertableUnit, MeasuresByUnit<"PiB" | "PB" | "B">>
+>;
+
+export const getMemory = (
+  node: IoK8sApiCoreV1Node
+):
+  | ConvertableMemoryValue
+  | Error => {
+  if (!node.status?.capacity?.memory) {
+    return new Error("node's memory is not available");
+  }
+
+  const quantity = parseQuantity(node.status.capacity.memory);
+
+  if (quantity instanceof Error) {
+    return quantity;
   }
 
   let adaptedValue: number = quantity.value;
-  let adaptedUnit: Extract<"B" | `${SuffixBinarySI | SuffixDecimalSI}B`, Unit>;
+  let adaptedUnit: ConvertableUnit;
   switch (quantity.unit) {
     case "B":
       adaptedUnit = quantity.unit;
@@ -72,8 +107,7 @@ export const getMemory = (
       break;
   }
 
-  const value = convert(adaptedValue, adaptedUnit).to(displayUnit);
-  return [value, null];
+  return convert(adaptedValue, adaptedUnit);
 };
 
 export const getCpu = (node: IoK8sApiCoreV1Node) => node.status?.capacity?.cpu;

@@ -25,8 +25,8 @@ const StorageClusterCreate: React.FC = () => {
     <Redirect to={"/fusion-access/file-systems"} />
   );
 };
-
 StorageClusterCreate.displayName = "StorageClusterCreate";
+
 export default StorageClusterCreate;
 
 const ConnectedStorageClusterCreate: React.FC = () => {
