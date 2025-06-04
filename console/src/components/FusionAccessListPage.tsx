@@ -106,8 +106,7 @@ interface UseListPageBodyStyleHackOptions {
 
 const LIST_PAGE_BODY_DEFAULT_CLASSES =
   "co-m-pane__body co-m-pane__body--no-top-margin";
-const LIST_PAGE_BODY_SELECTOR =
-  "#content-scrollable > section > div.co-m-pane__body";
+const LIST_PAGE_BODY_SELECTOR = "#content-scrollable > .co-m-pane__body";
 
 const useListPageBodyStyleHack = (
   options: Partial<UseListPageBodyStyleHackOptions>
@@ -129,11 +128,11 @@ const useListPageBodyStyleHack = (
 
       // then set new classes
       const classes = [
-        isFlex ? "pf-u-display-flex" : "",
-        isFilled ? "pf-u-flex-grow-1" : "",
-        direction ? `pf-u-flex-direction-${direction}` : "",
-        alignment ? `pf-u-align-items-${alignment}` : "",
-        justification ? `pf-u-justify-content-${justification}` : "",
+        isFlex ? "pf-v6-u-display-flex" : "",
+        isFilled ? "pf-v6-u-flex-grow-1" : "",
+        direction ? `pf-v6-u-flex-direction-${direction}` : "",
+        alignment ? `pf-v6-u-align-items-${alignment}` : "",
+        justification ? `pf-v6-u-justify-content-${justification}` : "",
       ].filter(Boolean);
       ref.classList.add(...classes);
     }
