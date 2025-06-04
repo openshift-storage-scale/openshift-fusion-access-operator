@@ -15,7 +15,6 @@ export interface FusionAccess extends K8sResourceKind {
       type: string;
     }>;
     externalImagePullError?: string;
-    externalImagePullStatus?: number;
     observedGeneration?: number;
     totalProvisionedDeviceCount?: number;
   };
