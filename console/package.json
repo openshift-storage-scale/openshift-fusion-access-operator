@@ -21,7 +21,7 @@
     "lint:inspect-config": "eslint --inspect-config -c config/eslint.config.mjs",
     "start": "concurrently --kill-others -c auto -n \"bridge,devsvr\" -p \"{name}:{pid}\" \"npm run start:console\" \"npm run start:devserver\"",
     "start:devserver": "npm run ts:webpack -- serve --progress -c config/webpack.config.ts",
-    "start:console": "CONSOLE_VERSION=4.18.0 scripts/start-console.sh",
+    "start:console": "CONSOLE_VERSION=4.19.0 scripts/start-console.sh",
     "test-cypress": "cypress open -p integration-tests",
     "test-cypress-headless": "NODE_OPTIONS='--max-old-space-size=4096' cypress run -p integration-tests --browser ${BRIDGE_E2E_BROWSER_NAME:=electron}",
     "test-integration": "scripts/test-integration.sh",
@@ -94,5 +94,6 @@
     "babel-loader": "^8.0.2",
     "i18next": "^24.2.3",
     "mocha": "^10.5.1"
-  }
+  },
+  "packageManager": "yarn@4.9.1+sha512.f95ce356460e05be48d66401c1ae64ef84d163dd689964962c6888a9810865e39097a5e9de748876c2e0bf89b232d583c33982773e9903ae7a76257270986538"
 }
