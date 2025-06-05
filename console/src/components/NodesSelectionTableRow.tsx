@@ -40,21 +40,21 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="role"
       >
         {node.role}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="cpu"
       >
         {node.cpu}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="memory"
       >
         {node.memory}{" "}
