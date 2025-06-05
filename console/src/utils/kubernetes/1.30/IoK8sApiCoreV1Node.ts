@@ -72,9 +72,7 @@ export type ConvertableMemoryValue = Converter<
 
 export const getMemory = (
   node: IoK8sApiCoreV1Node
-):
-  | ConvertableMemoryValue
-  | Error => {
+): ConvertableMemoryValue | Error => {
   if (!node.status?.capacity?.memory) {
     return new Error("node's memory is not available");
   }

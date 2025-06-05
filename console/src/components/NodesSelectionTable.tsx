@@ -10,33 +10,48 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import InfoIcon from "@patternfly/react-icons/dist/esm/icons/info-icon";
-import { WORKER_NODE_ROLE_LABEL } from "@/constants";
+import {
+  MIN_AMOUNT_OF_NODES_MSG_DIGEST,
+  MINIMUM_AMOUNT_OF_NODES,
+  MINIMUM_AMOUNT_OF_NODES_LITERAL,
+  MINIMUM_AMOUNT_OF_SHARED_DISKS,
+  MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL,
+  WORKER_NODE_ROLE_LABEL,
+} from "@/constants";
 import {
   t,
   useFusionAccessTranslations,
 } from "@/hooks/useFusionAccessTranslations";
-import { type NodeSelectionChangeHandler } from "@/hooks/useNodeSelectionChangeHandler";
+import {
+  useNodeSelectionChangeHandler,
+  type NodeSelectionChangeHandler,
+} from "@/hooks/useNodeSelectionChangeHandler";
 import { useWatchNode } from "@/hooks/useWatchNode";
 import { useWatchLocalVolumeDiscoveryResult } from "@/hooks/useWatchLocalVolumeDiscoveryResult";
 import {
   useNodesSelectionTableViewModel,
   type NodesSelectionTableRowViewModel,
+  type NodesSelectionTableViewModel,
 } from "@/hooks/useNodesSelectionTableViewModel";
 import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
+import { useStore } from "@/contexts/store/provider";
+import type { State, Actions } from "@/contexts/store/types";
+import { useEffect } from "react";
 
 export const NodesSelectionTable: React.FC = () => {
   const { t } = useFusionAccessTranslations();
+  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
   const nodesWatchState = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL],
     isList: true,
   });
-  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
   const vm = useNodesSelectionTableViewModel(nodesWatchState, lvdrsWatchState);
-
-  const n = vm.selectedNodes.length;
-  const s = vm.sharedDisks.size;
-  const sharedDisksCounter = `${n === 0 ? "No" : n} nodes selected${n >= 2 ? ` with ${s} shared disks` : ""}`;
+  const handleNodeSelectionChange = useNodeSelectionChangeHandler(
+    vm,
+    nodesWatchState[0]
+  );
+  useValidateStorageClusterMinimumRequirements(vm);
 
   return (
     <Stack hasGutter>
@@ -59,7 +74,7 @@ export const NodesSelectionTable: React.FC = () => {
           unfilteredData={vm.tableRows}
           loaded={vm.isLoaded}
           loadError={vm.loadError}
-          rowData={{ onNodeSelectionChange: vm.handleNodeSelectionChange }}
+          rowData={{ onNodeSelectionChange: handleNodeSelectionChange }}
           Row={NodesSelectionTableRow}
           EmptyMsg={NodesSelectionEmptyState}
         />
@@ -67,7 +82,7 @@ export const NodesSelectionTable: React.FC = () => {
       <StackItem>
         <HelperText>
           <HelperTextItem variant="indeterminate" icon={<InfoIcon />}>
-            {sharedDisksCounter}
+            {vm.sharedDisksCounterMessage}
           </HelperTextItem>
         </HelperText>
       </StackItem>
@@ -102,3 +117,62 @@ const columns: TableColumn<NodesSelectionTableRowViewModel>[] = [
     props: { className: "pf-v6-u-text-align-center" },
   },
 ];
+
+const useValidateStorageClusterMinimumRequirements = (
+  vm: NodesSelectionTableViewModel
+) => {
+  const [, dispatch] = useStore<State, Actions>();
+  const { t } = useFusionAccessTranslations();
+
+  useEffect(() => {
+    if (!vm.isLoaded) {
+      return;
+    }
+
+    const conditions: boolean[] = [
+      vm.sharedDisks.size < MINIMUM_AMOUNT_OF_SHARED_DISKS &&
+        vm.selectedNodes.length < 2,
+      vm.selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
+    ];
+
+    if (conditions.some(Boolean)) {
+      dispatch({
+        type: "updateCtas",
+        payload: { createStorageCluster: { isDisabled: true } },
+      });
+      dispatch({
+        type: "showAlert",
+        payload: {
+          key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
+          variant: "warning",
+          title: t("Storage cluster requirements"),
+          description: [
+            conditions[0]
+              ? t(
+                  "Selected nodes must share at least {{MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL}} disk",
+                  { MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL }
+                )
+              : "",
+            conditions[1]
+              ? t(
+                  "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
+                  {
+                    MINIMUM_AMOUNT_OF_NODES_LITERAL,
+                  }
+                )
+              : "",
+          ].filter(Boolean),
+          isDismissable: false,
+        },
+      });
+    } else {
+      dispatch({
+        type: "updateCtas",
+        payload: { createStorageCluster: { isDisabled: false } },
+      });
+      dispatch({
+        type: "dismissAlert",
+      });
+    }
+  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisks.size]);
+};

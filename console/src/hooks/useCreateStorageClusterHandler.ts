@@ -4,7 +4,6 @@ import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations
 import type { Cluster } from "@/models/ibm-spectrum-scale/Cluster";
 import { STORAGE_ROLE_LABEL } from "@/constants";
 import { useStore } from "@/contexts/store/provider";
-import { getDigest } from "@/utils/crypto/hash";
 import { useHistory } from "react-router";
 import type { State, Actions } from "@/contexts/store/types";
 
@@ -49,11 +48,9 @@ export const useCreateStorageClusterHandler = () => {
       history.push("/fusion-access/file-systems");
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
-      const descriptionDigest = await getDigest(description);
       dispatch({
-        type: "addAlert",
+        type: "showAlert",
         payload: {
-          key: descriptionDigest,
           variant: "danger",
           title: t("An error occurred while creating resources"),
           description,

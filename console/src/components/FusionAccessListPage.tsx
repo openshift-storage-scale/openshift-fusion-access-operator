@@ -12,7 +12,7 @@ import {
   List,
   ListItem,
 } from "@patternfly/react-core";
-import type { AlertsSlice } from "@/contexts/store/types";
+import type { AlertSlice } from "@/contexts/store/types";
 import { useLayoutEffect } from "react";
 
 interface ListPageProps {
@@ -20,8 +20,8 @@ interface ListPageProps {
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
-  alerts?: AlertsSlice;
-  onDismissAlert?: (alert: AlertsSlice[number]) => void;
+  alert?: AlertSlice;
+  onDismissAlert?: (alert: AlertSlice) => void;
   listPageBodyStyle?: Partial<UseListPageBodyStyleHackOptions>;
   footer?: React.ReactNode;
 }
@@ -29,7 +29,7 @@ interface ListPageProps {
 export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
   const {
     actions,
-    alerts = [],
+    alert,
     children,
     description = <br />,
     documentTitle,
@@ -55,8 +55,8 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
         <Stack hasGutter>
           <StackItem>{children}</StackItem>
           <StackItem isFilled style={{ alignContent: "flex-end" }}>
-            <AlertGroup isLiveRegion>
-              {alerts.map((alert) => (
+            {alert && (
+              <AlertGroup isLiveRegion>
                 <Alert
                   isInline
                   key={alert.key}
@@ -85,8 +85,8 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
                     alert.description
                   )}
                 </Alert>
-              ))}
-            </AlertGroup>
+              </AlertGroup>
+            )}
           </StackItem>
           <StackItem>{footer}</StackItem>
         </Stack>

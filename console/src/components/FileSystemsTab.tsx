@@ -28,7 +28,6 @@ import {
   FolderIcon,
 } from "@patternfly/react-icons";
 import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
-import { useTriggerAlertsOnErrors } from "@/hooks/useTriggerAlertsOnErrors";
 import { useWatchFileSystem } from "@/hooks/useWatchFileSystems";
 import type { FileSystem } from "@/models/ibm-spectrum-scale/FileSystem";
 import { getName } from "@/utils/console/K8sResourceCommon";
@@ -155,9 +154,6 @@ export const FileSystemsTab: React.FC = () => {
     routes,
     routesLoaded,
   } = useTableResources();
-
-  // TODO(jkilzi): useTriggerAlertsOnErrors needs polishing...
-  useTriggerAlertsOnErrors(fileSystemsLoadedError);
 
   const columns = useFileSystemsTableColumns();
   const [deleteFs, setDeleteFs] = useState<FileSystem>();

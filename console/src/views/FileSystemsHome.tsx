@@ -1,5 +1,4 @@
 import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";
-// import { DownloadLogsButton } from "@/components/DownloadLogsButton";
 import { FileSystemsTabbedNav } from "@/components/FileSystemsTabbedNav";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { StoreProvider } from "@/contexts/store/provider";
@@ -21,7 +20,6 @@ const FileSystemsHome: React.FC = () => {
         documentTitle={t("Fusion Access for SAN")}
         title={t("Fusion Access for SAN")}
         actions={[
-          // <DownloadLogsButton key="download-logs" />,
           <CreateFileSystemButton
             key="create-filesystem"
             onCreateFileSystem={() => {

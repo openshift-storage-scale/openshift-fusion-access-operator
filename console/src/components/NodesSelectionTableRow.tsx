@@ -1,4 +1,3 @@
-import { useSignals } from "@preact/signals-react/runtime";
 import {
   type RowProps,
   TableData,
@@ -14,8 +13,7 @@ type TableRowProps = RowProps<
 >;
 
 export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
-  useSignals();
-  const { activeColumnIDs, obj: node, rowData } = props;
+  const { activeColumnIDs, obj, rowData } = props;
   const { onNodeSelectionChange } = rowData;
 
   return (
@@ -26,39 +24,39 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
         className="pf-v6-c-table__check"
       >
         <Checkbox
-          id={`node-${node.uid}`}
-          isChecked={node.status$.value === "selected"}
+          id={`node-${obj.uid}`}
+          isChecked={obj.status === "selected"}
           isDisabled={
-            node.status$.value === "selection-pending" ||
-            node.warnings.has("InsufficientMemory")
+            obj.status === "selection-pending" ||
+            obj.warnings.has("InsufficientMemory")
           }
-          onChange={onNodeSelectionChange(node)}
+          onChange={onNodeSelectionChange(obj)}
         />
       </TableData>
       <TableData activeColumnIDs={activeColumnIDs} id="name">
-        {node.name}
+        {obj.name}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
         className="pf-v6-u-text-align-center"
         id="role"
       >
-        {node.role}
+        {obj.role}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
         className="pf-v6-u-text-align-center"
         id="cpu"
       >
-        {node.cpu}
+        {obj.cpu}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
         className="pf-v6-u-text-align-center"
         id="memory"
       >
-        {node.memory}{" "}
-        {node.warnings.has("InsufficientMemory") && (
+        {obj.memory}{" "}
+        {obj.warnings.has("InsufficientMemory") && (
           <Tooltip content={"Insufficient"}>
             <Icon status="warning" isInline>
               <ExclamationTriangleIcon />

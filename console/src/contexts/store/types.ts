@@ -6,14 +6,13 @@ export type Action<T extends string, P = undefined> = P extends undefined
 
 export type Actions =
   | Action<"updateGlobal", Partial<State["global"]>>
-  | Action<"addAlert", State["alerts"][number]>
-  | Action<"removeAlert", Omit<State["alerts"][number], "title">>
-  | Action<"clearAlerts">
+  | Action<"showAlert", State["alert"]>
+  | Action<"dismissAlert">
   | Action<"updateCtas", Partial<State["ctas"]>>;
 
 export interface State {
   global: GlobalSlice;
-  alerts: AlertsSlice;
+  alert: AlertSlice;
   ctas: CallToActionsSlice;
 }
 
@@ -21,17 +20,14 @@ export interface GlobalSlice {
   documentTitle: string;
 }
 
-export type AlertsSlice = Array<
-  Pick<AlertProps, "key" | "variant" | "title"> & {
-    description?: string | string[];
-    isDismissable?: boolean;
-  }
->;
+export type AlertSlice =
+  | (Pick<AlertProps, "key" | "variant" | "title"> & {
+      description?: string | string[];
+      isDismissable?: boolean;
+    })
+  | null;
 
-export type CallToActionNames =
-  | "createStorageCluster"
-  | "createFileSystem"
-  | "downloadLogs";
+export type CallToActionNames = "createStorageCluster" | "createFileSystem";
 
 export interface CallToActionState {
   isDisabled?: boolean;
