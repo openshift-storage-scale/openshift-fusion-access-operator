@@ -51,10 +51,8 @@ export const toggleNodeStorageRoleLabel = (
     STORAGE_ROLE_LABEL.split("=");
   if (shouldBeSelected) {
     result[storageRoleLabelKey] = storageRoleLabelValue;
-  } else {
-    if (storageRoleLabelKey in result) {
-      delete result[storageRoleLabelKey];
-    }
+  } else if (storageRoleLabelKey in result) {
+    delete result[storageRoleLabelKey];
   }
 
   return result;
