@@ -1,3 +1,4 @@
+import { useSignals } from "@preact/signals-react/runtime";
 import {
   type RowProps,
   TableData,
@@ -5,8 +6,7 @@ import {
 import { Checkbox, Icon, Tooltip } from "@patternfly/react-core";
 import { ExclamationTriangleIcon } from "@patternfly/react-icons";
 import type { NodeSelectionChangeHandler } from "@/hooks/useNodeSelectionChangeHandler";
-import type { NodesSelectionTableRowViewModel } from "@/view-models/NodesSelectionTableRowViewModel";
-import { useSignals } from "@preact/signals-react/runtime";
+import type { NodesSelectionTableRowViewModel } from "@/hooks/useNodesSelectionTableViewModel";
 
 type TableRowProps = RowProps<
   NodesSelectionTableRowViewModel,
@@ -21,15 +21,15 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
   return (
     <>
       <TableData
-        activeColumnIDs={activeColumnIDs}
         id="checkbox"
+        activeColumnIDs={activeColumnIDs}
         className="pf-v6-c-table__check"
       >
         <Checkbox
           id={`node-${node.uid}`}
-          isChecked={node.status === "selected"}
+          isChecked={node.status$.value === "selected"}
           isDisabled={
-            node.status === "selection-pending" ||
+            node.status$.value === "selection-pending" ||
             node.warnings.has("InsufficientMemory")
           }
           onChange={onNodeSelectionChange(node)}
@@ -57,7 +57,7 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
         className="pf-v5-u-text-align-center"
         id="memory"
       >
-        {node.getMemoryAsString()}{" "}
+        {node.memory}{" "}
         {node.warnings.has("InsufficientMemory") && (
           <Tooltip content={"Insufficient"}>
             <Icon status="warning" isInline>

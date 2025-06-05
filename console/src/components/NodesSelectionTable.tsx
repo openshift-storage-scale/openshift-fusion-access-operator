@@ -3,51 +3,38 @@ import {
   type TableColumn,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Alert, Stack, StackItem } from "@patternfly/react-core";
+import { WORKER_NODE_ROLE_LABEL } from "@/constants";
 import {
   t,
   useFusionAccessTranslations,
 } from "@/hooks/useFusionAccessTranslations";
-import { WORKER_NODE_ROLE_LABEL } from "@/constants";
-import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
-import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
+import { type NodeSelectionChangeHandler } from "@/hooks/useNodeSelectionChangeHandler";
 import { useWatchNode } from "@/hooks/useWatchNode";
 import { useWatchLocalVolumeDiscoveryResult } from "@/hooks/useWatchLocalVolumeDiscoveryResult";
-import { useSignals } from "@preact/signals-react/runtime";
-import { useEffect } from "react";
 import {
-  useNodeSelectionChangeHandler,
-  type NodeSelectionChangeHandler,
-} from "@/hooks/useNodeSelectionChangeHandler";
-import { useNodesSelectionTableViewModel } from "@/view-models/NodesSelectionTableViewModel";
-import type { NodesSelectionTableRowViewModel } from "@/view-models/NodesSelectionTableRowViewModel";
+  useNodesSelectionTableViewModel,
+  type NodesSelectionTableRowViewModel,
+} from "@/hooks/useNodesSelectionTableViewModel";
+import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
+import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
+import { useEffect } from "react";
 
 export const NodesSelectionTable: React.FC = () => {
-  useSignals();
-  const state = useNodesSelectionTableViewModel();
   const { t } = useFusionAccessTranslations();
-  const [nodes, nodesLoaded, nodesLoadErrorMessage] = useWatchNode({
+  const nodesWatchState = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL],
     isList: true,
   });
-  const [lvdrs, lvdrsLoaded, lvdrsLoadErrorMessage] =
-    useWatchLocalVolumeDiscoveryResult({ isList: true });
+  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
+  const vm = useNodesSelectionTableViewModel(nodesWatchState, lvdrsWatchState);
 
   useEffect(() => {
-    state.isLoaded = nodesLoaded && lvdrsLoaded;
-    state.loadErrorMessage = nodesLoadErrorMessage || lvdrsLoadErrorMessage;
-    if (state.isLoaded && !state.loadErrorMessage) {
-      state.setTableRows(nodes);
-    }
-  }, [
-    state,
-    lvdrsLoadErrorMessage,
-    lvdrsLoaded,
-    nodes,
-    nodesLoadErrorMessage,
-    nodesLoaded,
-  ]);
-
-  const handleNodeSelectionChange = useNodeSelectionChangeHandler(nodes);
+    const n = vm.selectedNodes.length;
+    const s = vm.sharedDisks.size;
+    console.log(
+      `${n === 0 ? "No" : n} nodes selected${n >= 2 ? `, ${s} shared disks` : ""}`
+    );
+  }, [vm.selectedNodes.length, vm.sharedDisks.size]);
 
   return (
     <Stack hasGutter>
@@ -66,11 +53,11 @@ export const NodesSelectionTable: React.FC = () => {
           { onNodeSelectionChange: NodeSelectionChangeHandler }
         >
           columns={columns}
-          data={state.tableRows}
-          unfilteredData={state.tableRows}
-          loaded={state.isLoaded}
-          loadError={state.loadErrorMessage}
-          rowData={{ onNodeSelectionChange: handleNodeSelectionChange }}
+          data={vm.tableRows}
+          unfilteredData={vm.tableRows}
+          loaded={vm.isLoaded}
+          loadError={vm.loadError}
+          rowData={{ onNodeSelectionChange: vm.handleNodeSelectionChange }}
           Row={NodesSelectionTableRow}
           EmptyMsg={NodesSelectionEmptyState}
         />

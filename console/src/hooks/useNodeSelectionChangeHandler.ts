@@ -1,10 +1,10 @@
+import { useCallback } from "react";
+import { useK8sModel, k8sPatch } from "@openshift-console/dynamic-plugin-sdk";
 import { STORAGE_ROLE_LABEL } from "@/constants";
 import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import type { NodesSelectionTableRowViewModel } from "@/view-models/NodesSelectionTableRowViewModel";
 import { getUid, hasLabel } from "@/utils/console/K8sResourceCommon";
 import { toggleNodeStorageRoleLabel } from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
-import { useK8sModel, k8sPatch } from "@openshift-console/dynamic-plugin-sdk";
-import { useCallback } from "react";
+import type { NodesSelectionTableRowViewModel } from "./useNodesSelectionTableViewModel";
 
 export type NodeSelectionChangeHandler = (
   node: NodesSelectionTableRowViewModel
@@ -13,14 +13,14 @@ export type NodeSelectionChangeHandler = (
 export const useNodeSelectionChangeHandler = (
   nodes: IoK8sApiCoreV1Node[]
 ): NodeSelectionChangeHandler => {
-  const [k8sNode, _] = useK8sModel({
+  const [k8sNode] = useK8sModel({
     version: "v1",
     kind: "Node",
   });
 
   return useCallback<NodeSelectionChangeHandler>(
     (nodeModel) => async (_, checked) => {
-      if (nodeModel.status === "selection-pending") {
+      if (nodeModel.status$.value === "selection-pending") {
         return;
       }
 
@@ -30,7 +30,7 @@ export const useNodeSelectionChangeHandler = (
       }
 
       try {
-        nodeModel.status = "selection-pending";
+        nodeModel.status$.value = "selection-pending";
         await k8sPatch({
           data: [
             {
@@ -42,9 +42,9 @@ export const useNodeSelectionChangeHandler = (
           model: k8sNode,
           resource: node,
         });
-        nodeModel.status = checked ? "selected" : "unselected";
+        nodeModel.status$.value = checked ? "selected" : "unselected";
       } catch (_) {
-        nodeModel.status = hasLabel(node, STORAGE_ROLE_LABEL)
+        nodeModel.status$.value = hasLabel(node, STORAGE_ROLE_LABEL)
           ? "selected"
           : "unselected";
       }
