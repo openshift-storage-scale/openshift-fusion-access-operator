@@ -67,13 +67,12 @@ export const useNodesSelectionTableViewModel = (
       )
       .map((lvdr) => lvdr.status?.discoveredDevices ?? [])
       .map((dd) => new Set(dd.map((d) => d.WWN)));
-    const result =
-      wwnSetsList.length >= 2
-        ? wwnSetsList.reduce((previous, current) =>
-            previous.intersection(current)
-          )
-        : new Set<string>();
-    return result;
+    
+      return wwnSetsList.length >= 2
+      ? wwnSetsList.reduce((previous, current) =>
+          previous.intersection(current)
+        )
+      : new Set<string>();
   }, [lvdrs, selectedNodes]);
 
   const sharedDisksCounterMessage = useMemo(() => {

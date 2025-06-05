@@ -6,6 +6,7 @@ import { Checkbox, Icon, Tooltip } from "@patternfly/react-core";
 import { ExclamationTriangleIcon } from "@patternfly/react-icons";
 import type { NodeSelectionChangeHandler } from "@/hooks/useNodeSelectionChangeHandler";
 import type { NodesSelectionTableRowViewModel } from "@/hooks/useNodesSelectionTableViewModel";
+import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
 
 type TableRowProps = RowProps<
   NodesSelectionTableRowViewModel,
@@ -15,6 +16,7 @@ type TableRowProps = RowProps<
 export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
   const { activeColumnIDs, obj, rowData } = props;
   const { onNodeSelectionChange } = rowData;
+  const { t } = useFusionAccessTranslations();
 
   return (
     <>
@@ -57,7 +59,7 @@ export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
       >
         {obj.memory}{" "}
         {obj.warnings.has("InsufficientMemory") && (
-          <Tooltip content={"Insufficient"}>
+          <Tooltip content={t("Insufficient")}>
             <Icon status="warning" isInline>
               <ExclamationTriangleIcon />
             </Icon>
