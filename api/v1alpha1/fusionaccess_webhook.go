@@ -96,12 +96,12 @@ func (r *FusionAccessValidator) ValidateCreate(ctx context.Context, obj runtime.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current cluster version: %v", err)
 	}
-	if !utils.IsOpenShiftSupported(string(p.Spec.IbmCnsaVersion), *ocpVersion) {
+	if !utils.IsOpenShiftSupported(string(p.Spec.StorageScaleVersion), *ocpVersion) {
 		// FIXME(bandini): we currently only log this so QE can test on upcoming versions that are not yet supported by IBM
-		fusionaccesslog.Info("IBM CNSA version not supported", "OCP Version", ocpVersion, "IBM CNSA Version", p.Spec.IbmCnsaVersion)
-		// FIXME(bandini): return nil, fmt.Errorf("IBM CNSA version %s is not supported", ocpVersion)
+		fusionaccesslog.Info("IBM Storage Scale version not supported", "OCP Version", ocpVersion, "IBM Storage ScaleVersion", p.Spec.StorageScaleVersion)
+		// FIXME(bandini): return nil, fmt.Errorf("IBM Storage Scale version %s is not supported", ocpVersion)
 	} else {
-		fusionaccesslog.Info("validate create", "name", p.Name, "OCP Version", ocpVersion, "IBM CNSA Version", p.Spec.IbmCnsaVersion)
+		fusionaccesslog.Info("validate create", "name", p.Name, "OCP Version", ocpVersion, "IBM Storage Scale Version", p.Spec.StorageScaleVersion)
 	}
 	return nil, nil
 }
@@ -130,9 +130,9 @@ func (r *FusionAccessValidator) ValidateUpdate(_ context.Context, oldObj, newObj
 		"name",
 		p.Name,
 		"new version",
-		pNew.Spec.IbmCnsaVersion,
+		pNew.Spec.StorageScaleVersion,
 		"old version",
-		p.Spec.IbmCnsaVersion,
+		p.Spec.StorageScaleVersion,
 	)
 
 	return nil, nil

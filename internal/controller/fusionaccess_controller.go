@@ -366,7 +366,7 @@ func (r *FusionAccessReconciler) Reconcile(
 
 	// Check if can pull the image if we have not already or if it failed previously
 	// Only do this check if we have a set cnsa version
-	if fusionaccess.Spec.IbmCnsaVersion != "" {
+	if fusionaccess.Spec.StorageScaleVersion != "" {
 		err = r.runPullImageCheck(ctx, ns, fusionaccess)
 		if err != nil {
 			fusionaccess.Status.Status = "ErrImagePull"
@@ -465,7 +465,7 @@ func (r *FusionAccessReconciler) getPullSecretSelector(
 }
 
 func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns string, fusionaccess *fusionv1alpha1.FusionAccess) error {
-	testImage, err := utils.GetExternalTestImage(string(fusionaccess.Spec.IbmCnsaVersion))
+	testImage, err := utils.GetExternalTestImage(string(fusionaccess.Spec.StorageScaleVersion))
 	if err != nil {
 		log.Log.Error(err, "Could not figure out test image", "testImage", testImage)
 		return err
@@ -481,7 +481,7 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 
 func getIbmManifest(fusionobj fusionv1alpha1.FusionAccessSpec) (string, error) {
 	extManifestURL := fusionobj.ExternalManifestURL
-	ibmCnsaVersion := fusionobj.IbmCnsaVersion
+	ibmCnsaVersion := fusionobj.StorageScaleVersion
 	if extManifestURL != "" {
 		log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", extManifestURL))
 		if utils.IsExternalManifestURLAllowed(extManifestURL) {
