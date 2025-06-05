@@ -2,7 +2,14 @@ import {
   VirtualizedTable,
   type TableColumn,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { Alert, Stack, StackItem } from "@patternfly/react-core";
+import {
+  Alert,
+  HelperText,
+  HelperTextItem,
+  Stack,
+  StackItem,
+} from "@patternfly/react-core";
+import InfoIcon from "@patternfly/react-icons/dist/esm/icons/info-icon";
 import { WORKER_NODE_ROLE_LABEL } from "@/constants";
 import {
   t,
@@ -17,7 +24,6 @@ import {
 } from "@/hooks/useNodesSelectionTableViewModel";
 import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useEffect } from "react";
 
 export const NodesSelectionTable: React.FC = () => {
   const { t } = useFusionAccessTranslations();
@@ -28,13 +34,9 @@ export const NodesSelectionTable: React.FC = () => {
   const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
   const vm = useNodesSelectionTableViewModel(nodesWatchState, lvdrsWatchState);
 
-  useEffect(() => {
-    const n = vm.selectedNodes.length;
-    const s = vm.sharedDisks.size;
-    console.log(
-      `${n === 0 ? "No" : n} nodes selected${n >= 2 ? `, ${s} shared disks` : ""}`
-    );
-  }, [vm.selectedNodes.length, vm.sharedDisks.size]);
+  const n = vm.selectedNodes.length;
+  const s = vm.sharedDisks.size;
+  const sharedDisksCounter = `${n === 0 ? "No" : n} nodes selected${n >= 2 ? ` with ${s} shared disks` : ""}`;
 
   return (
     <Stack hasGutter>
@@ -61,6 +63,13 @@ export const NodesSelectionTable: React.FC = () => {
           Row={NodesSelectionTableRow}
           EmptyMsg={NodesSelectionEmptyState}
         />
+      </StackItem>
+      <StackItem>
+        <HelperText>
+          <HelperTextItem variant="indeterminate" icon={<InfoIcon />}>
+            {sharedDisksCounter}
+          </HelperTextItem>
+        </HelperText>
       </StackItem>
     </Stack>
   );
