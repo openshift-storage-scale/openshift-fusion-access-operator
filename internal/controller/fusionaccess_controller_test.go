@@ -84,7 +84,7 @@ var _ = Describe("FusionAccess Controller", func() {
 					Namespace: "default",
 				},
 				Spec: fusionv1alpha.FusionAccessSpec{
-					StorageScaleVersion:  "v5.2.3.0",
+					StorageScaleVersion:  "v5.2.3.0.1",
 					LocalVolumeDiscovery: fusionv1alpha.StorageDeviceDiscovery{
 						// Create: false,
 					},

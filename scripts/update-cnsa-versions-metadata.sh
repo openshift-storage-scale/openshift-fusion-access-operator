@@ -32,7 +32,7 @@ awk -v enum="$ENUM_VERSIONS" '
 }
 END {
   for (i = 2; i <= NR; i++) {
-    if (lines[i] ~ /^type CNSAVersions.*/ && lines[i-1] ~ /Enum=.*/) {
+    if (lines[i] ~ /^type StorageScaleVersions.*/ && lines[i-1] ~ /Enum=.*/) {
       sub(/Enum=.*/, "Enum=" enum, lines[i-1])
     }
     print lines[i-1]
@@ -41,17 +41,17 @@ END {
 }' "${API_GO_FILE}" > "${TMP_FILE}"
 
 
-# This replaces the xDescriptors section of the line above the "IbmCnsaVersion CNSAVersions" line
+# This replaces the xDescriptors section of the line above the "IbmCnsaVersion StorageScaleVersions" line
 # and does so on the previous tmp file and saves it to the original file
 # // +operator-sdk:csv:customresourcedefinitions:type=spec,order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.1.1","urn:alm:descriptor:com.tectonic.ui:select:v5.2.2.0","urn:alm:descriptor:com.tectonic.ui:select:v5.2.2.1"}
-# IbmCnsaVersion CNSAVersions `json:"ibm_cnsa_version,omitempty"`
+# StorageScaleVersion StorageScaleVersions CNSAVersions `json:"storageScaleVersion,omitempty"`
 awk -v xd="$TECTONIC_VERSIONS" '
 {
   lines[NR] = $0
 }
 END {
   for (i = 2; i <= NR; i++) {
-    if (lines[i] ~ /IbmCnsaVersion CNSAVersions .*ibm_cnsa_version/ && lines[i-1] ~ /xDescriptors=\{.*\}/) {
+    if (lines[i] ~ /StorageScaleVersion CNSAVersions .*storageScaleVersion/ && lines[i-1] ~ /xDescriptors=\{.*\}/) {
       sub(/xDescriptors=\{[^}]*\}/, "xDescriptors=" xd, lines[i-1])
     }
     print lines[i-1]
