@@ -1,4 +1,4 @@
-import { StoreProvider, useStoreContext } from "@/contexts/store/context";
+import { StoreProvider, useStore } from "@/contexts/store/provider";
 import { reducer, initialState } from "@/contexts/store/reducer";
 import { FusionAccessListPage } from "@/components/FusionAccessListPage";
 import { CreateFileSystemButton } from "@/components/CreateFileSystemButton";
@@ -30,7 +30,6 @@ import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import type { LocalVolumeDiscoveryResult } from "@/models/fusion-access/LocalVolumeDiscoveryResult";
 import type { State, Actions } from "@/contexts/store/types";
 import { HelpLabelIcon } from "@/components/HelpLabelIcon";
-import { useTriggerAlertsOnErrors } from "@/hooks/useTriggerAlertsOnErrors";
 import { getWwn } from "@/utils/fusion-access/LocalVolumeDiscoveryResult";
 
 const NAME_FIELD_VALIDATION_REGEX =
@@ -52,7 +51,7 @@ FileSystemsCreate.displayName = "FileSystemsCreate";
 export default FileSystemsCreate;
 
 const ConnectedCreateFileSystems: React.FC = () => {
-  const [store] = useStoreContext<State, Actions>();
+  const [store, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
 
   return (
@@ -62,7 +61,8 @@ const ConnectedCreateFileSystems: React.FC = () => {
       description={t(
         "Create a file system to represent your required storage (based on the selected nodes’ storage)."
       )}
-      alerts={store.alerts}
+      alert={store.alert}
+      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
     >
       <FileSystemCreateForm />
     </FusionAccessListPage>
@@ -77,7 +77,7 @@ interface Lun {
 }
 
 const FileSystemCreateForm = () => {
-  const [store] = useStoreContext<State, Actions>();
+  const [store] = useStore<State, Actions>();
   const {
     getValue,
     setValue,
@@ -291,20 +291,14 @@ const useDisksDiscoveryResultsForStorageNodes = (): [
   LocalVolumeDiscoveryResult[],
   boolean,
 ] => {
-  const [disksDiscoveryResults, lvLoaded, disksDiscoveryResultsLoadError] =
-    useWatchLocalVolumeDiscoveryResult({
-      isList: true,
-    });
+  const [disksDiscoveryResults, lvLoaded] = useWatchLocalVolumeDiscoveryResult({
+    isList: true,
+  });
 
-  const [selectedNodes, nodesLoaded, selectedNodesLoadError] = useWatchNode({
+  const [selectedNodes, nodesLoaded] = useWatchNode({
     isList: true,
     withLabels: [WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL],
   });
-
-  useTriggerAlertsOnErrors(
-    disksDiscoveryResultsLoadError,
-    selectedNodesLoadError
-  );
 
   const results = useMemo(
     () =>

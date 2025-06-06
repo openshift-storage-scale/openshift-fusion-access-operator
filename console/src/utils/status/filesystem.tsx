@@ -3,7 +3,7 @@ import { GreenCheckCircleIcon, YellowExclamationTriangleIcon } from "@openshift-
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import type { TFunction } from "react-i18next";
 
-type FilesystemStatus = {
+export type FilesystemStatus = {
   id: 'deleting' | 'healthy' | 'unknown' | 'creating' | 'not-healthy';
   title: string;
   icon: React.ReactNode;

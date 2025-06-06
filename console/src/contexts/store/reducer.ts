@@ -9,34 +9,17 @@ enableMapSet(); // Enables Map and Set support in immer
 export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
   switch (action.type) {
     case "updateGlobal":
-      {
-        draft.global = { ...draft.global, ...action.payload };
-      }
+      draft.global = { ...draft.global, ...action.payload };
       break;
-    case "addAlert":
-      {
-        const alertAlreadyExists = draft.alerts.find(
-          (alert) => alert.key === action.payload.key
-        );
-        if (!alertAlreadyExists) {
-          draft.alerts.push(action.payload);
-        }
-      }
+    case "showAlert":
+      draft.alert = action.payload;
       break;
-    case "removeAlert":
-      {
-        draft.alerts = draft.alerts.filter(
-          ({ key }) => key !== action.payload.key
-        );
-      }
-      break;
-    case "clearAlerts":
-      draft.alerts = [];
+    case "dismissAlert":
+      draft.alert = null;
       break;
     case "updateCtas":
       {
-        const { createFileSystem, createStorageCluster, downloadLogs } =
-          action.payload;
+        const { createFileSystem, createStorageCluster } = action.payload;
         draft.ctas = {
           createFileSystem: {
             ...draft.ctas.createFileSystem,
@@ -46,7 +29,6 @@ export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
             ...draft.ctas.createStorageCluster,
             ...createStorageCluster,
           },
-          downloadLogs: { ...draft.ctas.downloadLogs, ...downloadLogs },
         };
       }
       break;
@@ -63,9 +45,8 @@ export const initialState: State = {
   global: {
     documentTitle: t("Fusion Access for SAN"),
   },
-  alerts: [],
+  alert: null,
   ctas: {
-    downloadLogs: { isDisabled: false, isLoading: false },
     createStorageCluster: { isDisabled: true, isLoading: false },
     createFileSystem: { isDisabled: true, isLoading: false },
   },

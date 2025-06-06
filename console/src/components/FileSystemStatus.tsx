@@ -1,8 +1,8 @@
-import type { getFilesystemStatus } from "@/utils/status/filesystem";
+import type { FilesystemStatus } from "@/utils/status/filesystem";
 import { Button, Popover } from "@patternfly/react-core";
 
 type FileSystemStatusProps = {
-  status: ReturnType<typeof getFilesystemStatus>;
+  status: FilesystemStatus;
 };
 
 const FileSystemStatus: React.FC<FileSystemStatusProps> = ({ status }) => {

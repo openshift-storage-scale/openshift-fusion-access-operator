@@ -2,53 +2,56 @@ import {
   VirtualizedTable,
   type TableColumn,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { Alert, Stack, StackItem } from "@patternfly/react-core";
-import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
-import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import { useWatchNode } from "@/hooks/useWatchNode";
+import {
+  Alert,
+  HelperText,
+  HelperTextItem,
+  Stack,
+  StackItem,
+} from "@patternfly/react-core";
+import InfoIcon from "@patternfly/react-icons/dist/esm/icons/info-icon";
 import {
   MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-  MINIMUM_AMOUNT_OF_MEMORY,
   MINIMUM_AMOUNT_OF_NODES,
+  MINIMUM_AMOUNT_OF_NODES_LITERAL,
+  MINIMUM_AMOUNT_OF_SHARED_DISKS,
+  MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL,
   WORKER_NODE_ROLE_LABEL,
 } from "@/constants";
-import { useTriggerAlertsOnErrors } from "@/hooks/useTriggerAlertsOnErrors";
+import {
+  t,
+  useFusionAccessTranslations,
+} from "@/hooks/useFusionAccessTranslations";
+import {
+  useNodeSelectionChangeHandler,
+  type NodeSelectionChangeHandler,
+} from "@/hooks/useNodeSelectionChangeHandler";
+import { useWatchNode } from "@/hooks/useWatchNode";
 import { useWatchLocalVolumeDiscoveryResult } from "@/hooks/useWatchLocalVolumeDiscoveryResult";
-import type { LocalVolumeDiscoveryResult } from "@/models/fusion-access/LocalVolumeDiscoveryResult";
+import {
+  useNodesSelectionTableViewModel,
+  type NodesSelectionTableRowViewModel,
+  type NodesSelectionTableViewModel,
+} from "@/hooks/useNodesSelectionTableViewModel";
 import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStoreContext } from "@/contexts/store/context";
+import { useStore } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
-import { useEffect, useMemo } from "react";
-import {
-  getNodesWithMinimumAmountOfMemory,
-  getSelectedNodes,
-} from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
+import { useEffect } from "react";
 
 export const NodesSelectionTable: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-
-  const [nodes, nodesLoaded, nodesLoadedError] = useWatchNode({
+  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
+  const nodesWatchState = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL],
     isList: true,
   });
-  const [
-    disksDiscoveryResults,
-    disksDiscoveryResultsLoaded,
-    disksDiscoveryResultsError,
-  ] = useWatchLocalVolumeDiscoveryResult({ isList: true });
-  useTriggerAlertsOnErrors(nodesLoadedError, disksDiscoveryResultsError);
-
-  const nodesWithMinimumAmountOfMemory =
-    getNodesWithMinimumAmountOfMemory(nodes);
-  const isLoaded = nodesLoaded && disksDiscoveryResultsLoaded;
-
-  useValidateStorageClusterMinimumRequirements(
-    nodesWithMinimumAmountOfMemory,
-    isLoaded
+  const vm = useNodesSelectionTableViewModel(nodesWatchState, lvdrsWatchState);
+  const handleNodeSelectionChange = useNodeSelectionChangeHandler(
+    vm,
+    nodesWatchState[0]
   );
-
-  const columns = useNodesSelectionTableColumns();
+  useValidateStorageClusterMinimumRequirements(vm);
 
   return (
     <Stack hasGutter>
@@ -57,69 +60,108 @@ export const NodesSelectionTable: React.FC = () => {
           isInline
           variant="info"
           title={t(
-            "Only worker nodes with a minimum of {{MINIMUM_AMOUNT_OF_MEMORY}} of RAM are displayed.",
-            { MINIMUM_AMOUNT_OF_MEMORY }
+            "Make sure all nodes for the storage cluster are selected before you continue."
           )}
         />
       </StackItem>
       <StackItem isFilled>
         <VirtualizedTable<
-          IoK8sApiCoreV1Node,
-          {
-            nodes: IoK8sApiCoreV1Node[];
-            disksDiscoveryResults: LocalVolumeDiscoveryResult[];
-          }
+          NodesSelectionTableRowViewModel,
+          { onNodeSelectionChange: NodeSelectionChangeHandler }
         >
-          data={nodesWithMinimumAmountOfMemory}
-          unfilteredData={nodesWithMinimumAmountOfMemory}
           columns={columns}
-          loaded={isLoaded}
-          loadError={nodesLoadedError || disksDiscoveryResultsError}
+          data={vm.tableRows}
+          unfilteredData={vm.tableRows}
+          loaded={vm.isLoaded}
+          loadError={vm.loadError}
+          rowData={{ onNodeSelectionChange: handleNodeSelectionChange }}
           Row={NodesSelectionTableRow}
-          rowData={{
-            nodes: nodesWithMinimumAmountOfMemory,
-            disksDiscoveryResults,
-          }}
           EmptyMsg={NodesSelectionEmptyState}
         />
+      </StackItem>
+      <StackItem>
+        <HelperText>
+          <HelperTextItem variant="indeterminate" icon={<InfoIcon />}>
+            {vm.sharedDisksCounterMessage}
+          </HelperTextItem>
+        </HelperText>
       </StackItem>
     </Stack>
   );
 };
 NodesSelectionTable.displayName = "NodesSelectionTable";
 
+const columns: TableColumn<NodesSelectionTableRowViewModel>[] = [
+  {
+    id: "checkbox",
+    title: "",
+    props: { className: "pf-v6-c-table__check" },
+  },
+  {
+    id: "name",
+    title: t("Name"),
+  },
+  {
+    id: "role",
+    title: t("Role"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+  {
+    id: "cpu",
+    title: t("CPU"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+  {
+    id: "memory",
+    title: t("Memory"),
+    props: { className: "pf-v6-u-text-align-center" },
+  },
+];
+
 const useValidateStorageClusterMinimumRequirements = (
-  nodesWithMinimumAmountOfMemory: IoK8sApiCoreV1Node[],
-  isLoaded: boolean
+  vm: NodesSelectionTableViewModel
 ) => {
-  const [, dispatch] = useStoreContext<State, Actions>();
+  const [, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
-  const selectedNodes = getSelectedNodes(nodesWithMinimumAmountOfMemory);
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!vm.isLoaded) {
       return;
     }
 
-    const description = t(
-      "At least {{MINIMUM_AMOUNT_OF_NODES}} nodes are required.",
-      {
-        MINIMUM_AMOUNT_OF_NODES,
-      }
-    );
+    const conditions: boolean[] = [
+      vm.sharedDisks.size < MINIMUM_AMOUNT_OF_SHARED_DISKS &&
+        vm.selectedNodes.length < 2,
+      vm.selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
+    ];
 
-    if (selectedNodes.length < MINIMUM_AMOUNT_OF_NODES) {
+    if (conditions.some(Boolean)) {
       dispatch({
         type: "updateCtas",
         payload: { createStorageCluster: { isDisabled: true } },
       });
       dispatch({
-        type: "addAlert",
+        type: "showAlert",
         payload: {
           key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
           variant: "warning",
           title: t("Storage cluster requirements"),
-          description,
+          description: [
+            conditions[0]
+              ? t(
+                  "Selected nodes must share at least {{MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL}} disk",
+                  { MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL }
+                )
+              : "",
+            conditions[1]
+              ? t(
+                  "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
+                  {
+                    MINIMUM_AMOUNT_OF_NODES_LITERAL,
+                  }
+                )
+              : "",
+          ].filter(Boolean),
           isDismissable: false,
         },
       });
@@ -129,47 +171,8 @@ const useValidateStorageClusterMinimumRequirements = (
         payload: { createStorageCluster: { isDisabled: false } },
       });
       dispatch({
-        type: "removeAlert",
-        payload: { key: MIN_AMOUNT_OF_NODES_MSG_DIGEST },
+        type: "dismissAlert",
       });
     }
-  }, [dispatch, isLoaded, selectedNodes.length, t]);
-};
-
-const useNodesSelectionTableColumns = (): TableColumn<IoK8sApiCoreV1Node>[] => {
-  const { t } = useFusionAccessTranslations();
-  return useMemo(
-    () => [
-      {
-        id: "checkbox",
-        title: "",
-        props: { className: "pf-v5-c-table__check" },
-      },
-      {
-        id: "name",
-        title: t("Name"),
-      },
-      {
-        id: "role",
-        title: t("Role"),
-        props: { className: "pf-v5-u-text-align-center" },
-      },
-      {
-        id: "cpu",
-        title: t("CPU"),
-        props: { className: "pf-v5-u-text-align-center" },
-      },
-      {
-        id: "memory",
-        title: t("Memory"),
-        props: { className: "pf-v5-u-text-align-center" },
-      },
-      {
-        id: "shared-disks",
-        title: t("Shared disks"),
-        props: { className: "pf-v5-u-text-align-center" },
-      },
-    ],
-    [t]
-  );
+  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisks.size]);
 };

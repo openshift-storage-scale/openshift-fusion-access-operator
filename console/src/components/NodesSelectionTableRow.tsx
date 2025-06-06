@@ -2,89 +2,69 @@ import {
   type RowProps,
   TableData,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { Checkbox } from "@patternfly/react-core";
-import { useSelectNodeHandler } from "@/hooks/useSelectNodeHandler";
-import { useSharedDisksCount } from "@/hooks/useSharedDisksCount";
-import type { IoK8sApiCoreV1Node } from "@/models/kubernetes/1.30/types";
-import type { LocalVolumeDiscoveryResult } from "@/models/fusion-access/LocalVolumeDiscoveryResult";
-import { getSelectedNodes } from "@/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
-import { useNodeSelectionState } from "@/hooks/useNodeSelectionState";
+import { Checkbox, Icon, Tooltip } from "@patternfly/react-core";
+import { ExclamationTriangleIcon } from "@patternfly/react-icons";
+import type { NodeSelectionChangeHandler } from "@/hooks/useNodeSelectionChangeHandler";
+import type { NodesSelectionTableRowViewModel } from "@/hooks/useNodesSelectionTableViewModel";
+import { useFusionAccessTranslations } from "@/hooks/useFusionAccessTranslations";
 
-export type TableRowProps = RowProps<
-  IoK8sApiCoreV1Node,
-  {
-    nodes: IoK8sApiCoreV1Node[];
-    disksDiscoveryResults: LocalVolumeDiscoveryResult[];
-  }
+type TableRowProps = RowProps<
+  NodesSelectionTableRowViewModel,
+  { onNodeSelectionChange: NodeSelectionChangeHandler }
 >;
 
 export const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
-  const { activeColumnIDs, obj: node, rowData } = props;
-  const { nodes, disksDiscoveryResults } = rowData;
-  const selectedNodes = getSelectedNodes(nodes);
-
-  const [
-    { uid, name, role, cpu, memory, isSelected, isSelectionPending },
-    nodeSelectionActions,
-  ] = useNodeSelectionState(node);
-
-  const sharedDisksCount = useSharedDisksCount(
-    name,
-    isSelected,
-    selectedNodes,
-    disksDiscoveryResults
-  );
-
-  const handleNodeSelection = useSelectNodeHandler({
-    node,
-    isSelectionPending,
-    nodeSelectionActions,
-  });
+  const { activeColumnIDs, obj, rowData } = props;
+  const { onNodeSelectionChange } = rowData;
+  const { t } = useFusionAccessTranslations();
 
   return (
     <>
       <TableData
-        activeColumnIDs={activeColumnIDs}
         id="checkbox"
-        className="pf-v5-c-table__check"
+        activeColumnIDs={activeColumnIDs}
+        className="pf-v6-c-table__check"
       >
         <Checkbox
-          id={`node-${uid}`}
-          isChecked={isSelected}
-          isDisabled={isSelectionPending}
-          onChange={handleNodeSelection}
+          id={`node-${obj.uid}`}
+          isChecked={obj.status === "selected"}
+          isDisabled={
+            obj.status === "selection-pending" ||
+            obj.warnings.has("InsufficientMemory")
+          }
+          onChange={onNodeSelectionChange(obj)}
         />
       </TableData>
       <TableData activeColumnIDs={activeColumnIDs} id="name">
-        {name}
+        {obj.name}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="role"
       >
-        {role}
+        {obj.role}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="cpu"
       >
-        {cpu}
+        {obj.cpu}
       </TableData>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
+        className="pf-v6-u-text-align-center"
         id="memory"
       >
-        {memory}
-      </TableData>
-      <TableData
-        activeColumnIDs={activeColumnIDs}
-        className="pf-v5-u-text-align-center"
-        id="shared-disks"
-      >
-        {sharedDisksCount}
+        {obj.memory}{" "}
+        {obj.warnings.has("InsufficientMemory") && (
+          <Tooltip content={t("Insufficient")}>
+            <Icon status="warning" isInline>
+              <ExclamationTriangleIcon />
+            </Icon>
+          </Tooltip>
+        )}
       </TableData>
     </>
   );

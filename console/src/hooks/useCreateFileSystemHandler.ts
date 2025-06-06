@@ -1,4 +1,4 @@
-import { useStoreContext } from "@/contexts/store/context";
+import { useStore } from "@/contexts/store/provider";
 import type { State, Actions } from "@/contexts/store/types";
 import type {
   LocalVolumeDiscoveryResult,
@@ -15,7 +15,6 @@ import { useFusionAccessTranslations } from "./useFusionAccessTranslations";
 import { useCallback } from "react";
 import type { LocalDisk } from "@/models/ibm-spectrum-scale/LocalDisk";
 import type { FileSystem } from "@/models/ibm-spectrum-scale/FileSystem";
-import { getDigest } from "@/utils/crypto/hash";
 import { SC_PROVISIONER } from "@/constants";
 
 export const useCreateFileSystemHandler = (
@@ -23,7 +22,7 @@ export const useCreateFileSystemHandler = (
   discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
   selectedDevices: DiscoveredDevice[]
 ) => {
-  const [, dispatch] = useStoreContext<State, Actions>();
+  const [, dispatch] = useStore<State, Actions>();
   const { t } = useFusionAccessTranslations();
   const history = useHistory();
 
@@ -74,11 +73,9 @@ export const useCreateFileSystemHandler = (
       history.push("/fusion-access/file-systems");
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
-      const descriptionDigest = await getDigest(description);
       dispatch({
-        type: "addAlert",
+        type: "showAlert",
         payload: {
-          key: descriptionDigest,
           variant: "danger",
           title: t("An error occurred while creating resources"),
           description,

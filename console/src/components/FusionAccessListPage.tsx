@@ -9,8 +9,10 @@ import {
   AlertActionCloseButton,
   Stack,
   StackItem,
+  List,
+  ListItem,
 } from "@patternfly/react-core";
-import type { AlertsSlice } from "@/contexts/store/types";
+import type { AlertSlice } from "@/contexts/store/types";
 import { useLayoutEffect } from "react";
 
 interface ListPageProps {
@@ -18,8 +20,8 @@ interface ListPageProps {
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
-  alerts?: AlertsSlice;
-  onDismissAlert?: (alert: AlertsSlice[number]) => void;
+  alert?: AlertSlice;
+  onDismissAlert?: (alert: AlertSlice) => void;
   listPageBodyStyle?: Partial<UseListPageBodyStyleHackOptions>;
   footer?: React.ReactNode;
 }
@@ -27,9 +29,9 @@ interface ListPageProps {
 export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
   const {
     actions,
-    alerts = [],
+    alert,
     children,
-    description,
+    description = <br />,
     documentTitle,
     listPageBodyStyle = {},
     onDismissAlert,
@@ -51,12 +53,10 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
 
       <ListPageBody>
         <Stack hasGutter>
-          <StackItem>
-            {children}
-          </StackItem>
-          <StackItem>
-            <AlertGroup isLiveRegion>
-              {alerts.map((alert) => (
+          <StackItem>{children}</StackItem>
+          <StackItem isFilled style={{ alignContent: "flex-end" }}>
+            {alert && (
+              <AlertGroup isLiveRegion>
                 <Alert
                   isInline
                   key={alert.key}
@@ -74,14 +74,21 @@ export const FusionAccessListPage: React.FC<ListPageProps> = (props) => {
                     ) : null
                   }
                 >
-                  {alert.description}
+                  {alert.description &&
+                  typeof alert.description !== "string" ? (
+                    <List>
+                      {alert.description.map((desc, idx) => (
+                        <ListItem key={idx}>{desc}</ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    alert.description
+                  )}
                 </Alert>
-              ))}
-            </AlertGroup>
+              </AlertGroup>
+            )}
           </StackItem>
-          <StackItem>
-            {footer}
-          </StackItem>
+          <StackItem>{footer}</StackItem>
         </Stack>
       </ListPageBody>
     </>
@@ -99,8 +106,7 @@ interface UseListPageBodyStyleHackOptions {
 
 const LIST_PAGE_BODY_DEFAULT_CLASSES =
   "co-m-pane__body co-m-pane__body--no-top-margin";
-const LIST_PAGE_BODY_SELECTOR =
-  "#content-scrollable > section > div.co-m-pane__body";
+const LIST_PAGE_BODY_SELECTOR = "#content-scrollable > .co-m-pane__body";
 
 const useListPageBodyStyleHack = (
   options: Partial<UseListPageBodyStyleHackOptions>
@@ -122,11 +128,11 @@ const useListPageBodyStyleHack = (
 
       // then set new classes
       const classes = [
-        isFlex ? "pf-u-display-flex" : "",
-        isFilled ? "pf-u-flex-grow-1" : "",
-        direction ? `pf-u-flex-direction-${direction}` : "",
-        alignment ? `pf-u-align-items-${alignment}` : "",
-        justification ? `pf-u-justify-content-${justification}` : "",
+        isFlex ? "pf-v6-u-display-flex" : "",
+        isFilled ? "pf-v6-u-flex-grow-1" : "",
+        direction ? `pf-v6-u-flex-direction-${direction}` : "",
+        alignment ? `pf-v6-u-align-items-${alignment}` : "",
+        justification ? `pf-v6-u-justify-content-${justification}` : "",
       ].filter(Boolean);
       ref.classList.add(...classes);
     }

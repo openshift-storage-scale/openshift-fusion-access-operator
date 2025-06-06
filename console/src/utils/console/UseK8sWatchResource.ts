@@ -3,6 +3,8 @@ import type {
   WatchK8sResource,
 } from "@openshift-console/dynamic-plugin-sdk";
 
+export type WatchedResourceState<R, E> = [R, boolean, E];
+
 interface ListableWatchK8sResource extends WatchK8sResource {
   isList: true;
 }
@@ -23,6 +25,6 @@ export interface UseK8sWatchResourceWithInferedList<
   O extends WatchK8sResource,
   E extends Error | string | undefined = string,
 > {
-  (options: ListableWatchK8sResource & O): [R[], boolean, E];
-  (options: NonListableWatchK8sResource & O): [R, boolean, E];
+  (options: ListableWatchK8sResource & O): WatchedResourceState<R[], E>;
+  (options: NonListableWatchK8sResource & O): WatchedResourceState<R, E>;
 }
