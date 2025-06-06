@@ -22,7 +22,7 @@ import (
 
 // NOTE(bandini): If you change anything in the following two lines you need to update
 // ./scripts/update-cnsa-versions-metadata.sh
-// +kubebuilder:validation:Enum=v5.2.3.0;v5.2.3.0.rc1;v5.2.3.0.1
+// +kubebuilder:validation:Enum=v5.2.3.0.1
 type StorageScaleVersions string
 
 // FusionAccessSpec defines the desired state of FusionAccess
