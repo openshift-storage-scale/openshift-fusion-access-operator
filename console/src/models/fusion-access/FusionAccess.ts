@@ -2,8 +2,8 @@ import type { K8sResourceKind } from "@openshift-console/dynamic-plugin-sdk";
 
 export interface FusionAccess extends K8sResourceKind {
   spec?: {
-    ibm_cnsa_version?: "v5.2.3.0";
-    storagedevicediscovery?: {
+    storageScaleVersion?: "v5.2.3.0";
+    storageDeviceDiscovery?: {
       create?: boolean;
     };
   };

@@ -84,7 +84,7 @@ var _ = Describe("FusionAccess Controller", func() {
 					Namespace: "default",
 				},
 				Spec: fusionv1alpha.FusionAccessSpec{
-					IbmCnsaVersion:       "v5.2.3.0",
+					StorageScaleVersion:  "v5.2.3.0",
 					LocalVolumeDiscovery: fusionv1alpha.StorageDeviceDiscovery{
 						// Create: false,
 					},
@@ -227,7 +227,7 @@ var _ = Describe("getIbmManifest", func() {
 		It("should return the external URL if allowed", func() {
 			fusionObj := fusionv1alpha.FusionAccessSpec{
 				ExternalManifestURL: "https://raw.githubusercontent.com/openshift-storage-scale/openshift-fusion-access-manifests/refs/heads/main/manifests/5.2.3.1.dev2/install.yaml",
-				IbmCnsaVersion:      "",
+				StorageScaleVersion: "",
 			}
 
 			url, err := getIbmManifest(fusionObj)
@@ -238,7 +238,7 @@ var _ = Describe("getIbmManifest", func() {
 		It("should return an error if external URL is disallowed", func() {
 			fusionObj := fusionv1alpha.FusionAccessSpec{
 				ExternalManifestURL: "http://bad-url.com",
-				IbmCnsaVersion:      "",
+				StorageScaleVersion: "",
 			}
 
 			_, err := getIbmManifest(fusionObj)
@@ -251,7 +251,7 @@ var _ = Describe("getIbmManifest", func() {
 		It("should return the install path", func() {
 			fusionObj := fusionv1alpha.FusionAccessSpec{
 				ExternalManifestURL: "",
-				IbmCnsaVersion:      "v5.2.3.0.1",
+				StorageScaleVersion: "v5.2.3.0.1",
 			}
 
 			path, err := getIbmManifest(fusionObj)
@@ -260,7 +260,7 @@ var _ = Describe("getIbmManifest", func() {
 		})
 	})
 
-	Context("when neither ExternalManifestURL nor IbmCnsaVersion is set", func() {
+	Context("when neither ExternalManifestURL nor StorageScaleVersion is set", func() {
 		It("should return an error", func() {
 			fusionObj := fusionv1alpha.FusionAccessSpec{}
 

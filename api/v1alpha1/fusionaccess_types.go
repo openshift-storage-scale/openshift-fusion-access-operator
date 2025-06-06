@@ -23,7 +23,7 @@ import (
 // NOTE(bandini): If you change anything in the following two lines you need to update
 // ./scripts/update-cnsa-versions-metadata.sh
 // +kubebuilder:validation:Enum=v5.2.3.0;v5.2.3.0.rc1;v5.2.3.0.1
-type CNSAVersions string
+type StorageScaleVersions string
 
 // FusionAccessSpec defines the desired state of FusionAccess
 type FusionAccessSpec struct {
@@ -31,11 +31,11 @@ type FusionAccessSpec struct {
 	// ./scripts/update-cnsa-versions-metadata.sh
 
 	// Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="IBM CNSA Version",order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0","urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.rc1","urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.1"}
-	IbmCnsaVersion CNSAVersions `json:"ibm_cnsa_version,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="IBM Storage Scale Version",order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0","urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.rc1","urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.1"}
+	StorageScaleVersion StorageScaleVersions `json:"storageScaleVersion,omitempty"`
 
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
-	LocalVolumeDiscovery StorageDeviceDiscovery `json:"storagedevicediscovery,omitempty"`
+	LocalVolumeDiscovery StorageDeviceDiscovery `json:"storageDeviceDiscovery,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=4,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	// +kubebuilder:validation:Format=uri
 	ExternalManifestURL string `json:"externalManifestURL,omitempty"`

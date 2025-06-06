@@ -42,19 +42,19 @@ spec:
               externalManifestURL:
                 format: uri
                 type: string
-              ibm_cnsa_version:
+              storageDeviceDiscovery:
+                properties:
+                  create:
+                    default: true
+                    type: boolean
+                type: object
+              storageScaleVersion:
                 description: Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
                 enum:
                 - v5.2.3.0
                 - v5.2.3.0.rc1
                 - v5.2.3.0.1
                 type: string
-              storagedevicediscovery:
-                properties:
-                  create:
-                    default: true
-                    type: boolean
-                type: object
             type: object
           status:
             description: FusionAccessStatus defines the observed state of FusionAccess
