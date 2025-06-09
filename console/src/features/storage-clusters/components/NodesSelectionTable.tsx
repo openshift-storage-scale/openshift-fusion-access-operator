@@ -1,33 +1,27 @@
 import {
+  TableData,
   VirtualizedTable,
+  type RowProps,
   type TableColumn,
 } from "@openshift-console/dynamic-plugin-sdk";
 import {
   Alert,
+  Checkbox,
   HelperText,
   HelperTextItem,
+  Icon,
   Stack,
   StackItem,
+  Tooltip,
 } from "@patternfly/react-core";
 import InfoIcon from "@patternfly/react-icons/dist/esm/icons/info-icon";
-import {
-  MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-  MINIMUM_AMOUNT_OF_NODES,
-  MINIMUM_AMOUNT_OF_NODES_LITERAL,
-  MINIMUM_AMOUNT_OF_SHARED_DISKS,
-  MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL,
-  WORKER_NODE_ROLE_LABEL,
-} from "@/constants";
+import { WORKER_NODE_ROLE_LABEL } from "@/constants";
 import {
   t,
   useFusionAccessTranslations,
 } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocalVolumeDiscoveryResult";
-import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
-import { useEffect } from "react";
 import {
   useNodeSelectionChangeHandler,
   type NodeSelectionChangeHandler,
@@ -35,9 +29,9 @@ import {
 import {
   useNodesSelectionTableViewModel,
   type NodesSelectionTableRowViewModel,
-  type NodesSelectionTableViewModel,
 } from "../hooks/useNodesSelectionTableViewModel";
-import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
+import { ExclamationTriangleIcon } from "@patternfly/react-icons";
+import { useValidateMinimumRequirements } from "../hooks/useValidateMinimumRequirements";
 
 export const NodesSelectionTable: React.FC = () => {
   const { t } = useFusionAccessTranslations();
@@ -51,7 +45,7 @@ export const NodesSelectionTable: React.FC = () => {
     vm,
     nodesWatchState[0]
   );
-  useValidateStorageClusterMinimumRequirements(vm);
+  useValidateMinimumRequirements(vm);
 
   return (
     <Stack hasGutter>
@@ -91,6 +85,75 @@ export const NodesSelectionTable: React.FC = () => {
 };
 NodesSelectionTable.displayName = "NodesSelectionTable";
 
+type TableRowProps = RowProps<
+  NodesSelectionTableRowViewModel,
+  { onNodeSelectionChange: NodeSelectionChangeHandler }
+>;
+
+const NodesSelectionTableRow: React.FC<TableRowProps> = (props) => {
+  const { activeColumnIDs, obj, rowData } = props;
+  const { onNodeSelectionChange } = rowData;
+  const { t } = useFusionAccessTranslations();
+
+  return (
+    <>
+      <TableData
+        id="checkbox"
+        activeColumnIDs={activeColumnIDs}
+        className="pf-v6-c-table__check"
+      >
+        <Checkbox
+          id={`node-${obj.uid}`}
+          isChecked={obj.status === "selected"}
+          isDisabled={
+            obj.status === "selection-pending" ||
+            obj.warnings.has("InsufficientMemory")
+          }
+          onChange={onNodeSelectionChange(obj)}
+        />
+      </TableData>
+      <TableData activeColumnIDs={activeColumnIDs} id="name">
+        {obj.name}
+      </TableData>
+      <TableData
+        activeColumnIDs={activeColumnIDs}
+        className="pf-v6-u-text-align-center"
+        id="role"
+      >
+        {obj.role}
+      </TableData>
+      <TableData
+        activeColumnIDs={activeColumnIDs}
+        className="pf-v6-u-text-align-center"
+        id="cpu"
+      >
+        {obj.cpu}
+      </TableData>
+      <TableData
+        activeColumnIDs={activeColumnIDs}
+        className="pf-v6-u-text-align-center"
+        id="memory"
+      >
+        {obj.memory}{" "}
+        {obj.warnings.has("InsufficientMemory") && (
+          <Tooltip content={t("Insufficient")}>
+            <Icon status="warning" isInline>
+              <ExclamationTriangleIcon />
+            </Icon>
+          </Tooltip>
+        )}
+      </TableData>
+    </>
+  );
+};
+NodesSelectionTableRow.displayName = "NodesSelectionTableRow";
+
+const NodesSelectionEmptyState: React.FC = () => {
+  // TODO(jkilzi): Impl. NodeSeletionTableEmptyState
+  return null;
+};
+NodesSelectionEmptyState.displayName = "NodesSelectionEmptyState";
+
 const columns: TableColumn<NodesSelectionTableRowViewModel>[] = [
   {
     id: "checkbox",
@@ -117,62 +180,3 @@ const columns: TableColumn<NodesSelectionTableRowViewModel>[] = [
     props: { className: "pf-v6-u-text-align-center" },
   },
 ];
-
-const useValidateStorageClusterMinimumRequirements = (
-  vm: NodesSelectionTableViewModel
-) => {
-  const [, dispatch] = useStore<State, Actions>();
-  const { t } = useFusionAccessTranslations();
-
-  useEffect(() => {
-    if (!vm.isLoaded) {
-      return;
-    }
-
-    const conditions: boolean[] = [
-      vm.sharedDisks.size < MINIMUM_AMOUNT_OF_SHARED_DISKS &&
-        vm.selectedNodes.length < 2,
-      vm.selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
-    ];
-
-    if (conditions.some(Boolean)) {
-      dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: true } },
-      });
-      dispatch({
-        type: "showAlert",
-        payload: {
-          key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-          variant: "warning",
-          title: t("Storage cluster requirements"),
-          description: [
-            conditions[0]
-              ? t(
-                  "Selected nodes must share at least {{MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL}} disk",
-                  { MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL }
-                )
-              : "",
-            conditions[1]
-              ? t(
-                  "At least {{MINIMUM_AMOUNT_OF_NODES_LITERAL}} nodes must be selected.",
-                  {
-                    MINIMUM_AMOUNT_OF_NODES_LITERAL,
-                  }
-                )
-              : "",
-          ].filter(Boolean),
-          isDismissable: false,
-        },
-      });
-    } else {
-      dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: false } },
-      });
-      dispatch({
-        type: "dismissAlert",
-      });
-    }
-  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisks.size]);
-};
