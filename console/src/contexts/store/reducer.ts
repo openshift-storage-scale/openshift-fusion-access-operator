@@ -1,6 +1,6 @@
 import { enableMapSet } from "immer";
 import type { ImmerReducer } from "use-immer";
-import { t } from "@/hooks/useFusionAccessTranslations";
+import { t } from "@/shared/hooks/useFusionAccessTranslations";
 import type { Actions, State } from "./types";
 
 enableMapSet(); // Enables Map and Set support in immer

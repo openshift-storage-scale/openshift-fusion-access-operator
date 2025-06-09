@@ -1,4 +1,4 @@
-import { t } from "./hooks/useFusionAccessTranslations";
+import { t } from "@/shared/hooks/useFusionAccessTranslations";
 
 export const MINIMUM_AMOUNT_OF_NODES = 3;
 export const MINIMUM_AMOUNT_OF_NODES_LITERAL = t("three");

@@ -7,10 +7,13 @@ export const pluginMetadata: ConsolePluginBuildMetadata = {
   version: packageJson.version,
   displayName: "Fusion Access Plugin",
   exposedModules: {
-    FusionAccessHome: "./views/FusionAccessHome.tsx",
-    StorageClusterCreate: "./views/StorageClusterCreate.tsx",
-    FileSystemsHome: "./views/FileSystemsHome.tsx",
-    FileSystemsCreate: "./views/FileSystemsCreate.tsx",
+    FusionAccessHomePage: "./features/fusion-access/pages/FusionAccessHomePage.tsx",
+    StorageClusterHomePage:
+      "./features/storage-clusters/pages/StorageClusterHomePage.tsx",
+    StorageClusterCreatePage:
+      "./features/storage-clusters/pages/StorageClusterCreatePage.tsx",
+    FileSystemsHomePage: "./features/file-systems/pages/FileSystemsHomePage.tsx",
+    FileSystemsCreatePage: "./features/file-systems/pages/FileSystemsCreatePage.tsx",
   },
   dependencies: {
     "@console/pluginAPI": ">=4.18.0-0",
@@ -34,7 +37,15 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access",
-      component: { $codeRef: "FusionAccessHome" },
+      component: { $codeRef: "FusionAccessHomePage" },
+    },
+  },
+  {
+    type: "console.page/route",
+    properties: {
+      exact: true,
+      path: "/fusion-access/storage-cluster",
+      component: { $codeRef: "StorageClusterHomePage" },
     },
   },
   {
@@ -42,7 +53,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/storage-cluster/create",
-      component: { $codeRef: "StorageClusterCreate" },
+      component: { $codeRef: "StorageClusterCreatePage" },
     },
   },
   {
@@ -50,7 +61,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/file-systems",
-      component: { $codeRef: "FileSystemsHome" },
+      component: { $codeRef: "FileSystemsHomePage" },
     },
   },
   {
@@ -58,7 +69,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/file-systems/create",
-      component: { $codeRef: "FileSystemsCreate" },
+      component: { $codeRef: "FileSystemsCreatePage" },
     },
   },
 ];
