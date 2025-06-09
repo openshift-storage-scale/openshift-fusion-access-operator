@@ -25,8 +25,8 @@ import {
 import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocalVolumeDiscoveryResult";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
-import { useStore } from "@/contexts/store/provider";
-import type { State, Actions } from "@/contexts/store/types";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
 import { useEffect } from "react";
 import {
   useNodeSelectionChangeHandler,

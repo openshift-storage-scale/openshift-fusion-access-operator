@@ -1,6 +1,6 @@
-import { StoreProvider } from "@/contexts/store/provider";
-import { reducer, initialState } from "@/contexts/store/reducer";
-import type { State, Actions } from "@/contexts/store/types";
+import { StoreProvider } from "@/shared/store/provider";
+import { reducer, initialState } from "@/shared/store/reducer";
+import type { State, Actions } from "@/shared/store/types";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useHistory } from "react-router";

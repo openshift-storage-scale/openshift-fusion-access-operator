@@ -3,9 +3,9 @@ import { k8sCreate, useK8sModel } from "@openshift-console/dynamic-plugin-sdk";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { Cluster } from "@/shared/types/ibm-spectrum-scale/Cluster";
 import { STORAGE_ROLE_LABEL } from "@/constants";
-import { useStore } from "@/contexts/store/provider";
+import { useStore } from "@/shared/store/provider";
 import { useHistory } from "react-router";
-import type { State, Actions } from "@/contexts/store/types";
+import type { State, Actions } from "@/shared/store/types";
 
 const [storageRoleLabelKey, storageRoleLabelValue] =
   STORAGE_ROLE_LABEL.split("=");

@@ -1,5 +1,5 @@
-import { StoreProvider, useStore } from "@/contexts/store/provider";
-import { reducer, initialState } from "@/contexts/store/reducer";
+import { StoreProvider, useStore } from "@/shared/store/provider";
+import { reducer, initialState } from "@/shared/store/reducer";
 import { FileSystemsCreateButton } from "@/features/file-systems/components/FileSystemsCreateButton";
 import { useCreateFileSystemHandler } from "@/features/file-systems/hooks/useCreateFileSystemHandler";
 import { ListPage } from "@/shared/components/ListPage";
@@ -31,7 +31,7 @@ import type {
   DiscoveredDevice,
   LocalVolumeDiscoveryResult,
 } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import type { State, Actions } from "@/contexts/store/types";
+import type { State, Actions } from "@/shared/store/types";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
 
 const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);

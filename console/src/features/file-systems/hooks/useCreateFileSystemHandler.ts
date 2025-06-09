@@ -1,5 +1,5 @@
-import { useStore } from "@/contexts/store/provider";
-import type { State, Actions } from "@/contexts/store/types";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
 import type {
   LocalVolumeDiscoveryResult,
   DiscoveredDevice,

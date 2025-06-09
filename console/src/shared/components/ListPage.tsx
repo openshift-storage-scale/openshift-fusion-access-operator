@@ -12,7 +12,7 @@ import {
   List,
   ListItem,
 } from "@patternfly/react-core";
-import type { AlertSlice } from "@/contexts/store/types";
+import type { AlertSlice } from "@/shared/store/types";
 import { useLayoutEffect } from "react";
 
 interface ListPageProps {

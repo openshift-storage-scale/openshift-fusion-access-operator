@@ -1,7 +1,7 @@
 import { Redirect, useHistory } from "react-router";
-import { StoreProvider, useStore } from "@/contexts/store/provider";
-import type { State, Actions } from "@/contexts/store/types";
-import { reducer, initialState } from "@/contexts/store/reducer";
+import { StoreProvider, useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
+import { reducer, initialState } from "@/shared/store/reducer";
 import { NodesSelectionTable } from "@/features/storage-clusters/components/NodesSelectionTable";
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClustersCreateButton } from "@/features/storage-clusters/components/StorageClustersCreateButton";

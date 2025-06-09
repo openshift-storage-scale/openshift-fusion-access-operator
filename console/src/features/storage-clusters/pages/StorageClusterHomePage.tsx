@@ -5,9 +5,9 @@ import { StorageClusterEmptyState } from "@/features/storage-clusters/components
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { ReactNodeWithPredefinedFallback } from "@/shared/components/ReactNodeWithPredefinedFallback";
-import { initialState, reducer } from "@/contexts/store/reducer";
-import type { State, Actions } from "@/contexts/store/types";
-import { StoreProvider, useStore } from "@/contexts/store/provider";
+import { initialState, reducer } from "@/shared/store/reducer";
+import type { State, Actions } from "@/shared/store/types";
+import { StoreProvider, useStore } from "@/shared/store/provider";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
