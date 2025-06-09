@@ -1,4 +1,4 @@
-import type { FilesystemStatus } from "@/shared/utils/status/filesystem";
+import type { FilesystemStatus } from "@/features/file-systems/utils/filesystem";
 import { Button, Popover } from "@patternfly/react-core";
 
 type FileSystemStatusProps = {

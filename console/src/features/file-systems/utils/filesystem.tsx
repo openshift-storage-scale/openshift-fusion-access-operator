@@ -1,7 +1,10 @@
+import { SC_PROVISIONER } from "@/constants";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import {
   GreenCheckCircleIcon,
   YellowExclamationTriangleIcon,
+  type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import type { TFunction } from "react-i18next";
@@ -64,4 +67,31 @@ export const getFilesystemStatus = (
     title: t("Healthy"),
     icon: <GreenCheckCircleIcon />,
   };
+};
+
+export const getFileSystemScs = (
+  fileSystem: FileSystem,
+  scs: StorageClass[]
+) => {
+  return scs.filter((sc) => {
+    if (sc.provisioner === SC_PROVISIONER) {
+      const fsName = (sc.parameters as { volBackendFs?: string })?.volBackendFs;
+      return fsName === fileSystem.metadata?.name;
+    }
+    return false;
+  });
+};
+
+export const isFilesystemUsed = (
+  fileSystem: FileSystem,
+  scs: StorageClass[],
+  pvcs: IoK8sApiCoreV1PersistentVolumeClaim[]
+) => {
+  const fsScs = getFileSystemScs(fileSystem, scs).map(
+    (sc) => sc.metadata?.name
+  );
+  return pvcs.some(
+    (pvc) =>
+      pvc.spec?.storageClassName && fsScs.includes(pvc.spec?.storageClassName)
+  );
 };

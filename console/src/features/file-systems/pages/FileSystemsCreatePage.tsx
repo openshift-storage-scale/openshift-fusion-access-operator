@@ -27,10 +27,14 @@ import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import { STORAGE_ROLE_LABEL, WORKER_NODE_ROLE_LABEL } from "@/constants";
 import convert from "convert";
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
-import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
+import type {
+  DiscoveredDevice,
+  LocalVolumeDiscoveryResult,
+} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
 import type { State, Actions } from "@/contexts/store/types";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
-import { getWwn } from "@/shared/utils/fusion-access/LocalVolumeDiscoveryResult";
+
+const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);
 
 const NAME_FIELD_VALIDATION_REGEX =
   /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;

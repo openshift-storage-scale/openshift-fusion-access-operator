@@ -1,6 +1,6 @@
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getFileSystemScs } from "@/shared/utils/filesystem";
+import { getFileSystemScs } from "@/features/file-systems/utils/filesystem";
 import {
   ResourceLink,
   type StorageClass,

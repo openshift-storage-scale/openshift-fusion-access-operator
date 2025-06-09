@@ -14,7 +14,7 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { FS_ALLOW_DELETE_LABEL } from "@/constants";
 import { FileSystemTableContext } from "@/features/file-systems/contexts/FileSystemsTableContext";
-import { getFileSystemScs } from "@/shared/utils/filesystem";
+import { getFileSystemScs } from "@/features/file-systems/utils/filesystem";
 
 interface FilesystemsDeleteModalProps {
   onClose: VoidFunction;
