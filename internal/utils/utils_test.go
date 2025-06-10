@@ -505,3 +505,65 @@ var _ = Describe("IsExternalManifestURLAllowed", func() {
 		Expect(IsExternalManifestURLAllowed(url)).To(BeFalse())
 	})
 })
+
+var _ = Describe("MergeSecrets", func() {
+
+	Context("when both secrets are valid", func() {
+		var dest, src *corev1.Secret
+
+		BeforeEach(func() {
+			dest = &corev1.Secret{
+				Data: map[string][]byte{
+					"username": []byte("admin"),
+				},
+				StringData: map[string]string{
+					"note": "original",
+				},
+			}
+			src = &corev1.Secret{
+				Data: map[string][]byte{
+					"password": []byte("secret"),
+					"username": []byte("overwritten"), // should override
+				},
+				StringData: map[string]string{
+					"note":    "updated", // should override
+					"comment": "new",
+				},
+			}
+		})
+
+		It("merges Data and StringData correctly", func() {
+			merged, err := MergeSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(merged.Data).To(HaveKeyWithValue("username", []byte("overwritten")))
+			Expect(merged.Data).To(HaveKeyWithValue("password", []byte("secret")))
+			Expect(merged.StringData).To(HaveKeyWithValue("note", "updated"))
+			Expect(merged.StringData).To(HaveKeyWithValue("comment", "new"))
+		})
+	})
+
+	Context("when dest is nil", func() {
+		It("returns an error", func() {
+			_, err := MergeSecrets(nil, &corev1.Secret{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when src is nil", func() {
+		It("returns an error", func() {
+			_, err := MergeSecrets(&corev1.Secret{}, nil)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when both Data and StringData are empty or nil", func() {
+		It("initializes maps and doesn't panic", func() {
+			dest := &corev1.Secret{}
+			src := &corev1.Secret{}
+			merged, err := MergeSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(merged.Data).To(BeEmpty())
+			Expect(merged.StringData).To(BeEmpty())
+		})
+	})
+})

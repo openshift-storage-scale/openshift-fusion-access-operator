@@ -356,3 +356,37 @@ func IsExternalManifestURLAllowed(url string) bool {
 	url = strings.ToLower(url)
 	return strings.HasPrefix(url, allowedPrefix)
 }
+
+func MergeSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
+	if dest == nil || src == nil {
+		return nil, fmt.Errorf("cannot merge nil secrets")
+	}
+
+	// Optionally enforce type match
+	if dest.Type != "" && src.Type != "" && dest.Type != src.Type {
+		return nil, fmt.Errorf("cannot merge secrets of different types: %s vs %s", dest.Type, src.Type)
+	}
+
+	// If dest.Type is empty, inherit from src
+	if dest.Type == "" {
+		dest.Type = src.Type
+	}
+
+	// Merge Data
+	if dest.Data == nil {
+		dest.Data = make(map[string][]byte)
+	}
+	for k, v := range src.Data {
+		dest.Data[k] = v
+	}
+
+	// Optionally merge StringData too
+	if dest.StringData == nil {
+		dest.StringData = make(map[string]string)
+	}
+	for k, v := range src.StringData {
+		dest.StringData[k] = v
+	}
+
+	return dest, nil
+}

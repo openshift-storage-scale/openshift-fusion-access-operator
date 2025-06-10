@@ -40,6 +40,7 @@ const (
 	ConfigMapName      = "kmm-dockerfile"
 	KMMModuleName      = "gpfs-module"
 	IBMCNSANamespace   = "ibm-spectrum-scale"
+	IBMENTITLEMENTNAME = "ibm-entitlement-key"
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -75,7 +76,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		return fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	if secret, err := getPatchedGlobalPullSecret(ctx, cl, pullSecret); err != nil {
+	if secret, err := getPatchedGlobalPullSecret(ctx, cl, ns, pullSecret); err != nil {
 		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
 	} else {
 		if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
@@ -146,42 +147,30 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 }
 
 // getPatchedGlobalPullSecret will return the patched global pull secret with the ibm pull secrets
-func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, pullsecret string) (*corev1.Secret, error) {
+func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, namespace, pullsecret string) (*corev1.Secret, error) {
 	var secrets map[string]map[string]map[string]string
 	if err := json.Unmarshal([]byte(pullsecret), &secrets); err != nil {
-		return nil, fmt.Errorf("failed to unmparshal pull secret in getPatchedGlobalPullSecret: %w", err)
+		return nil, fmt.Errorf("failed to unmparshal pull secret iin getPatchedGlobalPullSecret: %w", err)
 	}
-
+	ibmPullSecret := &corev1.Secret{}
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: IBMENTITLEMENTNAME}, ibmPullSecret); err != nil {
+		return nil, fmt.Errorf("failed to get ibmPullSecret pull secret %s in getPatchedGlobalPullSecret: %w", IBMENTITLEMENTNAME, err)
+	}
 	globalPullSecret := &corev1.Secret{}
-
 	if err := cl.Get(ctx, types.NamespacedName{Namespace: "openshift-config", Name: "pull-secret"}, globalPullSecret); err != nil {
 		return nil, fmt.Errorf("failed to get global pull secret in getPatchedGlobalPullSecret: %w", err)
 	}
 
-	var dockerConfigJSON map[string]map[string]map[string]string
-	if err := json.Unmarshal(globalPullSecret.Data[".dockerconfigjson"], &dockerConfigJSON); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal .dockerconfigjson in getPatchedGlobalPullSecret: %w", err)
-	}
-
-	for k, v := range secrets["auths"] {
-		dockerConfigJSON["auths"][k] = v
-	}
-
-	rawDockerConfigJSON, err := json.Marshal(dockerConfigJSON)
+	mergedSecret, err := utils.MergeSecrets(globalPullSecret, ibmPullSecret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal dockerconfigjson in getPatchedGlobalPullSecret: %w", err)
+		return nil, fmt.Errorf("failed to merge global pull secret and ibm pull secret: %w", err)
 	}
-	secretData := map[string][]byte{
-		".dockerconfigjson": rawDockerConfigJSON,
+	// make sure we use the global metadata
+	mergedSecret.ObjectMeta = metav1.ObjectMeta{
+		Name:      "pull-secret",
+		Namespace: "openshift-config",
 	}
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pull-secret",
-			Namespace: "openshift-config",
-		},
-		Data: secretData,
-		Type: "kubernetes.io/dockerconfigjson",
-	}, nil
+	return mergedSecret, nil
 }
 
 // getIBMCoreImage gets the core init image with the source code in them
