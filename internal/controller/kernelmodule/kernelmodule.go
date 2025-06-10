@@ -47,7 +47,7 @@ const (
 func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecret string) error {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
 	dockerConfigmap := newDockerConfigmap(ns)
 
@@ -55,16 +55,15 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		existing.Data = desired.Data
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to update dockerconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
 	}
 	kernelModule := NewKMMModule(ns, ibmScaleImage)
-
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
-		return err
+		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	buildConfigmap := newBuildConfigmap(IBMCNSANamespace)
@@ -73,18 +72,18 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		existing.Data = desired.Data
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	if secret, err := getPatchedGlobalPullSecret(ctx, cl, pullSecret); err != nil {
-		return err
+		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
 	} else {
 		if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
 			existing.Type = desired.Type
 			existing.Data = desired.Data
 			return nil
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
 		}
 	}
 	return nil
@@ -150,18 +149,18 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, pullsecret string) (*corev1.Secret, error) {
 	var secrets map[string]map[string]map[string]string
 	if err := json.Unmarshal([]byte(pullsecret), &secrets); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmparshal pull secret in getPatchedGlobalPullSecret: %w", err)
 	}
 
 	globalPullSecret := &corev1.Secret{}
 
 	if err := cl.Get(ctx, types.NamespacedName{Namespace: "openshift-config", Name: "pull-secret"}, globalPullSecret); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get global pull secret in getPatchedGlobalPullSecret: %w", err)
 	}
 
 	var dockerConfigJSON map[string]map[string]map[string]string
 	if err := json.Unmarshal(globalPullSecret.Data[".dockerconfigjson"], &dockerConfigJSON); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal .dockerconfigjson in getPatchedGlobalPullSecret: %w", err)
 	}
 
 	for k, v := range secrets["auths"] {
@@ -170,7 +169,7 @@ func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, pullsecre
 
 	rawDockerConfigJSON, err := json.Marshal(dockerConfigJSON)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal dockerconfigjson in getPatchedGlobalPullSecret: %w", err)
 	}
 	secretData := map[string][]byte{
 		".dockerconfigjson": rawDockerConfigJSON,
