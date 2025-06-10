@@ -52,6 +52,7 @@ spec:
                 description: Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
                 enum:
                 - v5.2.3.0.1
+                - v5.2.3.0.dummy
                 type: string
             type: object
           status:
