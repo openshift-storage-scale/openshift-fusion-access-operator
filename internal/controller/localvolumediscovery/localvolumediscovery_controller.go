@@ -186,6 +186,7 @@ func (r *LocalVolumeDiscoveryReconciler) updateDiscoveryStatus(ctx context.Conte
 		condition := metav1.Condition{
 			Type:               conditionType,
 			Status:             status,
+			Reason:             "DiscoveryUpdate",
 			Message:            message,
 			LastTransitionTime: metav1.Now(),
 		}
