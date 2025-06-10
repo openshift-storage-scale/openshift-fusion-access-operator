@@ -18,7 +18,6 @@ package kernelmodule
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
@@ -45,7 +44,7 @@ const (
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
 // HEADS UP: consider cleanup of old resources in case of name changes or removals!
-func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecret string) error {
+func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
@@ -76,7 +75,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client, pullSecre
 		return fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	if secret, err := getPatchedGlobalPullSecret(ctx, cl, ns, pullSecret); err != nil {
+	if secret, err := getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
 		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
 	} else {
 		if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
@@ -147,11 +146,7 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 }
 
 // getPatchedGlobalPullSecret will return the patched global pull secret with the ibm pull secrets
-func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, namespace, pullsecret string) (*corev1.Secret, error) {
-	var secrets map[string]map[string]map[string]string
-	if err := json.Unmarshal([]byte(pullsecret), &secrets); err != nil {
-		return nil, fmt.Errorf("failed to unmparshal pull secret iin getPatchedGlobalPullSecret: %w", err)
-	}
+func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, namespace string) (*corev1.Secret, error) {
 	ibmPullSecret := &corev1.Secret{}
 	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: IBMENTITLEMENTNAME}, ibmPullSecret); err != nil {
 		return nil, fmt.Errorf("failed to get ibmPullSecret pull secret %s in getPatchedGlobalPullSecret: %w", IBMENTITLEMENTNAME, err)

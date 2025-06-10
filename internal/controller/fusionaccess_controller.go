@@ -369,7 +369,7 @@ func (r *FusionAccessReconciler) Reconcile(
 
 		// Since the kernel module requires the pull secret, we only create that if the secret is found
 		log.Log.Info("Creating kernel module resources")
-		if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client, string(secret)); err != nil {
+		if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client); err != nil {
 			return ctrl.Result{}, err
 		}
 
