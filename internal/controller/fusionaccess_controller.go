@@ -82,6 +82,9 @@ func NewFusionAccessReconciler(
 
 //+kubebuilder:rbac:groups="",namespace=ibm-fusion-access,resources=secrets,verbs=get;list;watch
 
+// KMM support
+//+kubebuilder:rbac:groups=kmm.sigs.x-k8s.io,resources=modules,verbs=create;delete;get;list;patch;update;watch
+
 // Below rules are inserted via `make rbac-generate` automatically
 // IBM_RBAC_MARKER_START
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=list;watch;delete;update;get;create;patch
