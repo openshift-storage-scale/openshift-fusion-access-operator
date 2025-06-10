@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -566,4 +567,119 @@ var _ = Describe("MergeSecrets", func() {
 			Expect(merged.StringData).To(BeEmpty())
 		})
 	})
+	Context("when merging .dockerconfigjson", func() {
+		It("merges distinct auths from both secrets", func() {
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"docker.io": map[string]any{
+								"auth": "abc123",
+							},
+						},
+					}),
+				},
+			}
+
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"ghcr.io": map[string]any{
+								"auth": "xyz789",
+							},
+						},
+					}),
+				},
+			}
+
+			merged, err := MergeSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("docker.io"))
+			Expect(auths).To(HaveKey("ghcr.io"))
+
+			Expect(auths["docker.io"].(map[string]any)["auth"]).To(Equal("abc123"))
+			Expect(auths["ghcr.io"].(map[string]any)["auth"]).To(Equal("xyz789"))
+		})
+
+		It("overwrites duplicate auth entries with src values", func() {
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"docker.io": map[string]any{
+								"auth": "old-auth",
+							},
+						},
+					}),
+				},
+			}
+
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"docker.io": map[string]any{
+								"auth": "new-auth",
+							},
+						},
+					}),
+				},
+			}
+
+			merged, err := MergeSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("docker.io"))
+			Expect(auths["docker.io"].(map[string]any)["auth"]).To(Equal("new-auth"))
+		})
+
+		It("handles missing or empty .dockerconfigjson gracefully", func() {
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{},
+			}
+
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"custom.io": map[string]any{
+								"auth": "abc",
+							},
+						},
+					}),
+				},
+			}
+
+			merged, err := MergeSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("custom.io"))
+		})
+	})
 })
+
+func mustMarshal(obj any) []byte {
+	b, err := json.Marshal(obj)
+	Expect(err).ToNot(HaveOccurred())
+	return b
+}

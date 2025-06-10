@@ -75,17 +75,19 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	if secret, err := getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
+	// This can all be dropped with KMM 2.4
+	var secret *corev1.Secret
+	if secret, err = getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
 		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
-	} else {
-		if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
-			existing.Type = desired.Type
-			existing.Data = desired.Data
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
-		}
 	}
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
+		existing.Type = desired.Type
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
+	}
+
 	return nil
 }
 

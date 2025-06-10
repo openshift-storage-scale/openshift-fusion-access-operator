@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -357,6 +358,49 @@ func IsExternalManifestURLAllowed(url string) bool {
 	return strings.HasPrefix(url, allowedPrefix)
 }
 
+func mergeDockerConfigJSON(destRaw, srcRaw []byte) ([]byte, error) {
+	var destCfg map[string]any
+	var srcCfg map[string]any
+
+	// Gracefully handle empty JSON
+	if len(destRaw) > 0 {
+		if err := json.Unmarshal(destRaw, &destCfg); err != nil {
+			return nil, fmt.Errorf("invalid dest .dockerconfigjson: %w", err)
+		}
+	} else {
+		destCfg = make(map[string]any)
+	}
+
+	if len(srcRaw) > 0 {
+		if err := json.Unmarshal(srcRaw, &srcCfg); err != nil {
+			return nil, fmt.Errorf("invalid src .dockerconfigjson: %w", err)
+		}
+	} else {
+		srcCfg = make(map[string]any)
+	}
+
+	// Merge top-level keys
+	for k, v := range srcCfg {
+		// Special case: merge auths
+		if k == "auths" {
+			destAuths, _ := destCfg["auths"].(map[string]any)
+			srcAuths, _ := v.(map[string]any)
+			if destAuths == nil {
+				destAuths = make(map[string]any)
+			}
+			for reg, auth := range srcAuths {
+				destAuths[reg] = auth
+			}
+			destCfg["auths"] = destAuths
+		} else {
+			// Regular overwrite for other keys
+			destCfg[k] = v
+		}
+	}
+
+	return json.Marshal(destCfg)
+}
+
 func MergeSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
 	if dest == nil || src == nil {
 		return nil, fmt.Errorf("cannot merge nil secrets")
@@ -376,10 +420,18 @@ func MergeSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
 	if dest.Data == nil {
 		dest.Data = make(map[string][]byte)
 	}
-	for k, v := range src.Data {
-		dest.Data[k] = v
-	}
 
+	for k, v := range src.Data {
+		if k == ".dockerconfigjson" {
+			mergedJSON, err := mergeDockerConfigJSON(dest.Data[k], v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to merge .dockerconfigjson: %w", err)
+			}
+			dest.Data[k] = mergedJSON
+		} else {
+			dest.Data[k] = v
+		}
+	}
 	// Optionally merge StringData too
 	if dest.StringData == nil {
 		dest.StringData = make(map[string]string)
