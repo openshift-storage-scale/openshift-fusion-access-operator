@@ -332,7 +332,7 @@ func (r *FusionAccessReconciler) Reconcile(
 		log.Log.Error(err, "Error applying manifest")
 		fusionaccess.Status.Status = "Error"
 		meta.SetStatusCondition(&fusionaccess.Status.Conditions,
-			v1.Condition{Type: "ManifestApply", Status: v1.ConditionFalse, Reason: "ReconcileCompleted", Message: "CNSA manifest apply failed"})
+			v1.Condition{Type: "ManifestApply", Status: v1.ConditionFalse, Reason: "ReconcileCompleted", Message: "Storage Scale manifest apply failed"})
 		serr := r.Status().Update(ctx, fusionaccess)
 		if serr != nil {
 			return ctrl.Result{}, errors.Join(serr, err)
@@ -341,7 +341,7 @@ func (r *FusionAccessReconciler) Reconcile(
 	}
 	log.Log.Info(fmt.Sprintf("Applied manifest from %s", install_path))
 	meta.SetStatusCondition(&fusionaccess.Status.Conditions,
-		v1.Condition{Type: "ManifestApply", Status: v1.ConditionTrue, Reason: "ReconcileCompleted", Message: "CNSA manifest was applied"})
+		v1.Condition{Type: "ManifestApply", Status: v1.ConditionTrue, Reason: "ReconcileCompleted", Message: "Storage Scale manifest was applied"})
 	serr := r.Status().Update(ctx, fusionaccess)
 	if serr != nil {
 		return ctrl.Result{}, serr
@@ -385,7 +385,7 @@ func (r *FusionAccessReconciler) Reconcile(
 			return ctrl.Result{}, serr
 		}
 	} else {
-		log.Log.Info("Skipping image pull check as we are not using a CNSA version in the spec")
+		log.Log.Info("Skipping image pull check as we are not using a Storage Scale version in the spec")
 	}
 
 	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
@@ -496,7 +496,7 @@ func getIbmManifest(fusionobj fusionv1alpha1.FusionAccessSpec) (string, error) {
 		}
 		return install_path, nil
 	}
-	return "", fmt.Errorf("no CNSA manifest version and no external manifest specified")
+	return "", fmt.Errorf("no Storage Scale manifest version and no external manifest specified")
 }
 
 // isItOurPullSecret returns true for Create or changed Update events

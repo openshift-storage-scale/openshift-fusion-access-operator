@@ -266,7 +266,7 @@ var _ = Describe("getIbmManifest", func() {
 
 			_, err := getIbmManifest(fusionObj)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("no CNSA manifest version"))
+			Expect(err.Error()).To(ContainSubstring("no Storage Scale manifest version"))
 		})
 	})
 })
