@@ -38,7 +38,6 @@ const (
 	ServiceAccountName = "fusion-access-operator-controller-manager"
 	ConfigMapName      = "kmm-dockerfile"
 	KMMModuleName      = "gpfs-module"
-	IBMCNSANamespace   = "ibm-spectrum-scale"
 	IBMENTITLEMENTNAME = "ibm-entitlement-key"
 )
 
@@ -49,14 +48,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
-	dockerConfigmap := newDockerConfigmap(ns)
 
-	if err := kubeutils.CreateOrUpdateResource(ctx, cl, dockerConfigmap, func(existing, desired *corev1.ConfigMap) error {
-		existing.Data = desired.Data
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to update dockerconfigmap in CreateOrUpdateKMMResources: %w", err)
-	}
 	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
 	if err != nil {
 		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
@@ -64,15 +56,6 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	kernelModule := NewKMMModule(ns, ibmScaleImage)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
-	}
-
-	buildConfigmap := newBuildConfigmap(IBMCNSANamespace)
-
-	if err := kubeutils.CreateOrUpdateResource(ctx, cl, buildConfigmap, func(existing, desired *corev1.ConfigMap) error {
-		existing.Data = desired.Data
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	// This can all be dropped with KMM 2.4
@@ -184,7 +167,7 @@ func getIBMCoreImage(ctx context.Context, cl client.Client) (string, error) {
 	return objmap["images"].(map[string]any)["coreInit"].(string), nil
 }
 
-func newDockerConfigmap(namespace string) *corev1.ConfigMap {
+func NewDockerConfigmap(namespace string) *corev1.ConfigMap {
 	dockerFileValue := `ARG IBM_SCALE=quay.io/rhsysdeseng/cp/spectrum/scale/ibm-spectrum-scale-core-init@sha256:fde69d67fddd2e4e0b7d7d85387a221359daf332d135c9b9f239fb31b9b82fe0
 ARG DTK_AUTO=quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:01e0e07cc6c41638f8e9022fb9aa36a7984efcde2166d8158fb59a6c9f7dbbdf
 ARG KERNEL_FULL_VERSION
@@ -213,7 +196,7 @@ COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/modules* /opt/lib/mo
 	}
 }
 
-func newBuildConfigmap(namespace string) *corev1.ConfigMap {
+func NewBuildConfigmap(namespace string) *corev1.ConfigMap {
 	buildGplValue := `#!/bin/sh
 kerv=$(uname -r)
 touch /usr/lpp/mmfs/bin/lxtrace-$kerv

@@ -46,6 +46,7 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/console"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 )
 
@@ -350,6 +351,23 @@ func (r *FusionAccessReconciler) Reconcile(
 	if serr != nil {
 		return ctrl.Result{}, serr
 	}
+
+	dockerConfigmap := kernelmodule.NewDockerConfigmap(ns)
+	if err := kubeutils.CreateOrUpdateResource(ctx, r.Client, dockerConfigmap, func(existing, desired *corev1.ConfigMap) error {
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update dockerconfigmap for KMM: %w", err)
+	}
+
+	buildConfigmap := kernelmodule.NewBuildConfigmap("ibm-spectrum-scale")
+	if err := kubeutils.CreateOrUpdateResource(ctx, r.Client, buildConfigmap, func(existing, desired *corev1.ConfigMap) error {
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update buildconfigmap in CreateOrUpdateKMMResources: %w", err)
+	}
+
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
 	// If we don't find it, we don't create the entitlement secrets and we keep going as a user might be
 	// patching the global pull secret
