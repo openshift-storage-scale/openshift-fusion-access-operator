@@ -119,7 +119,8 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 		}
 	}
 
-	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/kernel-module-management-operator#kmm-adding-the-keys-for-secureboot_kernel-module-management-operator
+	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/
+	//     kernel-module-management-operator#kmm-adding-the-keys-for-secureboot_kernel-module-management-operator
 	if sign {
 		signing = &kmmv1beta1.Sign{
 			FilesToSign: []string{
@@ -224,9 +225,10 @@ func getIBMCoreImageHash(image string) string {
 
 // This needs to truncate at 63 due to k8s length limits
 func getIBMCoreImageHashForLabel(image string) string {
+	const maxLabelLength = 63
 	hash := getIBMCoreImageHash(image)
-	if len(hash) > 63 {
-		return hash[:63]
+	if len(hash) > maxLabelLength {
+		return hash[:maxLabelLength]
 	}
 	return hash
 }

@@ -71,7 +71,7 @@ var _ = Describe("getIBMCoreImageHashForLabel", func() {
 		longDigest := "sha256:" + strings.Repeat("a", 100)
 		image := "example.com/repo/image@" + longDigest
 		result := getIBMCoreImageHashForLabel(image)
-		Expect(len(result)).To(Equal(63))
+		Expect(result).To(HaveLen(63))
 	})
 })
 
