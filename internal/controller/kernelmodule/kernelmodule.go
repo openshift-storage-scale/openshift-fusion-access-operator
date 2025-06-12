@@ -61,7 +61,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
 	}
-	kernelModule := NewKMMModule(ns, ibmScaleImage)
+	kernelModule := NewKMMModule(ns, ibmScaleImage, false)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
 	}
@@ -87,8 +87,23 @@ func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 	return nil
 }
 
-func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
+func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module {
 	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
+	var signing *kmmv1beta1.Sign
+	if sign {
+		signing = &kmmv1beta1.Sign{
+			FilesToSign: []string{
+				"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko",
+				"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfs26.ko",
+				"/opt/lib/modules/${KERNEL_FULL_VERSION}/tracedev.ko",
+			},
+			KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
+			CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
+		}
+	} else {
+		signing = nil
+	}
+
 	return &kmmv1beta1.Module{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      KMMModuleName,
@@ -119,13 +134,7 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 								},
 							},
 						},
-						// Sign: &kmmv1beta1.Sign{
-						// 	FilesToSign: []string{
-						// 		"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfslinux.ko",
-						// 	},
-						// 	KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
-						// 	CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
-						// },
+						Sign: signing,
 					},
 					},
 				},
