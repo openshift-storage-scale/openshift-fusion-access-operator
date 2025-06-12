@@ -89,6 +89,18 @@ func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 
 func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module {
 	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
+	ibmImageHashLabel := getIBMCoreImageHashForLabel(ibmScaleImage)
+	var selector map[string]string
+	if ibmImageHashLabel != "" {
+		selector = map[string]string{
+			"kubernetes.io/arch":                  "amd64",
+			"scale.spectrum.ibm.com/image-digest": ibmImageHashLabel,
+		}
+	} else {
+		selector = map[string]string{
+			"kubernetes.io/arch": "amd64",
+		}
+	}
 	var signing *kmmv1beta1.Sign
 	if sign {
 		signing = &kmmv1beta1.Sign{
@@ -140,9 +152,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 				},
 				ServiceAccountName: ServiceAccountName,
 			},
-			Selector: map[string]string{
-				"kubernetes.io/arch": "amd64",
-			},
+			Selector: selector,
 		},
 	}
 }
@@ -192,6 +202,15 @@ func getIBMCoreImageHash(image string) string {
 		return image[colonIdx+1:]
 	}
 	return ""
+}
+
+// This needs to truncate at 63 due to k8s length limits
+func getIBMCoreImageHashForLabel(image string) string {
+	hash := getIBMCoreImageHash(image)
+	if len(hash) > 63 {
+		return hash[:63]
+	}
+	return hash
 }
 
 func NewDockerConfigmap(namespace string) *corev1.ConfigMap {
