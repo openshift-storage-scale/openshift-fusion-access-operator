@@ -40,7 +40,7 @@ Production releases builds on top of the staging releases to do more or less the
 * Release the [FBC](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html) (File Based Catalog) fragment to the RH catalog index in production after updating the FBC graph file to include the new fragment like it was done in staging, but using the production image pullspec.
 
 ### Preparing the environment
-The release of the operator includes support for multiple versions within the same repository. The git repository for the operator defines branches as `release-X.Y` as the location of the semantic X and Y version. In turn, Konflux supports different versions by defining their own uniquely named application, with each containing their own set of compoments, also unique in their name, such as `controller-rhel9-operator-1-2` or `controller-rhel9-operator-1-3`.
+The release of the operator includes support for multiple versions within the same repository. The git repository for the operator defines branches as `release-X.Y` as the location of the semantic X and Y version. In turn, Konflux supports different versions by defining their own uniquely named application, with each containing their own set of components, also unique in their name, such as `controller-rhel9-operator-1-2` or `controller-rhel9-operator-1-3`.
 
 Thus, to make it easy and reusable, the release process defined in this page needs to parametrize the names of the components so that the process can be reused as much as possible. We will start the process by defining an environment variable that contains the name of the application that holds the controller and bundle. The next command lists all the applications in the workspace:
 ```
@@ -57,10 +57,10 @@ applicationName=operator-0-1
 releaseVersion=$(echo $applicationName| sed  's/operator//g')
 ```
 
-Retrieve the names of the components that match the controller and bundle based on the prefixed compoment names as we know them `controller-rhel9-operator` and `operator-bundle`:
+Retrieve the names of the components that match the controller and bundle based on the prefixed component names as we know them `controller-rhel9-operator` and `operator-bundle`:
 ```console
 operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep bundle)
-echo "Bundle compoment registered as $operator_bundle"
+echo "Bundle component registered as $operator_bundle"
 ```
 
 Capture all components in an array for later usage
@@ -68,7 +68,7 @@ Capture all components in an array for later usage
 unset components
 declare -A components
 componentNames=($(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'))
-for name in $componentNames; do genericName=$(echo $name | sed 's/'$releaseVersion'//g'); components[$genericName]=$name; done
+for name in ${componentNames[@]}; do genericName=$(echo $name | sed 's/'$releaseVersion'//g'); components[$genericName]=$name; done
 
 ```
 
