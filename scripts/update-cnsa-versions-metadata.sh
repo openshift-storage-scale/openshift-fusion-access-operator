@@ -51,7 +51,7 @@ awk -v xd="$TECTONIC_VERSIONS" '
 }
 END {
   for (i = 2; i <= NR; i++) {
-    if (lines[i] ~ /StorageScaleVersion CNSAVersions .*storageScaleVersion/ && lines[i-1] ~ /xDescriptors=\{.*\}/) {
+    if (lines[i] ~ /StorageScaleVersion StorageScaleVersions.*storageScaleVersion/ && lines[i-1] ~ /xDescriptors=\{.*\}/) {
       sub(/xDescriptors=\{[^}]*\}/, "xDescriptors=" xd, lines[i-1])
     }
     print lines[i-1]
