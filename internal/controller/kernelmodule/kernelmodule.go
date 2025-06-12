@@ -48,6 +48,13 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
+	dockerConfigmap := NewDockerConfigmap(ns)
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, dockerConfigmap, func(existing, desired *corev1.ConfigMap) error {
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update dockerconfigmap for KMM: %w", err)
+	}
 
 	ibmScaleImage, err := getIBMCoreImage(ctx, cl)
 	if err != nil {
