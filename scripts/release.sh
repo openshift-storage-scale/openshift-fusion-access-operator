@@ -10,8 +10,7 @@ fi
 
 make USE_IMAGE_DIGESTS="" clean bundle generate manifests docker-build docker-push \
     bundle-build bundle-push \
-    console-build console-push devicefinder-docker-build devicefinder-docker-push \
-    must-gather-docker-build must-gather-docker-push
+    console-build console-push devicefinder-docker-build devicefinder-docker-push
 
 export BUNDLE_IMGS=$(skopeo list-tags docker://quay.io/openshift-storage-scale/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "quay.io/openshift-storage-scale/openshift-fusion-access-bundle:\(.)"] | join(",")')
 make catalog-build catalog-push

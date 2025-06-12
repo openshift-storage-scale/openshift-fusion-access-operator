@@ -92,8 +92,7 @@ fi
 
 make VERSION=${VERSION} IMAGE_TAG_BASE=${REGISTRY}/openshift-fusion-access CHANNELS=fast USE_IMAGE_DIGESTS="" \
     manifests bundle generate docker-build docker-push bundle-build bundle-push console-build console-push \
-    devicefinder-docker-build devicefinder-docker-push catalog-build catalog-push catalog-install \
-    must-gather-docker-build must-gather-docker-push
+    devicefinder-docker-build devicefinder-docker-push catalog-build catalog-push catalog-install
 
 wait_for_resource "packagemanifest" "${OPERATOR}" "" "${CATALOGSOURCE}"
 apply_subscription

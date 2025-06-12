@@ -7,7 +7,6 @@ ARG VERSION=1.0
 LABEL controller-rhel9-operator=${OPERATOR_IMG}
 LABEL devicefinder=${DEVICEFINDER_IMAGE}
 LABEL console-plugin=${CONSOLE_PLUGIN_IMAGE}
-LABEL must-gather=${MUST_GATHER_IMAGE}
 
 COPY bundle/manifests /manifests/
 COPY bundle/metadata /metadata/
