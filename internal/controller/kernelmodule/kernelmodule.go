@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,6 +41,8 @@ const (
 	ConfigMapName      = "kmm-dockerfile"
 	KMMModuleName      = "gpfs-module"
 	IBMENTITLEMENTNAME = "ibm-entitlement-key"
+	SecureBootKey      = "secureboot-signing-key"
+	SecureBootKeyPub   = "secureboot-signing-key-pub"
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -61,7 +64,8 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
 	}
-	kernelModule := NewKMMModule(ns, ibmScaleImage, false)
+	signModules := doSigningSecretsExist(ctx, cl, ns)
+	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
 	}
@@ -82,15 +86,28 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	return nil
 }
 
+func doSigningSecretsExist(ctx context.Context, cl client.Client, namespace string) bool {
+	secretNames := []string{SecureBootKey, SecureBootKeyPub}
+	for _, name := range secretNames {
+		err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &corev1.Secret{})
+		if err != nil {
+			return false
+		}
+	}
+	return true // Both secrets found
+}
+
 func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 	existing.Spec = desired.Spec
 	return nil
 }
 
 func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module {
+	var signing *kmmv1beta1.Sign
+	var selector map[string]string
+
 	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
 	ibmImageHashLabel := getIBMCoreImageHashForLabel(ibmScaleImage)
-	var selector map[string]string
 	if ibmImageHashLabel != "" {
 		selector = map[string]string{
 			"kubernetes.io/arch":                  "amd64",
@@ -101,7 +118,8 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 			"kubernetes.io/arch": "amd64",
 		}
 	}
-	var signing *kmmv1beta1.Sign
+
+	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/kernel-module-management-operator#kmm-adding-the-keys-for-secureboot_kernel-module-management-operator
 	if sign {
 		signing = &kmmv1beta1.Sign{
 			FilesToSign: []string{
@@ -109,8 +127,8 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 				"/opt/lib/modules/${KERNEL_FULL_VERSION}/mmfs26.ko",
 				"/opt/lib/modules/${KERNEL_FULL_VERSION}/tracedev.ko",
 			},
-			KeySecret:  &corev1.LocalObjectReference{Name: "my-signing-key"},
-			CertSecret: &corev1.LocalObjectReference{Name: "my-signing-key-pub"},
+			KeySecret:  &corev1.LocalObjectReference{Name: SecureBootKey},
+			CertSecret: &corev1.LocalObjectReference{Name: SecureBootKeyPub},
 		}
 	} else {
 		signing = nil
