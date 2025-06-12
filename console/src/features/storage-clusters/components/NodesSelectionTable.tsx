@@ -35,18 +35,18 @@ import { useValidateMinimumRequirements } from "../hooks/useValidateMinimumRequi
 
 export const NodesSelectionTable: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult({ isList: true });
+  const lvdrsWatchState = useWatchLocalVolumeDiscoveryResult();
   const nodesWatchState = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL],
-    isList: true,
   });
   const vm = useNodesSelectionTableViewModel(nodesWatchState, lvdrsWatchState);
   const handleNodeSelectionChange = useNodeSelectionChangeHandler(
     vm,
-    nodesWatchState[0]
+    nodesWatchState[0] ?? []
   );
+  
   useValidateMinimumRequirements(vm);
-
+  
   return (
     <Stack hasGutter>
       <StackItem>

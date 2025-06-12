@@ -37,7 +37,10 @@ import { ConnectedFileSystemsDeleteModal } from "./FileSystemsDeleteModal";
 import { getFilesystemStatus } from "@/features/file-systems/utils/filesystem";
 import { FileSystemTableContext } from "@/features/file-systems/contexts/FileSystemsTableContext";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
-import { GpfsDashboardLink, type Route } from "./FileSystemsGpfsDashboardLink";
+import {
+  FileSystemsDashboardLink,
+  type Route,
+} from "./FileSystemsDashboardLink";
 import { isFilesystemUsed } from "@/features/file-systems/utils/filesystem";
 import FileSystemStatus from "./FileSystemsStatus";
 import FileSystemStorageClasses from "./FileSystemsStorageClasses";
@@ -72,7 +75,7 @@ const columns = [
 
 const useTableResources = () => {
   const [fileSystems, fileSystemsLoaded, fileSystemsLoadedError] =
-    useWatchFileSystem({ isList: true });
+    useWatchFileSystem();
 
   const [pvcs, pvcsLoaded] = useK8sWatchResource<
     IoK8sApiCoreV1PersistentVolumeClaim[]
@@ -96,7 +99,7 @@ const useTableResources = () => {
   });
 
   const [storageClusters, storageClustersLoaded] = useWatchSpectrumScaleCluster(
-    { isList: true, limit: 1 }
+    { limit: 1 }
   );
 
   const storageClusterName = storageClusters?.[0]?.metadata?.name;
@@ -163,8 +166,8 @@ export const FileSystemsTab: React.FC = () => {
       value={{ filesystem: deleteFs, setFileSystem: setDeleteFs }}
     >
       <VirtualizedTable<FileSystem, RowData>
-        data={fileSystems}
-        unfilteredData={fileSystems}
+        data={fileSystems ?? []}
+        unfilteredData={fileSystems ?? []}
         loaded={fileSystemsLoaded}
         loadError={fileSystemsLoadedError}
         columns={columns}
@@ -255,7 +258,7 @@ const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         id={columns[4].id}
         {...columns[4].props}
       >
-        <GpfsDashboardLink
+        <FileSystemsDashboardLink
           fileSystem={fileSystem}
           routes={routes}
           loaded={routesLoaded}
@@ -336,7 +339,7 @@ const useFileSystemsTableColumns = (): TableColumn<FileSystem>[] => {
       },
       {
         id: columns[4].id,
-        title: t("Link to GPFS dashboard"),
+        title: t("Link to file system dashboard"),
         props: columns[4].props,
       },
       {

@@ -295,19 +295,17 @@ const useDisksDiscoveryResultsForStorageNodes = (): [
   LocalVolumeDiscoveryResult[],
   boolean,
 ] => {
-  const [disksDiscoveryResults, lvLoaded] = useWatchLocalVolumeDiscoveryResult({
-    isList: true,
-  });
+  const [disksDiscoveryResults, lvLoaded] =
+    useWatchLocalVolumeDiscoveryResult();
 
   const [selectedNodes, nodesLoaded] = useWatchNode({
-    isList: true,
     withLabels: [WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL],
   });
 
   const results = useMemo(
     () =>
-      disksDiscoveryResults.filter((result) =>
-        selectedNodes.find(
+      (disksDiscoveryResults ?? []).filter((result) =>
+        (selectedNodes ?? []).find(
           (node) => node.metadata?.name === result.spec.nodeName
         )
       ),

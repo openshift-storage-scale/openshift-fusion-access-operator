@@ -1,20 +1,17 @@
-import {
-  useK8sWatchResource,
-  type WatchK8sResource,
-} from "@openshift-console/dynamic-plugin-sdk";
+import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
+import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/kubernetes/1.30/types";
-import type { UseK8sWatchResourceWithInferedList } from "@/shared/utils/console/UseK8sWatchResource";
 
 interface Options extends WatchK8sResource {
   withLabels?: Array<`${string}=${string}`>;
 }
 
-export const useWatchNode: UseK8sWatchResourceWithInferedList<
-  IoK8sApiCoreV1Node,
-  Omit<Options, "groupVersionKind">
-> = (options) =>
-  useK8sWatchResource({
+export const useWatchNode = (
+  options: Omit<Options, "groupVersionKind" | "isList">
+) =>
+  useNormalizedK8sWatchResource<IoK8sApiCoreV1Node>({
     ...options,
+    isList: true,
     groupVersionKind: {
       version: "v1",
       kind: "Node",

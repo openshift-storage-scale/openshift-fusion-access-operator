@@ -12,8 +12,8 @@ import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hook
 import { CancelButton } from "@/shared/components/CancelButton";
 
 const StorageClusterCreate: React.FC = () => {
-  const [cluster] = useWatchSpectrumScaleCluster({ isList: true, limit: 1 });
-  return cluster.length === 0 ? (
+  const [cluster] = useWatchSpectrumScaleCluster({ limit: 1 });
+  return (cluster ?? []).length === 0 ? (
     <StoreProvider<State, Actions>
       reducer={reducer}
       initialState={initialState}

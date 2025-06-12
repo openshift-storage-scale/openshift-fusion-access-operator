@@ -23,8 +23,7 @@ export const useValidateMinimumRequirements = (
     }
 
     const conditions: boolean[] = [
-      vm.sharedDisks.size < MINIMUM_AMOUNT_OF_SHARED_DISKS &&
-        vm.selectedNodes.length < 2,
+      vm.sharedDisksCount < MINIMUM_AMOUNT_OF_SHARED_DISKS,
       vm.selectedNodes.length < MINIMUM_AMOUNT_OF_NODES,
     ];
 
@@ -67,5 +66,5 @@ export const useValidateMinimumRequirements = (
         type: "dismissAlert",
       });
     }
-  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisks.size]);
+  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisksCount]);
 };

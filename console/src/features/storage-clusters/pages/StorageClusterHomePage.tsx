@@ -1,13 +1,13 @@
-import { useCallback } from "react";
 import { Redirect, useHistory } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClusterEmptyState } from "@/features/storage-clusters/components/StorageClusterEmptyState";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { ReactNodeWithPredefinedFallback } from "@/shared/components/ReactNodeWithPredefinedFallback";
+import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { StoreProvider, useStore } from "@/shared/store/provider";
+import { FILE_SYSTEMS_HOME_URLPATH, STORAGE_CLUSTER_CREATE_URLPATH } from "@/constants";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -24,34 +24,36 @@ export default StorageClusterHomePage;
 
 const ConnectedStorageClusterHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  const [storageClusters, storageClustersLoaded, storageClustersError] =
-    useWatchSpectrumScaleCluster({ isList: true, limit: 1 });
 
-  const history = useHistory();
-  const handleCreateStorageCluster = useCallback(() => {
-    history.push("/fusion-access/storage-cluster/create");
-  }, [history]);
   const [store, dispatch] = useStore<State, Actions>();
 
-  return storageClusters.length === 0 ? (
+  const history = useHistory();
+
+  const [storageClusters, storageClustersLoaded, storageClustersError] =
+    useWatchSpectrumScaleCluster({ limit: 1 });
+
+  return (
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "dismissAlert" })}
     >
-      <ReactNodeWithPredefinedFallback
+      <ResourceStatusBoundary
         loaded={storageClustersLoaded}
         error={storageClustersError}
       >
-        <StorageClusterEmptyState
-          onCreateStorageCluster={handleCreateStorageCluster}
-        />
-      </ReactNodeWithPredefinedFallback>
+        {(storageClusters ?? []).length === 0 ? (
+          <StorageClusterEmptyState
+            onCreateStorageCluster={() => {
+              history.push(STORAGE_CLUSTER_CREATE_URLPATH);
+            }}
+          />
+        ) : (
+          <Redirect to={FILE_SYSTEMS_HOME_URLPATH} />
+        )}
+      </ResourceStatusBoundary>
     </ListPage>
-  ) : (
-    <Redirect to={"/fusion-access/file-systems"} />
   );
 };
-
 ConnectedStorageClusterHomePage.displayName = "ConnectedFusionAccessHomePage";

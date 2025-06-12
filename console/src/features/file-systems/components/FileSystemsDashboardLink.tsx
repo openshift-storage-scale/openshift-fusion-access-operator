@@ -4,7 +4,7 @@ import { Button, Skeleton } from "@patternfly/react-core";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { ExternalLinkAltIcon } from "@patternfly/react-icons";
 
-type GpfsDashboardLinkProps = {
+type FileSystemsDashboardLinkProps = {
   fileSystem: FileSystem;
   routes: Route[];
   loaded: boolean;
@@ -16,15 +16,15 @@ export type Route = K8sResourceCommon & {
   };
 };
 
-export const GpfsDashboardLink: React.FC<GpfsDashboardLinkProps> = ({
-  fileSystem,
-  routes,
-  loaded,
-}) => {
+export const FileSystemsDashboardLink: React.FC<
+  FileSystemsDashboardLinkProps
+> = ({ fileSystem, routes, loaded }) => {
   const { t } = useFusionAccessTranslations();
 
   if (!loaded) {
-    return <Skeleton screenreaderText={t("Loading gpfs dashboard link")} />;
+    return (
+      <Skeleton screenreaderText={t("Loading file system dashboard link")} />
+    );
   }
 
   if (!routes.length) {
@@ -48,4 +48,4 @@ export const GpfsDashboardLink: React.FC<GpfsDashboardLinkProps> = ({
     </Button>
   );
 };
-GpfsDashboardLink.displayName = "GpfsDashboardLink";
+FileSystemsDashboardLink.displayName = "GpfsDashboardLink";
