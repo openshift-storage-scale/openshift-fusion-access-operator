@@ -52,6 +52,20 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
+
+	// This can all be dropped with KMM 2.4
+	var secret *corev1.Secret
+	if secret, err = getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
+		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
+	}
+	if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
+		existing.Type = desired.Type
+		existing.Data = desired.Data
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
+	}
+
 	dockerConfigmap := NewDockerConfigmap(ns)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, dockerConfigmap, func(existing, desired *corev1.ConfigMap) error {
 		existing.Data = desired.Data
@@ -68,19 +82,6 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
-	}
-
-	// This can all be dropped with KMM 2.4
-	var secret *corev1.Secret
-	if secret, err = getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
-		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
-	}
-	if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
-		existing.Type = desired.Type
-		existing.Data = desired.Data
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	return nil
