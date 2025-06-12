@@ -8,7 +8,6 @@ export VERSION ?= $(shell cat VERSION.txt)
 
 OPERATOR_DOCKERFILE ?= operator.Dockerfile
 DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
-MUST_GATHER_DOCKERFILE ?= must-gather.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
 # Version of yaml file to generate rbacs from
@@ -60,9 +59,6 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 
 export DEVICEFINDER_IMAGE ?= $(IMAGE_TAG_BASE)-devicefinder:$(VERSION)
-# Must Gather image
-
-export MUST_GATHER_IMAGE ?= $(IMAGE_TAG_BASE)-must-gather:$(VERSION)
 
 REV=$(shell git describe --long --tags --match='v*' --dirty 2>/dev/null || git rev-list -n1 HEAD)
 CURPATH=$(PWD)
@@ -208,11 +204,6 @@ generate-dockefile-devicefinder:
 	envsubst < templates/devicefinder.Dockerfile.template > $(DEVICEFINDER_DOCKERFILE)
 
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
-.PHONY: generate-dockefile-must-gather
-generate-dockefile-must-gather:
-	envsubst < templates/must-gather.Dockerfile.template > $(MUST_GATHER_DOCKERFILE)
-
-# Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
 .PHONY: generate-dockerfile-console-plugin
 generate-dockerfile-console-plugin:
 	envsubst '$${VERSION}' < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
@@ -246,14 +237,6 @@ devicefinder-docker-build: generate-dockefile-devicefinder ## Build docker image
 .PHONY: devicefinder-docker-push
 devicefinder-docker-push: ## Push docker image of the devicefinder
 	$(CONTAINER_TOOL) push $(DEVICEFINDER_IMAGE)
-
-.PHONY: must-gather-docker-build
-must-gather-docker-build: generate-dockefile-must-gather ## Build docker image of the must gather container
-	$(CONTAINER_TOOL) build --platform=linux/$(TARGETARCH) -t $(MUST_GATHER_IMAGE) -f $(CURPATH)/${MUST_GATHER_DOCKERFILE} .
-
-.PHONY: must-gather-docker-push
-must-gather-docker-push: ## Push docker image of the must gather container
-	$(CONTAINER_TOOL) push $(MUST_GATHER_IMAGE)
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

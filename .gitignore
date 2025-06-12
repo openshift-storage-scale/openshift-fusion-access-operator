@@ -35,8 +35,6 @@ go.work
 
 bundle_tmp*/
 
-must-gather.local.*/
-
 build/*
 bundle/*
 
