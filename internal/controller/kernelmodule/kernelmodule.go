@@ -202,33 +202,3 @@ COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/modules* /opt/lib/mo
 		},
 	}
 }
-
-func NewBuildConfigmap(namespace string) *corev1.ConfigMap {
-	buildGplValue := `#!/bin/sh
-kerv=$(uname -r)
-touch /usr/lpp/mmfs/bin/lxtrace-$kerv
-if ! lsmod | grep -q "^mmfslinux"; then echo "Kernel module is not loaded"; exit 1; fi
-mkdir -p /lib/modules/$kerv/extra
-echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
-echo "This is a workaround to pass some file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
-
-exit 0
-`
-	hostPathValue := `/
-`
-
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "buildgpl",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/instance": "ibm-spectrum-scale",
-				"app.kubernetes.io/name":     "cluster",
-			},
-		},
-		Data: map[string]string{
-			"buildgpl":            buildGplValue,
-			"hostPathDirectories": hostPathValue,
-		},
-	}
-}
