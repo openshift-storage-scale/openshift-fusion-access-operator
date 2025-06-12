@@ -19,6 +19,7 @@ package kernelmodule
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
@@ -87,13 +88,13 @@ func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 }
 
 func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
+	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
 	return &kmmv1beta1.Module{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      KMMModuleName,
 			Namespace: namespace,
 		},
 		Spec: kmmv1beta1.ModuleSpec{
-
 			ModuleLoader: kmmv1beta1.ModuleLoaderSpec{
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					Modprobe: kmmv1beta1.ModprobeSpec{
@@ -106,7 +107,7 @@ func NewKMMModule(namespace, ibmScaleImage string) *kmmv1beta1.Module {
 					},
 					KernelMappings: []kmmv1beta1.KernelMapping{{
 						Regexp:         "^.*\\.x86_64$",
-						ContainerImage: fmt.Sprintf("image-registry.openshift-image-registry.svc:5000/%s/gpfs_compat_kmod:${KERNEL_FULL_VERSION}", namespace),
+						ContainerImage: fmt.Sprintf("image-registry.openshift-image-registry.svc:5000/%s/gpfs_compat_kmod:${KERNEL_FULL_VERSION}-%s", namespace, ibmImageHash),
 						Build: &kmmv1beta1.Build{
 							DockerfileConfigMap: &corev1.LocalObjectReference{
 								Name: ConfigMapName,
@@ -172,6 +173,16 @@ func getIBMCoreImage(ctx context.Context, cl client.Client) (string, error) {
 		return "", err
 	}
 	return objmap["images"].(map[string]any)["coreInit"].(string), nil
+}
+
+func getIBMCoreImageHash(image string) string {
+	if atIdx := strings.Index(image, "@sha256:"); atIdx != -1 {
+		return image[atIdx+len("@sha256:"):]
+	}
+	if colonIdx := strings.LastIndex(image, ":"); colonIdx != -1 && !strings.Contains(image[colonIdx:], "/") {
+		return image[colonIdx+1:]
+	}
+	return ""
 }
 
 func NewDockerConfigmap(namespace string) *corev1.ConfigMap {
