@@ -44,6 +44,7 @@ import (
 
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/console"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 )
@@ -80,6 +81,9 @@ func NewFusionAccessReconciler(
 //+kubebuilder:rbac:groups=fusion.storage.openshift.io,resources=fusionaccesses/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups="",namespace=ibm-fusion-access,resources=secrets,verbs=get;list;watch
+
+// KMM support
+//+kubebuilder:rbac:groups=kmm.sigs.x-k8s.io,resources=modules,verbs=create;delete;get;list;patch;update;watch
 
 // Below rules are inserted via `make rbac-generate` automatically
 // IBM_RBAC_MARKER_START
@@ -346,6 +350,7 @@ func (r *FusionAccessReconciler) Reconcile(
 	if serr != nil {
 		return ctrl.Result{}, serr
 	}
+
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
 	// If we don't find it, we don't create the entitlement secrets and we keep going as a user might be
 	// patching the global pull secret
@@ -362,6 +367,14 @@ func (r *FusionAccessReconciler) Reconcile(
 			return reconcile.Result{}, err
 		}
 		log.Log.Info("Entitlement secrets created")
+
+		// Since the kernel module requires the pull secret, we only create that if the secret is found
+		log.Log.Info("Creating kernel module resources")
+		if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		log.Log.Info("Successfully created kernel module resources")
 	}
 
 	// Check if can pull the image if we have not already or if it failed previously

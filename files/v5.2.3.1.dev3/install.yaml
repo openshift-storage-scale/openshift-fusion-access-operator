@@ -647,8 +647,11 @@ spec:
                 description: |-
                   ttlDuration specifies the time duration to wait before automatically deleting the CVO after successful completion.
                   It can be specified in hours (e.g. 5h) or in days (2h). The default value is 24h.
-                pattern: ^[0-9]+[dh]$
                 type: string
+                x-kubernetes-validations:
+                - message: ttlDuration must be a number followed by 'h' (hours) or
+                    'd' (days), e.g., '12h' or '3d'
+                  rule: self.matches('^[0-9]+[hd]$')
             required:
             - action
             - cacheVolume
@@ -726,6 +729,12 @@ spec:
                   - type
                   type: object
                 type: array
+              downloadInitiated:
+                description: |-
+                  DownloadInitiated is a flag that indicates whether the download operation has been triggered.
+                  This field becomes true once the download operation has successfully initiated,
+                  and remains false if the operation has not yet started.
+                type: boolean
               failedToQueueCount:
                 description: FailedToQueueCount is the number of invalid files specified
                   by users which could not be added to the download queue.
@@ -4187,6 +4196,9 @@ spec:
     - jsonPath: .status.conditions[?(@.type=="Updated")].status
       name: Updated
       type: string
+    - jsonPath: .status.conditions[?(@.type=="Healthy")].reason
+      name: Healthy
+      type: string
     - jsonPath: .status.pods.total
       name: Pods
       type: string
@@ -6004,6 +6016,9 @@ spec:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=="Success")].status
       name: Established
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Healthy")].reason
+      name: Healthy
       type: string
     - jsonPath: .spec.remote.cluster
       name: Remote Cluster
@@ -10666,21 +10681,18 @@ data:
     apiVersion: scale.spectrum.ibm.com/v1alpha1
     kind: ClusterManagerConfig
     images:
-      coreECE: cp.icr.io/cp/gpfs/erasure-code/ibm-spectrum-scale-daemon@sha256:e9ef091df15e5d17166321869d62e5a58061d598bca4f68d9c8d2c05f2b45021
-      coreDME: cp.icr.io/cp/gpfs/data-management/ibm-spectrum-scale-daemon@sha256:e287f6538f619dd1b06884fc7c3ca957366b8e365782539addb83bfa13a92be1
-      coreDAE: cp.icr.io/cp/gpfs/data-access/ibm-spectrum-scale-daemon@sha256:72c607d9288093b3e18fda25bb9ae608c931343254987a2b3bfc7c647afeea5c
-      coreInit: cp.icr.io/cp/gpfs/ibm-spectrum-scale-core-init@sha256:8bd2d8d1663d5a709327561d92e962ed1e6fb4925df9925701a637cadc22be2b
-      gui: cp.icr.io/cp/gpfs/ibm-spectrum-scale-gui@sha256:179fd0f462c15f303c7a006b1a8ad71f01cd4215bcac99ac46722e37a56dba93
-      postgres: cp.icr.io/cp/gpfs/postgres@sha256:0bcc5bbbb2aa9c9b4c6505845918c7eb55d783cf5c1f434fac33012579fb149d
-      logs: cp.icr.io/cp/gpfs/ibm-spectrum-scale-logs@sha256:ef767949384ffdf4f2067496051961a7b2c75e52d9255991ce0152072bfb9d2d
-      pmcollector: cp.icr.io/cp/gpfs/ibm-spectrum-scale-pmcollector@sha256:f4c3d343e92a9931830b2693bc274136a14f6f497e7da92c199a957b9c0a0c7a
-      sysmon: cp.icr.io/cp/gpfs/ibm-spectrum-scale-monitor@sha256:9543dfe369c3d1d4bd93f7c7743f990ae652e9bc2256a0ba6ed1d03e6924afd0
-      grafanaBridge: cp.icr.io/cp/gpfs/ibm-spectrum-scale-grafana-bridge@sha256:b05cf7a8f6e1be3aa576f237075757fb318c9d3174f54410dbc17365176ce121
-      coreDNS: cp.icr.io/cp/gpfs/ibm-spectrum-scale-coredns@sha256:6a317b23fee629c0b07eb95d34ab7593bb38d41bffc5d1cd4cb2870539c66cd4
-      mustGather: icr.io/cpopen/ibm-spectrum-scale-must-gather@sha256:4ce047b7b8f81652fd6c2c0a6682d92c08b5e99e1f31dcdde196e01267f58cc9
-      ganesha: cp.icr.io/cp/gpfs/ibm-spectrum-scale-ganesha@sha256:054e9e382241ec3bc2a6cab30f1a045b74674492b25afd1110896b4060d1ab6f
-      stunnel: cp.icr.io/cp/gpfs/ibm-spectrum-scale-stunnel@sha256:a2c94c1357fe27ef5070d8ea7ba39e9524243d925ffaf3af6300238b565de44b
-      pmsensors: cp.icr.io/cp/gpfs/ibm-spectrum-scale-pmsensors@sha256:c9270e17334eba8fd77733282bb78866fa7266e87d86bcb19146a116d4e83483
+      coreECE: quay.io/openshift-storage-scale/erasure-code/ibm-spectrum-scale-daemon:5.2.3.1.dev3
+      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:5.2.3.1.dev3
+      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:5.2.3.1.dev3
+      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:5.2.3.1.dev3
+      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:5.2.3.1.dev3
+      postgres: quay.io/openshift-storage-scale/postgres:5.2.3.1.dev3
+      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:5.2.3.1.dev3
+      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:5.2.3.1.dev3
+      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:5.2.3.1.dev3
+      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:5.2.3.1.dev3
+      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:5.2.3.1.dev3
+      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:5.2.3.1.dev3
 kind: ConfigMap
 metadata:
   labels:
@@ -10688,6 +10700,29 @@ metadata:
     app.kubernetes.io/name: operator
   name: ibm-spectrum-scale-manager-config
   namespace: ibm-spectrum-scale-operator
+---
+apiVersion: v1
+data:
+  buildgpl: |-
+    #!/bin/sh
+    kerv=$(uname -r)
+    touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+    if ! lsmod | grep -q "^mmfslinux"; then
+      echo "Error: Kernel module is not loaded yet"
+      exit 1
+    fi
+    mkdir -p /lib/modules/$kerv/extra
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
+    exit 0
+  hostPathDirectories: /
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-spectrum-scale
+    app.kubernetes.io/name: cluster
+  name: buildgpl
+  namespace: ibm-spectrum-scale
 ---
 apiVersion: v1
 kind: Service
@@ -10712,7 +10747,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    productVersion: 2.14.0
+    productVersion: 2.14.1
   labels:
     app.kubernetes.io/instance: ibm-spectrum-scale-csi-operator
     app.kubernetes.io/managed-by: ibm-spectrum-scale-csi-operator
@@ -10731,7 +10766,7 @@ spec:
       annotations:
         productID: ibm-spectrum-scale-csi-operator
         productName: IBM Spectrum Scale CSI Operator
-        productVersion: 2.14.0
+        productVersion: 2.14.1
       labels:
         app.kubernetes.io/instance: ibm-spectrum-scale-csi-operator
         app.kubernetes.io/managed-by: ibm-spectrum-scale-csi-operator
@@ -10759,26 +10794,26 @@ spec:
         - name: SHORTNAME_NODE_MAPPING
           value: "yes"
         - name: CSI_SNAPSHOTTER_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/csi-snapshotter@sha256:5f4bb469fec51147ce157329dab598c758da1b018bad6dad26f0ff469326d769
+          value: quay.io/openshift-storage-scale/csi/csi-snapshotter:5.2.3.1.dev3
         - name: CSI_ATTACHER_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/csi-attacher@sha256:69888dba58159c8bc0d7c092b9fb97900c9ca8710d088b0b7ea7bd9052df86f6
+          value: quay.io/openshift-storage-scale/csi/csi-attacher:5.2.3.1.dev3
         - name: CSI_PROVISIONER_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/csi-provisioner@sha256:d5e46da8aff7d73d6f00c761dae94472bcda6e78f4f17b3802dc89d44de0111b
+          value: quay.io/openshift-storage-scale/csi/csi-provisioner:5.2.3.1.dev3
         - name: CSI_LIVENESSPROBE_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/livenessprobe@sha256:2c5f9dc4ea5ac5509d93c664ae7982d4ecdec40ca7b0638c24e5b16243b8360f
+          value: quay.io/openshift-storage-scale/csi/livenessprobe:5.2.3.1.dev3
         - name: CSI_NODE_REGISTRAR_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/csi-node-driver-registrar@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d
+          value: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:5.2.3.1.dev3
         - name: CSI_RESIZER_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/csi-resizer@sha256:8ddd178ba5d08973f1607f9b84619b58320948de494b31c9d7cd5375b316d6d4
+          value: quay.io/openshift-storage-scale/csi/csi-resizer:5.2.3.1.dev3
         - name: CSI_DRIVER_IMAGE
-          value: cp.icr.io/cp/gpfs/csi/ibm-spectrum-scale-csi-driver@sha256:4856f2904c1893e8893f6d8e6775c23fe0871f0547c5d24984d70bbbbb7b3580
+          value: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:5.2.3.1.dev3
         - name: METRICS_BIND_ADDRESS
           value: "8383"
         - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: icr.io/cpopen/ibm-spectrum-scale-csi-operator@sha256:8d74a489683d33a2e21d2b00b774d08b51861213fcd0a93ad93a1a1658595439
+        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-csi-operator:5.2.3.1.dev3
         imagePullPolicy: IfNotPresent
         livenessProbe:
           exec:
@@ -10831,7 +10866,7 @@ metadata:
   labels:
     app.kubernetes.io/instance: ibm-spectrum-scale
     app.kubernetes.io/name: operator
-    app.kubernetes.io/version: v5.2.3.0
+    app.kubernetes.io/version: v5.2.3.1
     control-plane: controller-manager
   name: ibm-spectrum-scale-controller-manager
   namespace: ibm-spectrum-scale-operator
@@ -10847,7 +10882,7 @@ spec:
       labels:
         app.kubernetes.io/instance: ibm-spectrum-scale
         app.kubernetes.io/name: operator
-        app.kubernetes.io/version: v5.2.3.0
+        app.kubernetes.io/version: v5.2.3.1
         control-plane: controller-manager
     spec:
       affinity:
@@ -10889,7 +10924,9 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.memory
-        image: icr.io/cpopen/ibm-spectrum-scale-operator@sha256:d2f9ebc3bb196ad85b931f2dabdce13aed2e6598227b8fc2434d6df9f840f696
+        - name: MM_DISABLE_MODULE_MANAGEMENT
+          value: "1"
+        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:5.2.3.1.dev3
         livenessProbe:
           httpGet:
             path: /healthz
@@ -11093,6 +11130,23 @@ volumes:
 - persistentVolumeClaim
 - projected
 - secret
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: spectrumscale.csi.ibm.com
+spec:
+  attachRequired: true
+  fsGroupPolicy: File
+  podInfoOnMount: true
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ibm-spectrum-scale-csi-config
+  namespace: ibm-spectrum-scale-csi
+data:
+  VAR_DRIVER_PRIMARY_FILESYSTEM : "DISABLED"
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration

@@ -177,7 +177,6 @@ github.com/openshift/api/cloudnetwork/v1
 github.com/openshift/api/config
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
-github.com/openshift/api/config/v1alpha2
 github.com/openshift/api/console
 github.com/openshift/api/console/v1
 github.com/openshift/api/helm
@@ -275,6 +274,10 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250327110929-b96669dba558
+## explicit; go 1.23.0
+github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1
+github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta2
 # github.com/rogpeppe/go-internal v1.13.1
 ## explicit; go 1.22
 # github.com/spf13/cobra v1.9.1

@@ -47,9 +47,7 @@ spec:
         displayName: IBM Storage Scale Version
         path: storageScaleVersion
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0
-        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.rc1
-        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.0.1
+        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.1.dev3
       - displayName: Local Volume Discovery
         path: storageDeviceDiscovery
         x-descriptors:

@@ -378,6 +378,8 @@ $(OPERATOR_SDK): $(LOCALBIN) ## Download operator-sdk locally if necessary.
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	$(KUSTOMIZE) build config/manifests | envsubst | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	# Since https://www.github.com/operator-framework/operator-sdk/issues/6598 we copy the dependencies file on our own
+	cp -f ./config/olm-dependencies.yaml ./bundle/metadata/dependencies.yaml
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build

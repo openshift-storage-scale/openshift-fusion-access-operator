@@ -50,8 +50,27 @@ var _ = Describe("FusionAccess Controller", func() {
 		namespace         = newNamespace("ibm-fusion-access-operator")
 		version           = newOCPVersion(oscinitVersion)
 		clusterConsole    = &operatorv1.Console{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
-		testTimeout       = 5 * time.Second
+		clusterPullSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pull-secret",
+				Namespace: "openshift-config",
+			},
+			Data: map[string][]byte{".dockerconfigjson": []byte(`
+					{
+		  				"auths": {
+							"quay.io/repo1": {
+								"auth": "authkey",
+								"email": ""
+		    				},
+							"quay.io/repo2": {
+								"auth": "authkey",
+								"email": ""
+		    				}
+						}
+					}`)}}
+		testTimeout = 5 * time.Second
 	)
+
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -68,7 +87,7 @@ var _ = Describe("FusionAccess Controller", func() {
 			os.Setenv("DEPLOYMENT_NAMESPACE", "ibm-fusion-access-operator")
 			fakeClientBuilder = fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithRuntimeObjects(version, namespace, clusterConsole).
+				WithRuntimeObjects(version, namespace, clusterConsole, clusterPullSecret).
 				WithStatusSubresource(&fusionv1alpha.FusionAccess{})
 
 		})
@@ -84,7 +103,7 @@ var _ = Describe("FusionAccess Controller", func() {
 					Namespace: "default",
 				},
 				Spec: fusionv1alpha.FusionAccessSpec{
-					StorageScaleVersion:  "v5.2.3.0.1",
+					StorageScaleVersion:  "v5.2.3.1.dev3",
 					LocalVolumeDiscovery: fusionv1alpha.StorageDeviceDiscovery{
 						// Create: false,
 					},
@@ -251,12 +270,12 @@ var _ = Describe("getIbmManifest", func() {
 		It("should return the install path", func() {
 			fusionObj := fusionv1alpha.FusionAccessSpec{
 				ExternalManifestURL: "",
-				StorageScaleVersion: "v5.2.3.0.1",
+				StorageScaleVersion: "v5.2.3.1.dev3",
 			}
 
 			path, err := getIbmManifest(fusionObj)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(path).To(Equal("../../files/v5.2.3.0.1/install.yaml"))
+			Expect(path).To(Equal("../../files/v5.2.3.1.dev3/install.yaml"))
 		})
 	})
 

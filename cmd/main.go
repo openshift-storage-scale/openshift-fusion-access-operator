@@ -38,6 +38,8 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
+	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
+
 	consolev1 "github.com/openshift/api/console/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -64,6 +66,8 @@ func init() {
 	utilruntime.Must(consolev1.AddToScheme(scheme))
 
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
+
+	utilruntime.Must(kmmv1beta1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
