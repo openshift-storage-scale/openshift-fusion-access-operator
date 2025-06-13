@@ -17,7 +17,7 @@
     "i18n": "i18next -c config/i18next-parser.config.mjs && scripts/set-english-defaults.ts",
     "lint": "concurrently -c auto -n \"eslint,stylelint\" -p \"{name}:{pid}\" \"npm run lint:eslint\" \"npm run lint:styles\"",
     "lint:eslint": "eslint -c config/eslint.config.mjs",
-    "lint:styles": "stylelint 'src/**/*.css' --allow-empty-input",
+    "lint:styles": "stylelint -c config/.stylelintrc.yaml 'src/**/*.css' --allow-empty-input",
     "lint:inspect-config": "eslint --inspect-config -c config/eslint.config.mjs",
     "start": "concurrently --kill-others -c auto -n \"bridge,devsvr\" -p \"{name}:{pid}\" \"npm run start:console\" \"npm run start:devserver\"",
     "start:devserver": "npm run ts:webpack -- serve --progress -c config/webpack.config.ts",
