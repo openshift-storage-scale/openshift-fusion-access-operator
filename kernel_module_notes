@@ -1,2 +1,0 @@
-oc create secret generic my-signing-key-pub -n gpfs-kernel-module --from-file=cert=~/work/secure_boot_poc/sb_cert.cer
-oc create secret generic my-signing-key -n gpfs-kernel-module --from-file=cert=~/work/secure_boot_poc/sb_cert.priv
