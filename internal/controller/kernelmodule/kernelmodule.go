@@ -157,10 +157,10 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 			ModuleLoader: kmmv1beta1.ModuleLoaderSpec{
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					Modprobe: kmmv1beta1.ModprobeSpec{
-						ModuleName: "mmfslinux",
+						ModuleName: "mmfs26",
 						ModulesLoadingOrder: []string{
-							"mmfslinux",
 							"mmfs26",
+							"mmfslinux",
 							"tracedev",
 						},
 					},
