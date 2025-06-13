@@ -19,6 +19,7 @@ package kernelmodule
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
@@ -28,21 +29,28 @@ import (
 
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	// ServiceAccountName is the name of the service account that will be used for the DS to load the kernel module
 	// this will be the same as the operator service account for now
-	ServiceAccountName = "fusion-access-operator-controller-manager"
-	ConfigMapName      = "kmm-dockerfile"
-	KMMModuleName      = "gpfs-module"
-	IBMENTITLEMENTNAME = "ibm-entitlement-key"
-	SecureBootKey      = "secureboot-signing-key"
-	SecureBootKeyPub   = "secureboot-signing-key-pub"
+	ServiceAccountName                  = "fusion-access-operator-controller-manager"
+	ConfigMapName                       = "kmm-dockerfile"
+	KMMModuleName                       = "gpfs-module"
+	IBMENTITLEMENTNAME                  = "ibm-entitlement-key"
+	SecureBootKey                       = "secureboot-signing-key"
+	SecureBootKeyPub                    = "secureboot-signing-key-pub"
+	KMMImageConfigMapName               = "kmm-image-config"
+	KMMImageConfigKeyRegistryURL        = "kmm_image_registry_url"
+	KMMImageConfigKeyRepo               = "kmm_image_repo"
+	KMMImageConfigKeyTLSInsecure        = "kmm_tls_insecure"
+	KMMImageConfigKeyTLSSkipVerify      = "kmm_tls_skip_verify"
+	KMMImageConfigKeyRegistrySecretName = "kmm_image_registry_secret_name" //nolint:gosec
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -79,7 +87,11 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
 	}
 	signModules := doSigningSecretsExist(ctx, cl, ns)
-	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules)
+	KMMImageConfig, err := getKMMImageConfig(ctx, cl, ns)
+	if err != nil {
+		return fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
+	}
+	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules, &KMMImageConfig)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
 	}
@@ -103,7 +115,7 @@ func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 	return nil
 }
 
-func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module {
+func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KMMImageConfig) *kmmv1beta1.Module {
 	var signing *kmmv1beta1.Sign
 	var selector map[string]string
 
@@ -145,16 +157,21 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 			ModuleLoader: kmmv1beta1.ModuleLoaderSpec{
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					Modprobe: kmmv1beta1.ModprobeSpec{
-						ModuleName: "mmfslinux",
+						ModuleName: "mmfs26",
 						ModulesLoadingOrder: []string{
-							"mmfslinux",
 							"mmfs26",
+							"mmfslinux",
 							"tracedev",
 						},
 					},
+					RegistryTLS: kmmv1beta1.TLSOptions{
+						Insecure:              kmmImageConfig.TLSInsecure,
+						InsecureSkipTLSVerify: kmmImageConfig.TLSSkipVerify,
+					},
+
 					KernelMappings: []kmmv1beta1.KernelMapping{{
 						Regexp:         "^.*\\.x86_64$",
-						ContainerImage: fmt.Sprintf("image-registry.openshift-image-registry.svc:5000/%s/gpfs_compat_kmod:${KERNEL_FULL_VERSION}-%s", namespace, ibmImageHash),
+						ContainerImage: fmt.Sprintf("%s/%s:${KERNEL_FULL_VERSION}-%s", kmmImageConfig.RegistryURL, kmmImageConfig.Repo, ibmImageHash),
 						Build: &kmmv1beta1.Build{
 							DockerfileConfigMap: &corev1.LocalObjectReference{
 								Name: ConfigMapName,
@@ -172,9 +189,66 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool) *kmmv1beta1.Module
 				},
 				ServiceAccountName: ServiceAccountName,
 			},
+			ImageRepoSecret: func() *corev1.LocalObjectReference {
+				if kmmImageConfig.RegistrySecretName != "" {
+					return &corev1.LocalObjectReference{Name: kmmImageConfig.RegistrySecretName}
+				}
+				return nil
+			}(),
 			Selector: selector,
 		},
 	}
+}
+
+// Struct to hold image config
+type KMMImageConfig struct {
+	RegistryURL        string
+	Repo               string
+	TLSInsecure        bool
+	TLSSkipVerify      bool
+	RegistrySecretName string
+}
+
+func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) (KMMImageConfig, error) {
+	config := KMMImageConfig{
+		RegistryURL:        "image-registry.openshift-image-registry.svc:5000",
+		Repo:               fmt.Sprintf("%s/gpfs_compat_kmod", namespace),
+		TLSInsecure:        false,
+		TLSSkipVerify:      false,
+		RegistrySecretName: "",
+	}
+	cm := &corev1.ConfigMap{}
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KMMImageConfigMapName}, cm); err != nil {
+		if errors.IsNotFound(err) {
+			log.Log.Info(fmt.Sprintf("Configmap %s not found, using default values", KMMImageConfigMapName))
+			return config, nil
+		}
+		return config, fmt.Errorf("failed to get configmap %s in getKMMImageConfig: %w", KMMImageConfigMapName, err)
+	}
+	data := cm.Data
+
+	// Override values if present
+	if val, ok := data[KMMImageConfigKeyRegistryURL]; ok {
+		config.RegistryURL = val
+	}
+	if val, ok := data[KMMImageConfigKeyRepo]; ok {
+		config.Repo = val
+	}
+	if val, ok := data[KMMImageConfigKeyTLSInsecure]; ok {
+		if parsed, err := strconv.ParseBool(val); err == nil {
+			config.TLSInsecure = parsed
+		}
+	}
+	if val, ok := data[KMMImageConfigKeyTLSSkipVerify]; ok {
+		if parsed, err := strconv.ParseBool(val); err == nil {
+			config.TLSSkipVerify = parsed
+		}
+	}
+	if val, ok := data[KMMImageConfigKeyRegistrySecretName]; ok {
+		config.RegistrySecretName = val
+	}
+
+	return config, nil
 }
 
 // getPatchedGlobalPullSecret will return the patched global pull secret with the ibm pull secrets
