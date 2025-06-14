@@ -7,7 +7,7 @@ interface Options extends WatchK8sResource {
 }
 
 export const useWatchNode = (
-  options: Omit<Options, "groupVersionKind" | "isList">
+  options: Omit<Options, "groupVersionKind" | "isList"> = {}
 ) =>
   useNormalizedK8sWatchResource<IoK8sApiCoreV1Node>({
     ...options,

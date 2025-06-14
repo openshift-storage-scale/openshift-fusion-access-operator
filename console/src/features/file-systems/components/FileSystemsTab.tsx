@@ -17,8 +17,6 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
-  EmptyStateHeader,
-  EmptyStateIcon,
   MenuToggle,
   Skeleton,
 } from "@patternfly/react-core";
@@ -360,12 +358,11 @@ const FileSystemsTableEmptyState: React.FC = () => {
   }, [histroy]);
 
   return (
-    <EmptyState>
-      <EmptyStateHeader
-        titleText={t("No file systems")}
-        headingLevel="h4"
-        icon={<EmptyStateIcon icon={FolderIcon} />}
-      />
+    <EmptyState
+      titleText={t("No file systems")}
+      headingLevel="h4"
+      icon={FolderIcon}
+    >
       <EmptyStateBody>
         {t("You can create one by pressing the button below.")}
       </EmptyStateBody>

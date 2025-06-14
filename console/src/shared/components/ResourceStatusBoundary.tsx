@@ -6,8 +6,6 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
-  EmptyStateHeader,
-  EmptyStateIcon,
   Spinner,
 } from "@patternfly/react-core";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
@@ -84,12 +82,7 @@ const LoadingFallback: React.FC<LoadingFallbackProps> = (props) => {
   } = props;
 
   return (
-    <EmptyState>
-      <EmptyStateHeader
-        headingLevel="h4"
-        titleText={title}
-        icon={<Spinner />}
-      />
+    <EmptyState icon={Spinner} titleText={title} headingLevel="h4">
       <EmptyStateBody>{description}</EmptyStateBody>
     </EmptyState>
   );
@@ -123,12 +116,11 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = (props) => {
   } = props;
 
   return (
-    <EmptyState>
-      <EmptyStateHeader
-        titleText={title}
-        headingLevel="h4"
-        icon={<EmptyStateIcon icon={ExclamationCircleIcon} />}
-      />
+    <EmptyState
+      titleText={title}
+      headingLevel="h4"
+      icon={ExclamationCircleIcon}
+    >
       <EmptyStateBody>{description}</EmptyStateBody>
       <EmptyStateFooter>
         {actions.map((action) => (
