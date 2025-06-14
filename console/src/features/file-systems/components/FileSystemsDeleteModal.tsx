@@ -1,6 +1,15 @@
 import * as React from "react";
 import { Trans } from "react-i18next";
-import { Alert, Button, Modal, Stack, StackItem } from "@patternfly/react-core";
+import {
+  Alert,
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Stack,
+  StackItem,
+} from "@patternfly/react-core";
 import {
   k8sDelete,
   k8sGet,
@@ -46,7 +55,7 @@ const FileSystemsDeleteModal: React.FC<FilesystemsDeleteModalProps> = ({
     kind: "StorageClass",
   });
 
-  const [scs, scsLoaded, scsError] = useK8sWatchResource<StorageClass[]>({
+  const [scs] = useK8sWatchResource<StorageClass[]>({
     groupVersionKind: {
       kind: "StorageClass",
       group: "storage.k8s.io",
@@ -163,12 +172,40 @@ const FileSystemsDeleteModal: React.FC<FilesystemsDeleteModalProps> = ({
 
   return (
     <Modal
-      title={t("Delete Filesystem?")}
-      titleIconVariant="warning"
       isOpen
       aria-describedby="modal-delete-filesystem"
       onClose={() => !isDeleting && onClose()}
-      actions={[
+      variant="medium"
+    >
+      <ModalHeader title={t("Delete Filesystem?")} titleIconVariant="warning" />
+      <ModalBody>
+        <Stack hasGutter>
+          <StackItem isFilled>
+            <Trans t={t} ns="public">
+              Are you sure you want to delete{" "}
+              <strong>{{ resourceName: filesystem.metadata?.name }}</strong>{" "}
+              from namespace{" "}
+              <strong>{{ resourceNs: filesystem.metadata?.namespace }}</strong>?
+            </Trans>
+          </StackItem>
+          {errors?.length && (
+            <StackItem>
+              <Alert
+                isInline
+                variant="danger"
+                title={t("An error occurred while deleting resources.")}
+              >
+                <Stack>
+                  {errors.map((e, index) => (
+                    <StackItem key={index}>{e}</StackItem>
+                  ))}
+                </Stack>
+              </Alert>
+            </StackItem>
+          )}
+        </Stack>
+      </ModalBody>
+      <ModalFooter>
         <Button
           key="confirm"
           variant="danger"
@@ -177,7 +214,7 @@ const FileSystemsDeleteModal: React.FC<FilesystemsDeleteModalProps> = ({
           isDisabled={isDeleting}
         >
           {isDeleting ? t("Deleting") : t("Delete")}
-        </Button>,
+        </Button>
         <Button
           key="cancel"
           variant="link"
@@ -185,35 +222,8 @@ const FileSystemsDeleteModal: React.FC<FilesystemsDeleteModalProps> = ({
           isDisabled={isDeleting}
         >
           {t("Cancel")}
-        </Button>,
-      ]}
-      variant="medium"
-    >
-      <Stack hasGutter>
-        <StackItem isFilled>
-          <Trans t={t} ns="public">
-            Are you sure you want to delete{" "}
-            <strong>{{ resourceName: filesystem.metadata?.name }}</strong> from
-            namespace{" "}
-            <strong>{{ resourceNs: filesystem.metadata?.namespace }}</strong>?
-          </Trans>
-        </StackItem>
-        {errors?.length && (
-          <StackItem>
-            <Alert
-              isInline
-              variant="danger"
-              title={t("An error occurred while deleting resources.")}
-            >
-              <Stack>
-                {errors.map((e, index) => (
-                  <StackItem key={index}>{e}</StackItem>
-                ))}
-              </Stack>
-            </Alert>
-          </StackItem>
-        )}
-      </Stack>
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };
