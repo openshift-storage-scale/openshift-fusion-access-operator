@@ -1,9 +1,9 @@
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import type { ViewModelSlice } from "@/shared/types/internal/ViewModelSlice";
+import type { ViewModelSlice } from "@/internal/types/ViewModelSlice";
 import { useK8sWatchResource } from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
 import type { Route } from "../types/Route";
-import type { LoadableResourceState } from "@/shared/types/internal/LoadableResource";
+import type { LoadableResourceState } from "@/internal/types/LoadableResource";
 
 export const useRoutesSlice = (): ViewModelSlice<
   LoadableResourceState<Route[]>
