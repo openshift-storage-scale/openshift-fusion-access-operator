@@ -1,24 +1,19 @@
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { type K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 import { Button, Skeleton } from "@patternfly/react-core";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { ExternalLinkAltIcon } from "@patternfly/react-icons";
+import type { Route } from "../types/Route";
 
 type FileSystemsDashboardLinkProps = {
   fileSystem: FileSystem;
   routes: Route[];
   loaded: boolean;
-};
-
-export type Route = K8sResourceCommon & {
-  spec: {
-    host: string;
-  };
+  isDisabled?: boolean;
 };
 
 export const FileSystemsDashboardLink: React.FC<
   FileSystemsDashboardLinkProps
-> = ({ fileSystem, routes, loaded }) => {
+> = ({ fileSystem, routes, loaded, isDisabled = false }) => {
   const { t } = useFusionAccessTranslations();
 
   if (!loaded) {
@@ -43,6 +38,7 @@ export const FileSystemsDashboardLink: React.FC<
       icon={<ExternalLinkAltIcon />}
       iconPosition="end"
       isInline
+      isDisabled={isDisabled}
     >
       {fileSystem.metadata?.name || ""}
     </Button>

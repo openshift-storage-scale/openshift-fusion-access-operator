@@ -9,8 +9,8 @@ import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
 import {
-  FILE_SYSTEMS_CREATE_URLPATH,
-  STORAGE_CLUSTER_HOME_URLPATH,
+  FILE_SYSTEMS_CREATE_URL_PATH,
+  STORAGE_CLUSTER_HOME_URL_PATH,
 } from "@/constants";
 
 const FileSystemsHomePage: React.FC = () => {
@@ -46,7 +46,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
         <FileSystemsCreateButton
           key="create-filesystem"
           onCreateFileSystem={() => {
-            history.push(FILE_SYSTEMS_CREATE_URLPATH);
+            history.push(FILE_SYSTEMS_CREATE_URL_PATH);
           }}
         />
       }
@@ -56,7 +56,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
         error={storageClustersError}
       >
         {(storageClusters ?? []).length === 0 ? (
-          <Redirect to={STORAGE_CLUSTER_HOME_URLPATH} />
+          <Redirect to={STORAGE_CLUSTER_HOME_URL_PATH} />
         ) : (
           <FileSystemsTabbedNav />
         )}
