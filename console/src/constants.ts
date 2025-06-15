@@ -17,8 +17,10 @@ export const FS_ALLOW_DELETE_LABEL = "scale.spectrum.ibm.com/allowDelete";
 export const SC_PROVISIONER = "spectrumscale.csi.ibm.com";
 
 // URL paths
-export const FUSION_ACCESS_HOME_URLPATH = "/fusion-access";
-export const STORAGE_CLUSTER_HOME_URLPATH = "/fusion-access/storage-cluster";
-export const STORAGE_CLUSTER_CREATE_URLPATH = "/fusion-access/storage-cluster/create";
-export const FILE_SYSTEMS_HOME_URLPATH = "/fusion-access/file-systems";
-export const FILE_SYSTEMS_CREATE_URLPATH = "/fusion-access/file-systems/create";
+export const FUSION_ACCESS_HOME_URL_PATH = "/fusion-access";
+export const STORAGE_CLUSTER_HOME_URL_PATH = "/fusion-access/storage-cluster";
+export const STORAGE_CLUSTER_CREATE_URL_PATH =
+  "/fusion-access/storage-cluster/create";
+export const FILE_SYSTEMS_HOME_URL_PATH = "/fusion-access/file-systems";
+export const FILE_SYSTEMS_CREATE_URL_PATH =
+  "/fusion-access/file-systems/create";

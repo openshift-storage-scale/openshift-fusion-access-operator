@@ -44,7 +44,7 @@ export const extensions: EncodedExtension[] = [
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/storage-cluster",
+      path: "/fusion-access/storage-cluster/*",
       component: { $codeRef: "StorageClusterHomePage" },
     },
   },
@@ -60,7 +60,7 @@ export const extensions: EncodedExtension[] = [
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/file-systems",
+      path: "/fusion-access/file-systems/*",
       component: { $codeRef: "FileSystemsHomePage" },
     },
   },
