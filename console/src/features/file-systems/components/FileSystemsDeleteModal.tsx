@@ -69,7 +69,6 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
           key="confirm"
           variant="danger"
           onClick={async () => {
-            vm.actions.setIsDeleting(true);
             await handleDeleteFileSystem();
           }}
           isLoading={vm.state.isDeleting}

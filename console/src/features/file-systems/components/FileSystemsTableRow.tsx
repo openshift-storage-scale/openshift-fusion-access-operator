@@ -45,7 +45,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
   const isInUse = isFilesystemInUse(
     fileSystem,
     vm.storageClasses.state.data ?? [],
-    vm.persistenVolumeClaims.state.data ?? []
+    vm.persistentVolumeClaims.state.data ?? []
   );
 
   return (
@@ -105,7 +105,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         id={vm.columns[5].id}
         className={vm.columns[5].props.className}
       >
-        {!vm.persistenVolumeClaims.state.loaded ? (
+        {!vm.persistentVolumeClaims.state.loaded ? (
           <Skeleton screenreaderText={t("Loading actions")} />
         ) : (
           <Dropdown
@@ -117,7 +117,9 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
                 aria-label="filesystem actions"
                 variant="plain"
                 isDisabled={
-                  status.id === "deleting" || status.id === "creating" || isInUse
+                  status.id === "deleting" ||
+                  status.id === "creating" ||
+                  isInUse
                 }
                 onClick={() => setIsOpenActionsMenu(!isOpenActionsMenu)}
                 isExpanded={isOpenActionsMenu}
