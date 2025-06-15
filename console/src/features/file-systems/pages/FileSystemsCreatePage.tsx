@@ -6,8 +6,6 @@ import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import {
   EmptyState,
-  EmptyStateHeader,
-  EmptyStateIcon,
   Form,
   FormContextProvider,
   FormGroup,
@@ -208,7 +206,7 @@ const FileSystemCreateForm = () => {
             isRequired
             fieldId="luns-selection-table"
             label="Select LUNs"
-            labelIcon={
+            labelHelp={
               <HelpLabelIcon
                 popoverContent={t(
                   "Select LUNs to designate the storage devices used in the file system."
@@ -217,13 +215,11 @@ const FileSystemCreateForm = () => {
             }
           >
             {!loaded ? (
-              <EmptyState>
-                <EmptyStateHeader
-                  titleText={t("Loading LUNs")}
-                  headingLevel="h4"
-                  icon={<EmptyStateIcon icon={Spinner} />}
-                />
-              </EmptyState>
+              <EmptyState
+                titleText={t("Loading LUNs")}
+                headingLevel="h4"
+                icon={Spinner}
+              ></EmptyState>
             ) : availableLuns.length ? (
               <Table id="luns-selection-table" variant="compact">
                 <Thead>
@@ -261,13 +257,11 @@ const FileSystemCreateForm = () => {
                 </Tbody>
               </Table>
             ) : (
-              <EmptyState>
-                <EmptyStateHeader
-                  titleText={t("No available LUNs")}
-                  headingLevel="h4"
-                  icon={<EmptyStateIcon icon={FolderIcon} />}
-                />
-              </EmptyState>
+              <EmptyState
+                titleText={t("No available LUNs")}
+                headingLevel="h4"
+                icon={FolderIcon}
+              ></EmptyState>
             )}
           </FormGroup>
         </Form>

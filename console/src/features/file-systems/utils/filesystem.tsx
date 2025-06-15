@@ -82,7 +82,7 @@ export const getFileSystemScs = (
   });
 };
 
-export const isFilesystemUsed = (
+export const isFilesystemInUse = (
   fileSystem: FileSystem,
   scs: StorageClass[],
   pvcs: IoK8sApiCoreV1PersistentVolumeClaim[]
