@@ -105,7 +105,7 @@ export const useNodesSelectionTableViewModel = (
       if (subjectIndex === -1) {
         return currentState;
       }
-      const draftState = structuredClone(currentState);
+      const draftState = window.structuredClone(currentState);
       draftState[subjectIndex].status = status;
       return draftState;
     });

@@ -11,11 +11,11 @@ import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
 import {
   newViewModelSlice,
   type ViewModelSlice,
-} from "@/shared/types/internal/ViewModelSlice";
+} from "@/internal/types/ViewModelSlice";
 import {
   newLoadableResourceState,
   type LoadableResourceState,
-} from "@/shared/types/internal/LoadableResource";
+} from "@/internal/types/LoadableResource";
 import { useDeleteModalSlice } from "./useDeleteModalSlice";
 import { useRoutesSlice } from "./useRoutesSlice";
 

@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useState, useMemo } from "react";
-import type { ViewModelSlice } from "@/shared/types/internal/ViewModelSlice";
+import type { ViewModelSlice } from "@/internal/types/ViewModelSlice";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 
 interface DeleteModalState {
