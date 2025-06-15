@@ -23,7 +23,7 @@ export interface FileSystemsTabViewModel {
   columns: TableColumn<FileSystem>[];
   deleteModal: ReturnType<typeof useDeleteModalSlice>;
   fileSystems: ViewModelSlice<LoadableResourceState<FileSystem[]>>;
-  persistenVolumeClaims: ViewModelSlice<
+  persistentVolumeClaims: ViewModelSlice<
     LoadableResourceState<IoK8sApiCoreV1PersistentVolumeClaim[]>
   >;
   routes: ReturnType<typeof useRoutesSlice>;
@@ -107,7 +107,7 @@ export const useFileSystemsTabViewModel = (): FileSystemsTabViewModel => {
       fileSystems: newViewModelSlice(
         newLoadableResourceState(fileSystemsWatchResult)
       ),
-      persistenVolumeClaims: newViewModelSlice(
+      persistentVolumeClaims: newViewModelSlice(
         newLoadableResourceState(pvcsWatchResult)
       ),
       storageClasses: newViewModelSlice(

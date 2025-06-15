@@ -14,10 +14,10 @@ import { FileSystemsCreateButton } from "./FileSystemsCreateButton";
 
 export const FileSystemsTableEmptyState: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  const histroy = useHistory();
+  const history = useHistory();
   const handleCreateFileSystem = useCallback(() => {
-    histroy.push(FILE_SYSTEMS_CREATE_URL_PATH);
-  }, [histroy]);
+    history.push(FILE_SYSTEMS_CREATE_URL_PATH);
+  }, [history]);
 
   return (
     <EmptyState
