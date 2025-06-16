@@ -163,6 +163,9 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 							"mmfslinux",
 							"tracedev",
 						},
+						// This is used to copy the lxtrace binary from /opt/lxtrace/${KERNEL_FULL_VERSION}/*
+						// to kmm-operator-manager-config` at `worker.setFirmwareClassPath`
+						FirmwarePath: "/opt/lxtrace/",
 					},
 					RegistryTLS: kmmv1beta1.TLSOptions{
 						Insecure:              kmmImageConfig.TLSInsecure,
@@ -322,9 +325,10 @@ RUN cp -avf /lib/modules/${KERNEL_FULL_VERSION}/extra/*.ko /opt/lib/modules/${KE
 RUN depmod -b /opt
 FROM registry.redhat.io/ubi9/ubi-minimal
 ARG KERNEL_FULL_VERSION
-RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/
+RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/ /opt/lxtrace/
 COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/*.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
-COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/modules* /opt/lib/modules/${KERNEL_FULL_VERSION}/`
+COPY --from=builder /opt/lib/modules/${KERNEL_FULL_VERSION}/modules* /opt/lib/modules/${KERNEL_FULL_VERSION}/
+COPY --from=builder /usr/lpp/mmfs/bin/lxtrace-${KERNEL_FULL_VERSION} /opt/lxtrace/`
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

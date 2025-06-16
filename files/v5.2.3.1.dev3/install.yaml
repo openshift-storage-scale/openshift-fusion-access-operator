@@ -10706,7 +10706,7 @@ data:
   buildgpl: |-
     #!/bin/sh
     kerv=$(uname -r)
-    touch /usr/lpp/mmfs/bin/lxtrace-$kerv
+    rsync -av /host/var/lib/firmware/lxtrace-* /usr/lpp/mmfs/bin/
     if ! lsmod | grep -q "^mmfslinux"; then
       echo "Error: Kernel module is not loaded yet"
       exit 1
