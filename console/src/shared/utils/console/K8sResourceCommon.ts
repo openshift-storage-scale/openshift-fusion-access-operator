@@ -8,7 +8,7 @@ export const hasLabel = (obj: K8sResourceCommon, label: string): boolean => {
   const [k, v] = label.split("=");
   const labels = getLabels(obj);
 
-  if (labels) {
+  if (labels && Object.keys(labels).length > 0) {
     result = labels[k] === v;
   }
 

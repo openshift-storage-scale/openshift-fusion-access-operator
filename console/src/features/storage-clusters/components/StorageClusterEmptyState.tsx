@@ -1,12 +1,10 @@
 import React from "react";
 import {
-  EmptyState as PFEmptyState,
+  EmptyState,
   EmptyStateBody,
   Button,
   EmptyStateFooter,
   EmptyStateActions,
-  EmptyStateHeader,
-  EmptyStateIcon,
 } from "@patternfly/react-core";
 import {
   StorageDomainIcon,
@@ -27,12 +25,11 @@ export const StorageClusterEmptyState: React.FC<
   const { t } = useFusionAccessTranslations();
 
   return (
-    <PFEmptyState>
-      <EmptyStateHeader
-        titleText={t("No storage cluster")}
-        headingLevel="h4"
-        icon={<EmptyStateIcon icon={StorageDomainIcon} />}
-      />
+    <EmptyState
+      titleText={t("No storage cluster")}
+      headingLevel="h4"
+      icon={StorageDomainIcon}
+    >
       <EmptyStateBody>
         {t(
           "You need to create a storage cluster before you'll be able to create file systems."
@@ -57,7 +54,7 @@ export const StorageClusterEmptyState: React.FC<
           </Button>
         </EmptyStateActions>
       </EmptyStateFooter>
-    </PFEmptyState>
+    </EmptyState>
   );
 };
 

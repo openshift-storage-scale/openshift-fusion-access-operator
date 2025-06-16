@@ -11,12 +11,14 @@ type FileSystemStorageClassesProps = {
   fileSystem: FileSystem;
   storageClasses: StorageClass[];
   loaded: boolean;
+  isDisabled?: boolean;
 };
 
 const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
   fileSystem,
   loaded,
   storageClasses,
+  isDisabled = false,
 }) => {
   const { t } = useFusionAccessTranslations();
   if (!loaded) {
@@ -33,6 +35,7 @@ const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
       {scs.map((sc) => (
         <StackItem key={sc.metadata?.uid}>
           <ResourceLink
+            {...(isDisabled && { onClick: () => {} })}
             groupVersionKind={{
               group: "storage.k8s.io",
               version: "v1",

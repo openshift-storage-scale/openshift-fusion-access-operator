@@ -46,7 +46,7 @@ export const toggleNodeStorageRoleLabel = (
   shouldBeSelected: boolean
 ): Record<string, string> => {
   const labels = getLabels(node);
-  const result = structuredClone(labels);
+  const result = window.structuredClone(labels);
   const [storageRoleLabelKey, storageRoleLabelValue] =
     STORAGE_ROLE_LABEL.split("=");
   if (shouldBeSelected) {
