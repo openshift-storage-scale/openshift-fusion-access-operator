@@ -376,7 +376,15 @@ func (r *FusionAccessReconciler) Reconcile(
 
 		log.Log.Info("Successfully created kernel module resources")
 	}
+	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully created / updated console plugin resources")
 
+	if err := console.EnablePlugin(ctx, r.Client); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully enabled console plugin")
 	// Check if can pull the image if we have not already or if it failed previously
 	// Only do this check if we have a set cnsa version
 	if fusionaccess.Spec.StorageScaleVersion != "" {
@@ -400,16 +408,6 @@ func (r *FusionAccessReconciler) Reconcile(
 	} else {
 		log.Log.Info("Skipping image pull check as we are not using a Storage Scale version in the spec")
 	}
-
-	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
-		return ctrl.Result{}, err
-	}
-	log.Log.Info("Successfully created / updated console plugin resources")
-
-	if err := console.EnablePlugin(ctx, r.Client); err != nil {
-		return ctrl.Result{}, err
-	}
-	log.Log.Info("Successfully enabled console plugin")
 
 	if fusionaccess.Spec.LocalVolumeDiscovery.Create {
 		// Create Device discovery
@@ -488,6 +486,7 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 		log.Log.Info("Image pull test succeeded", "ns", ns, "testImage", testImage)
 	} else {
 		log.Log.Error(err, "Image pull test failed", "ns", ns, "testImage", testImage)
+		return err
 	}
 	return nil
 }
