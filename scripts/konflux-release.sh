@@ -1,10 +1,6 @@
 #!/bin/bash
 set -e -o pipefail
 
-get_last_git_merge_commit() {
-    git log --merges -n 1 --pretty=format:"%H"
-}
-
 PROJ="storage-scale-releng-tenant"
 DEST_REGISTRY="quay.io/rhn_support_mbaldess"
 
@@ -114,7 +110,32 @@ for genericName in "${!components[@]}"; do
   REPO=$(basename "${SOURCEIMAGE%%@*}")
   DIGEST="${SOURCEIMAGE##*@}"
   DESTIMAGE="${DEST_REGISTRY}/${REPO}@${DIGEST}"
+  echo "Check ${genericName} - ${versionedName}"
+  case ${genericName} in
+    console-plugin)
+      export CONSOLE_PLUGIN_IMAGE=${DESTIMAGE}
+      ;;
+    controller-rhel9-operator)
+      export OPERATOR_IMG=${DESTIMAGE}
+      ;;
+    devicefinder)
+      export DEVICEFINDER_IMAGE=${DESTIMAGE}
+      ;;
+  esac
 
   echo "Uploading ${SOURCEIMAGE} to ${DESTIMAGE}"
   skopeo copy docker://${SOURCEIMAGE} docker://${DESTIMAGE}
 done
+
+echo "Rebuilding bundle with ${CONSOLE_PLUGIN_IMAGE} - ${OPERATOR_IMG} - ${DEVICEFINDER_IMAGE}"
+make bundle
+export BUNDLE_IMG="${DEST_REGISTRY}/openshift-fusion-access-bundle:$(cat VERSION.txt)"
+echo "Rebuilding bundle image: ${BUNDLE_IMG}"
+make bundle-build
+echo "Pushing ${BUNDLE_IMG}"
+podman push "${BUNDLE_IMG}"
+export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "quay.io/rhn_support_mbaldess/openshift-fusion-access-bundle:\(.)"] | join(",")')
+export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
+make catalog-build 
+#catalog-push
+
