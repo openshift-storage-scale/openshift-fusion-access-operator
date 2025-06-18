@@ -91,7 +91,7 @@ if [[ ${#errors[@]} == 0 ]];then
   echo "OK: snapshot ${SNAPSHOT} image pullspecs and release versions match with bundle's labels"
 else
   echo "ERROR: This snapshot is not a good candidate for a release:"
-  for error in ${(v)errors}; do
+  for error in "${errors[@]}"; do
     echo -e $error
   done
   exit 1
