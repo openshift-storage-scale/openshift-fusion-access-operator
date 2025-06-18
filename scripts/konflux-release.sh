@@ -144,5 +144,17 @@ export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion
 export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
 make catalog-build 
 echo "Catalog built: ${CATALOG_IMG}"
-#catalog-push
+make catalog-push
 
+echo ""
+echo "The following containers where pushed:"
+echo "${CONSOLE_PLUGIN_IMAGE}"
+echo "${OPERATOR_IMG}"
+echo "${DEVICEFINDER_IMAGE}"
+echo "${BUNDLE_IMG}"
+echo ""
+echo "The catalog has been pushed to: ${CATALOG_IMG}"
+echo ""
+echo "If you are happy about the changes you can run:"
+echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:$(cat VERSION.txt) ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+echo "podman push ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
