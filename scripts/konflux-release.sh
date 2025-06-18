@@ -2,7 +2,7 @@
 set -e -o pipefail
 
 PROJ="storage-scale-releng-tenant"
-DEST_REGISTRY="quay.io/rhn_support_mbaldess"
+DEST_REGISTRY="quay.io/openshift-storage-scale"
 
 if [ -z "$1" ]; then
   # COMMIT=$(get_last_git_merge_commit)
