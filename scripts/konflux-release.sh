@@ -135,7 +135,10 @@ make bundle-build
 echo "Pushing ${BUNDLE_IMG}"
 podman push "${BUNDLE_IMG}"
 
-# FIXME: copy the bundle into released-bundles/$(cat VERSION.txt)
+BUNDLE_DIR="released-bundles/$(cat VERSION.txt)"
+echo "Copying the newly created bundle to ${BUNDLE_DIR}"
+mkdir -p "${BUNDLE_DIR}"
+cp -avf bundle "${BUNDLE_DIR}"
 
 export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "'${DEST_REGISTRY}'/openshift-fusion-access-bundle:\(.)"] | join(",")')
 export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
