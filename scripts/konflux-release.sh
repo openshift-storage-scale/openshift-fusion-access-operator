@@ -52,7 +52,7 @@ fi
 
 bundle=$(oc get snapshot ${SNAPSHOT} -ojsonpath='{.spec.components[?(@.name=="'$operator_bundle'")].containerImage}')
 releaseLabelInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.release}}")
-echo "Using: ${SNAPSHOT}"
+echo "Using snapshot: ${SNAPSHOT}"
 echo " bundle: ${bundle}"
 echo " release label: ${releaseLabelInBundle}"
 
@@ -134,8 +134,12 @@ echo "Rebuilding bundle image: ${BUNDLE_IMG}"
 make bundle-build
 echo "Pushing ${BUNDLE_IMG}"
 podman push "${BUNDLE_IMG}"
-export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "quay.io/rhn_support_mbaldess/openshift-fusion-access-bundle:\(.)"] | join(",")')
+
+# FIXME: copy the bundle into released-bundles/$(cat VERSION.txt)
+
+export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "'${DEST_REGISTRY}'/openshift-fusion-access-bundle:\(.)"] | join(",")')
 export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
 make catalog-build 
+echo "Catalog built: ${CATALOG_IMG}"
 #catalog-push
 
