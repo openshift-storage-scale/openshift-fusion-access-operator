@@ -2,7 +2,8 @@
 set -e -o pipefail
 
 PROJ="storage-scale-releng-tenant"
-DEST_REGISTRY="quay.io/openshift-storage-scale"
+DEST_REGISTRY="${DEST_REGISTRY:-quay.io/openshift-storage-scale}"
+VERSION=$(cat VERSION.txt)
 
 check_image_exists() {
   local image_ref="$1"
@@ -21,6 +22,11 @@ if [ -z "$1" ]; then
   # echo "Using the last merge commit automatically: ${COMMIT}"
   echo "Please pass the merge commit you want to use: ./$0 <mergecommit>"
   exit 1
+fi
+
+if [ -z "${VERSION}" ]; then
+    echo "VERSION.txt is unset"
+    exit 1
 fi
 COMMIT="${1}"
 echo "User provided commit: ${COMMIT}"
@@ -137,17 +143,23 @@ for genericName in "${!components[@]}"; do
 
   echo "Uploading IMAGE: ${SOURCEIMAGE} to ${DESTIMAGE}"
   skopeo copy docker://${SOURCEIMAGE} docker://${DESTIMAGE}
+  podman pull "${DESTIMAGE}"
+  # Extract base image (without @sha256)
+  BASE_IMAGE="${DESTIMAGE%@*}"
+  NEW_DESTIMAGE="${BASE_IMAGE}:${VERSION}"
+  podman tag "${DESTIMAGE}" "${NEW_DESTIMAGE}"
+  podman push "${NEW_DESTIMAGE}"
 done
 
 echo "Rebuilding bundle with ${CONSOLE_PLUGIN_IMAGE} - ${OPERATOR_IMG} - ${DEVICEFINDER_IMAGE}"
 make bundle
-export BUNDLE_IMG="${DEST_REGISTRY}/openshift-fusion-access-bundle:$(cat VERSION.txt)"
+export BUNDLE_IMG="${DEST_REGISTRY}/openshift-fusion-access-bundle:${VERSION}"
 echo "Rebuilding bundle image: ${BUNDLE_IMG}"
 make bundle-build
 echo "Pushing ${BUNDLE_IMG}"
 podman push "${BUNDLE_IMG}"
 
-BUNDLE_DIR="released-bundles/$(cat VERSION.txt)"
+BUNDLE_DIR="released-bundles/${VERSION}"
 echo "Copying the newly created bundle to ${BUNDLE_DIR}"
 rm -rf "${BUNDLE_DIR}"
 mkdir -p "${BUNDLE_DIR}"
@@ -161,16 +173,16 @@ echo "Catalog built: ${CATALOG_IMG}"
 make catalog-push
 
 echo ""
+
 echo "The following containers where pushed. Testing that they are indeed available:"
 check_image_exists "${CONSOLE_PLUGIN_IMAGE}"
 check_image_exists "${OPERATOR_IMG}"
 check_image_exists "${DEVICEFINDER_IMAGE}"
 check_image_exists "${BUNDLE_IMG}"
 
-
 echo ""
 echo "The catalog has been pushed to: ${CATALOG_IMG}"
 echo ""
 echo "If you are happy about the changes you can run:"
-echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:$(cat VERSION.txt) ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:${VERSION} ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
 echo "podman push ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
