@@ -5,6 +5,18 @@ PROJ="storage-scale-releng-tenant"
 DEST_REGISTRY="${DEST_REGISTRY:-quay.io/openshift-storage-scale}"
 VERSION=$(cat VERSION.txt)
 
+check_image_exists() {
+  local image_ref="$1"
+
+  if skopeo inspect --no-tags --raw "docker://${image_ref}" &>/dev/null; then
+    echo "✅ Image exists: ${image_ref}"
+    return 0
+  else
+    echo "❌ Image does NOT exist: ${image_ref}"
+    return 1
+  fi
+}
+
 if [ -z "$1" ]; then
   # COMMIT=$(get_last_git_merge_commit)
   # echo "Using the last merge commit automatically: ${COMMIT}"
@@ -129,7 +141,7 @@ for genericName in "${!components[@]}"; do
       ;;
   esac
 
-  echo "Uploading ${SOURCEIMAGE} to ${DESTIMAGE}"
+  echo "Uploading IMAGE: ${SOURCEIMAGE} to ${DESTIMAGE}"
   skopeo copy docker://${SOURCEIMAGE} docker://${DESTIMAGE}
   podman pull "${DESTIMAGE}"
   # Extract base image (without @sha256)
@@ -149,8 +161,10 @@ podman push "${BUNDLE_IMG}"
 
 BUNDLE_DIR="released-bundles/${VERSION}"
 echo "Copying the newly created bundle to ${BUNDLE_DIR}"
+rm -rf "${BUNDLE_DIR}"
 mkdir -p "${BUNDLE_DIR}"
 cp -avf bundle "${BUNDLE_DIR}"
+echo "Command used: ${0} ${COMMIT}" > "${BUNDLE_DIR}/cmd.txt"
 
 export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "'${DEST_REGISTRY}'/openshift-fusion-access-bundle:\(.)"] | join(",")')
 export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
@@ -159,11 +173,13 @@ echo "Catalog built: ${CATALOG_IMG}"
 make catalog-push
 
 echo ""
-echo "The following containers where pushed (with their hash and tag ${VERSION}):"
-echo "${CONSOLE_PLUGIN_IMAGE}"
-echo "${OPERATOR_IMG}"
-echo "${DEVICEFINDER_IMAGE}"
-echo "${BUNDLE_IMG}"
+
+echo "The following containers where pushed. Testing that they are indeed available:"
+check_image_exists "${CONSOLE_PLUGIN_IMAGE}"
+check_image_exists "${OPERATOR_IMG}"
+check_image_exists "${DEVICEFINDER_IMAGE}"
+check_image_exists "${BUNDLE_IMG}"
+
 echo ""
 echo "The catalog has been pushed to: ${CATALOG_IMG}"
 echo ""
