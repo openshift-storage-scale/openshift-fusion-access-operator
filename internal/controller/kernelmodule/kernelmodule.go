@@ -197,7 +197,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 				if kmmImageConfig.RegistrySecretName != "" {
 					return &corev1.LocalObjectReference{Name: kmmImageConfig.RegistrySecretName}
 				}
-				return nil
+				return &corev1.LocalObjectReference{Name: IBMENTITLEMENTNAME}
 			}(),
 			Selector: selector,
 		},
