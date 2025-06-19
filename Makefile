@@ -36,7 +36,6 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL) $(USE_IMAGE_DIGESTS)
 
-BUNDLE_CONTAINERFILE_TEMPLATE ?= new-bundle.Dockerfile
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
@@ -363,6 +362,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | envsubst | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	# Since https://www.github.com/operator-framework/operator-sdk/issues/6598 we copy the dependencies file on our own
 	cp -f ./config/olm-dependencies.yaml ./bundle/metadata/dependencies.yaml
+	./hack/add_openshift_version_annotation.sh
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
