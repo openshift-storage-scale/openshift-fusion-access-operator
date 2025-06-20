@@ -28,7 +28,7 @@ LABEL \
     License="Apache License 2.0"
 
 COPY --from=builder /opt/app-root/src/licenses/ /licenses/
-COPY --from=builder /opt/app-root/src/docker/etc/default.conf "${NGINX_CONFIGURATION_PATH}"
+COPY --from=builder /opt/app-root/src/docker/etc/default.conf /opt/app-root/etc/nginx.d/
 COPY --from=builder /opt/app-root/src/dist .
 USER 1001
 CMD /usr/libexec/s2i/run
