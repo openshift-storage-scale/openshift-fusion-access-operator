@@ -13,8 +13,10 @@ function useReducerWithThunk<State, Action>(
 ): [State, React.Dispatch<Action>] {
   const [state, dispatch] = useImmerReducer(reducer, initialState);
 
-  const customDispatch = useCallback(
-    (param: Thunk<Action, State> | Action): void => {
+  const customDispatch = useCallback<
+    React.Dispatch<Thunk<Action, State> | Action>
+  >(
+    (param) => {
       if (typeof param === "function") {
         const thunk = param as Thunk<Action, State>;
         void thunk(dispatch, state);
