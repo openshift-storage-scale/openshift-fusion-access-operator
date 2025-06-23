@@ -1,15 +1,42 @@
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import { useImmerReducer, type ImmerReducer } from "use-immer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StoreContextValue<TState = any, TActions = any> =
-  | [TState, React.Dispatch<TActions>]
+type Thunk<Action = any, State = any> = (
+  d: React.Dispatch<Action>,
+  s: State
+) => Promise<void>;
+
+function useReducerWithThunk<State, Action>(
+  reducer: ImmerReducer<State, Action>,
+  initialState: State
+): [State, React.Dispatch<Action>] {
+  const [state, dispatch] = useImmerReducer(reducer, initialState);
+
+  const customDispatch = useCallback(
+    (param: Thunk<Action, State> | Action): void => {
+      if (typeof param === "function") {
+        const thunk = param as Thunk<Action, State>;
+        void thunk(dispatch, state);
+      } else {
+        dispatch(param);
+      }
+    },
+    [dispatch, state]
+  );
+
+  return useMemo(() => [state, customDispatch], [customDispatch, state]);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StoreContextValue<State = any, Action = any> =
+  | [State, React.Dispatch<Action>]
   | null;
 
 const StoreContext = createContext<StoreContextValue>(null);
 
-export function useStore<TState = unknown, TActions = unknown>() {
-  const context = useContext<StoreContextValue<TState, TActions>>(StoreContext);
+export function useStore<State = unknown, Action = unknown>() {
+  const context = useContext<StoreContextValue<State, Action>>(StoreContext);
   if (!context) {
     throw new Error("useStoreContext hook must be used within <StoreProvider>");
   }
@@ -17,16 +44,16 @@ export function useStore<TState = unknown, TActions = unknown>() {
   return context;
 }
 
-interface StoreProviderProps<TState, TActions> {
-  reducer: ImmerReducer<TState, TActions>;
-  initialState: TState;
+interface StoreProviderProps<State, Action> {
+  reducer: ImmerReducer<State, Action>;
+  initialState: State;
 }
 
-export function StoreProvider<TState, TActions>(
-  props: React.PropsWithChildren<StoreProviderProps<TState, TActions>>
+export function StoreProvider<State, Action>(
+  props: React.PropsWithChildren<StoreProviderProps<State, Action>>
 ) {
   const { children, initialState, reducer } = props;
-  const stateAndDispatch = useImmerReducer(reducer, initialState);
+  const stateAndDispatch = useReducerWithThunk(reducer, initialState);
 
   return (
     <StoreContext.Provider value={stateAndDispatch}>
