@@ -66,5 +66,6 @@ export const useValidateMinimumRequirements = (
         type: "dismissAlert",
       });
     }
-  }, [dispatch, t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisksCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisksCount]);
 };

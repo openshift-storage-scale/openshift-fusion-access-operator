@@ -44,12 +44,10 @@ const ConnectedStorageClusterCreate: React.FC = () => {
       footer={
         <Split hasGutter>
           <StorageClustersCreateButton
-            key="create-button"
-            isDisabled={store.ctas.createStorageCluster.isDisabled}
-            isLoading={store.ctas.createStorageCluster.isLoading}
+            {...store.ctas.createStorageCluster}
             onCreateStorageCluster={handleCreateStorageCluster}
           />
-          <CancelButton key="cancel-button" onCancel={history.goBack} />
+          <CancelButton onCancel={history.goBack} />
         </Split>
       }
     >
