@@ -19,11 +19,13 @@ import { FILE_SYSTEMS_HOME_URL_PATH, SC_PROVISIONER } from "@/constants";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
-  discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
-  selectedDevices: DiscoveredDevice[]
+  selectedDevices: DiscoveredDevice[],
+  lvdrs: LocalVolumeDiscoveryResult[]
 ) => {
   const [, dispatch] = useStore<State, Actions>();
+
   const { t } = useFusionAccessTranslations();
+
   const history = useHistory();
 
   const [localDiskModel] = useK8sModel({
@@ -55,16 +57,16 @@ export const useCreateFileSystemHandler = (
       const namespace = "ibm-spectrum-scale";
 
       const localDisks = await createLocalDisks(
-        discoveryResultsForStorageNodes,
         selectedDevices,
+        lvdrs,
         localDiskModel,
         namespace
       );
 
       await createFileSystem(
+        fileSystemName,
         localDisks,
         fileSystemModel,
-        fileSystemName,
         namespace
       );
 
@@ -88,9 +90,9 @@ export const useCreateFileSystemHandler = (
         payload: { createStorageCluster: { isLoading: false } },
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    discoveryResultsForStorageNodes,
-    dispatch,
+    lvdrs,
     fileSystemModel,
     fileSystemName,
     history,
@@ -102,9 +104,9 @@ export const useCreateFileSystemHandler = (
 };
 
 function createFileSystem(
+  fileSystemName: string,
   localDisks: PromiseSettledResult<LocalDisk>[],
   fileSystemModel: K8sModel,
-  fileSystemName: string,
   namespace: string
 ): Promise<FileSystem> {
   return k8sCreate<FileSystem>({
@@ -137,17 +139,18 @@ function createFileSystem(
 }
 
 function createLocalDisks(
-  discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
   selectedDevices: DiscoveredDevice[],
+  lvdrs: LocalVolumeDiscoveryResult[],
   localDiskModel: K8sModel,
   namespace: string
 ) {
   const promises: Promise<LocalDisk>[] = [];
   for (const device of selectedDevices) {
     // find a node that contains this device
-    const discoveryResult = discoveryResultsForStorageNodes.find((r) =>
+    const discoveryResult = lvdrs.find((r) =>
       r.status?.discoveredDevices?.find((d) => d.WWN === device.WWN)
     );
+
     if (!discoveryResult) {
       throw new Error(
         "No storage node contains the selected LUN with WWN: " + device.WWN

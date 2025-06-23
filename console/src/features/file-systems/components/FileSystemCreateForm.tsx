@@ -15,56 +15,55 @@ import {
 } from "@patternfly/react-core";
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
-import { WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL } from "@/constants";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocalVolumeDiscoveryResult";
-import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import type {
-  DiscoveredDevice,
-  LocalVolumeDiscoveryResult,
-} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import { FileSystemsCreateButton } from "./FileSystemsCreateButton";
+import type { DiscoveredDevice } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
+import { useStorageClusterLvdrs } from "../hooks/useStorageClusterLvdrs";
+import type { Lun } from "../types/Lun";
 import { useCreateFileSystemHandler } from "../hooks/useCreateFileSystemHandler";
-import type { Lun } from "../types/LUN";
 
 export const FileSystemCreateForm = () => {
-  const [store] = useStore<State, Actions>();
-  const {
-    getValue,
-    setValue,
-    getError,
-    setError,
-    errors,
-    isTouched,
-    setTouched,
-  } = useFormContext();
-  const { t } = useFusionAccessTranslations();
-  const fileSystemName = getValue("name");
-  const fileSystemNameErrorMessage = getError("name");
-  const [discoveryResultsForStorageNodes, loaded] =
-    useDisksDiscoveryResultsForStorageNodes();
+  const [, dispatch] = useStore<State, Actions>();
 
-  const selectedLuns = useSelectedLuns(getValue("selected-luns"));
+  const form = useFormContext();
+
+  const { t } = useFusionAccessTranslations();
+
+  const fileSystemName = form.getValue("name");
+
+  const fileSystemNameErrorMessage = form.getError("name");
+
+  const [lvdrs, lvdrsLoaded, lvdrsLoadError] = useStorageClusterLvdrs();
+
+  useEffect(() => {
+    if (lvdrsLoadError) {
+      dispatch({
+        type: "showAlert",
+        payload: {
+          title: t("Failed to load LocaVolumeDiscoveryResults"),
+          description: lvdrsLoadError.message,
+          isDismissable: true,
+          variant: "danger",
+        },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lvdrsLoadError, t]);
+
+  const selectedLuns = useSelectedLuns(form.getValue("selected-luns"));
 
   // we show only disks that are present in all nodes
   const discoveredDevices =
-    discoveryResultsForStorageNodes[0]?.status?.discoveredDevices?.filter(
-      ({ WWN }) =>
-        discoveryResultsForStorageNodes.every((r) =>
-          r.status?.discoveredDevices?.some((d) => d.WWN === WWN)
-        )
-    ) || [];
+    lvdrs[0]?.status?.discoveredDevices?.filter(({ WWN }) =>
+      lvdrs.every((r) =>
+        r.status?.discoveredDevices?.some((d) => d.WWN === WWN)
+      )
+    ) ?? [];
 
   const selectedDevices = discoveredDevices.filter((d) =>
     selectedLuns.find((l) => l.id === getWwn(d))
-  );
-  const handleCreateFileSystem = useCreateFileSystemHandler(
-    fileSystemName,
-    discoveryResultsForStorageNodes,
-    selectedDevices
   );
 
   const availableLuns = discoveredDevices.map((disk) => {
@@ -85,45 +84,74 @@ export const FileSystemCreateForm = () => {
         const nextSelectedLuns = isSelecting
           ? selectedLuns.concat(lun)
           : selectedLuns.filter(({ id }) => id !== lun.id);
-        setValue("selected-luns", JSON.stringify(nextSelectedLuns));
+        form.setValue("selected-luns", JSON.stringify(nextSelectedLuns));
       },
-    [selectedLuns, setValue]
+    [selectedLuns, form]
   );
 
   const handleSelectAllLuns = useCallback(
     (_event: React.FormEvent<HTMLInputElement>, isSelecting: boolean) => {
       const nextSelectedLuns = isSelecting ? availableLuns : [];
-      setValue("selected-luns", JSON.stringify(nextSelectedLuns));
+      form.setValue("selected-luns", JSON.stringify(nextSelectedLuns));
     },
-    [availableLuns, setValue]
+    [availableLuns, form]
   );
 
   useEffect(() => {
-    if (!isTouched("name")) {
+    if (!form.isTouched("name")) {
       return;
     }
     if (NAME_FIELD_VALIDATION_REGEX.test(fileSystemName)) {
-      setError("name", undefined);
+      form.setError("name", undefined);
     } else {
-      setError(
+      form.setError(
         "name",
         t("Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}", {
           NAME_FIELD_VALIDATION_REGEX,
         })
       );
     }
-  }, [fileSystemName, setError, isTouched, t]);
+  }, [fileSystemName, form, t]);
 
-  const columns = useColumns();
+  useEffect(() => {
+    dispatch({
+      type: "updateCtas",
+      payload: {
+        createFileSystem: {
+          isDisabled:
+            !form.isValid || !fileSystemName || selectedDevices.length === 0,
+        },
+      },
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.isValid, fileSystemName, selectedDevices.length]);
+
+  const columns = useMemo(
+    () =>
+      ({
+        NAME: t("Name"),
+        ID: t("ID"),
+        CAPACITY: t("Capacity"),
+      }) as const,
+    [t]
+  );
+
+  const handleCreateFileSystem = useCreateFileSystemHandler(
+    fileSystemName,
+    selectedDevices,
+    lvdrs
+  );
 
   return (
     <Stack hasGutter>
-      <StackItem>
+      <StackItem isFilled>
         <Form
           isWidthLimited
           id="file-system-create-form"
           onSubmit={(e) => {
             e.preventDefault();
+            handleCreateFileSystem();
           }}
         >
           <FormGroup isRequired label="Name" fieldId="name">
@@ -137,8 +165,8 @@ export const FileSystemCreateForm = () => {
               placeholder="file-system-1"
               validated={fileSystemNameErrorMessage ? "error" : "default"}
               onChange={(_, newName) => {
-                setValue("name", newName);
-                setTouched("name", true);
+                form.setValue("name", newName);
+                form.setTouched("name", true);
               }}
             />
             {fileSystemNameErrorMessage ? (
@@ -166,7 +194,7 @@ export const FileSystemCreateForm = () => {
               />
             }
           >
-            {!loaded ? (
+            {!lvdrsLoaded ? (
               <EmptyState
                 titleText={t("Loading LUNs")}
                 headingLevel="h4"
@@ -218,64 +246,13 @@ export const FileSystemCreateForm = () => {
           </FormGroup>
         </Form>
       </StackItem>
-      <StackItem>
-        <FileSystemsCreateButton
-          key="create-filesystem"
-          type="submit"
-          form="file-system-create-form"
-          isDisabled={
-            !!Object.keys(errors).length ||
-            !fileSystemName ||
-            !selectedDevices.length
-          }
-          isLoading={store.ctas.createFileSystem.isLoading}
-          onCreateFileSystem={handleCreateFileSystem}
-        />
-      </StackItem>
     </Stack>
   );
 };
 FileSystemCreateForm.displayName = "FileSystemCreateForm";
 
-const useDisksDiscoveryResultsForStorageNodes = (): [
-  LocalVolumeDiscoveryResult[],
-  boolean,
-] => {
-  const [disksDiscoveryResults, lvLoaded] =
-    useWatchLocalVolumeDiscoveryResult();
-
-  const [selectedNodes, nodesLoaded] = useWatchNode({
-    withLabels: [WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL],
-  });
-
-  const results = useMemo(
-    () =>
-      (disksDiscoveryResults ?? []).filter((result) =>
-        (selectedNodes ?? []).find(
-          (node) => node.metadata?.name === result.spec.nodeName
-        )
-      ),
-    [disksDiscoveryResults, selectedNodes]
-  );
-
-  return [results, lvLoaded && nodesLoaded];
-};
-
 const useSelectedLuns = (serializedLuns: string) =>
   useMemo(() => JSON.parse(serializedLuns || "[]") as Lun[], [serializedLuns]);
-
-const useColumns = () => {
-  const { t } = useFusionAccessTranslations();
-  return useMemo(
-    () =>
-      ({
-        NAME: t("Name"),
-        ID: t("ID"),
-        CAPACITY: t("Capacity"),
-      }) as const,
-    [t]
-  );
-};
 
 const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);
 

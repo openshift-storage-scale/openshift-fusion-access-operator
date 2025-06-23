@@ -2,9 +2,13 @@ import { StoreProvider, useStore } from "@/shared/store/provider";
 import { reducer, initialState } from "@/shared/store/reducer";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { FormContextProvider } from "@patternfly/react-core";
+import { FormContextProvider, Split } from "@patternfly/react-core";
 import type { State, Actions } from "@/shared/store/types";
 import { FileSystemCreateForm } from "../components/FileSystemCreateForm";
+import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
+import { useCreateFileSystemHandler } from "../hooks/useCreateFileSystemHandler";
+import { CancelButton } from "@/shared/components/CancelButton";
+import { useHistory } from "react-router";
 
 const FileSystemsCreate: React.FC = () => {
   return (
@@ -23,7 +27,10 @@ export default FileSystemsCreate;
 
 const ConnectedCreateFileSystems: React.FC = () => {
   const [store, dispatch] = useStore<State, Actions>();
+
   const { t } = useFusionAccessTranslations();
+
+  const history = useHistory();
 
   return (
     <ListPage
@@ -34,6 +41,16 @@ const ConnectedCreateFileSystems: React.FC = () => {
       )}
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      footer={
+        <Split hasGutter>
+          <FileSystemsCreateButton
+            type="submit"
+            form="file-system-create-form"
+            {...store.ctas.createFileSystem}
+          />
+          <CancelButton onCancel={history.goBack} />
+        </Split>
+      }
     >
       <FileSystemCreateForm />
     </ListPage>
