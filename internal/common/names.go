@@ -6,7 +6,6 @@ import (
 
 const (
 	defaultDeviceFinderImageVersion = "quay.io/openshift-storage-scale/openshift-fusion-access-devicefinder"
-	defaultKubeProxyImage           = "quay.io/openshift/origin-kube-rbac-proxy:latest"
 
 	// OwnerNamespaceLabel references the owning object's namespace
 	OwnerNamespaceLabel = "fusion.storage.openshift.io/owner-namespace"
@@ -31,12 +30,4 @@ func GetDeviceFinderImage() string {
 		return deviceFinderImageFromEnv
 	}
 	return defaultDeviceFinderImageVersion
-}
-
-// GetKubeRBACProxyImage returns the image to be used for Kube RBAC Proxy sidecar container
-func GetKubeRBACProxyImage() string {
-	if kubeRBACProxyImageFromEnv := os.Getenv(KubeRBACProxyImageEnv); kubeRBACProxyImageFromEnv != "" {
-		return kubeRBACProxyImageFromEnv
-	}
-	return defaultKubeProxyImage
 }
