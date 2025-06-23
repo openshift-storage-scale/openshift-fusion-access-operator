@@ -3,8 +3,8 @@ import { useImmerReducer, type ImmerReducer } from "use-immer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Thunk<Action = any, State = any> = (
-  d: React.Dispatch<Action>,
-  s: State
+  dispatch: React.Dispatch<Action>,
+  state: State
 ) => Promise<void>;
 
 function useReducerWithThunk<State, Action>(
