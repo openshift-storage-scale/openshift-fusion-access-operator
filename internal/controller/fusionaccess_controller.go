@@ -385,6 +385,7 @@ func (r *FusionAccessReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 	log.Log.Info("Successfully enabled console plugin")
+
 	// Check if can pull the image if we have not already or if it failed previously
 	// Only do this check if we have a set cnsa version
 	if fusionaccess.Spec.StorageScaleVersion != "" {
@@ -411,7 +412,6 @@ func (r *FusionAccessReconciler) Reconcile(
 
 	if fusionaccess.Spec.LocalVolumeDiscovery.Create {
 		// Create Device discovery
-
 		lvd := localvolumediscovery.NewLocalVolumeDiscovery(ns)
 		if err := localvolumediscovery.CreateOrUpdateLocalVolumeDiscovery(ctx, lvd, r.Client); err != nil {
 			return ctrl.Result{}, err
