@@ -1,15 +1,13 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import { reducer, initialState } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { FileSystemsTabbedNav } from "../components/FileSystemsTabbedNav";
-import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
 import {
-  FILE_SYSTEMS_CREATE_URL_PATH,
   STORAGE_CLUSTER_HOME_URL_PATH,
 } from "@/constants";
 
@@ -31,8 +29,6 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const history = useHistory();
-
   const [storageClusters, storageClustersLoaded, storageClustersError] =
     useWatchSpectrumScaleCluster({ limit: 1 });
 
@@ -42,14 +38,6 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
       title={t("Fusion Access for SAN")}
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "dismissAlert" })}
-      actions={
-        <FileSystemsCreateButton
-          key="create-filesystem"
-          onCreateFileSystem={() => {
-            history.push(FILE_SYSTEMS_CREATE_URL_PATH);
-          }}
-        />
-      }
     >
       <ResourceStatusBoundary
         loaded={storageClustersLoaded}

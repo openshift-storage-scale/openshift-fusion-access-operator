@@ -219,7 +219,7 @@ const FileSystemCreateForm = () => {
                 titleText={t("Loading LUNs")}
                 headingLevel="h4"
                 icon={Spinner}
-              ></EmptyState>
+              />
             ) : availableLuns.length ? (
               <Table id="luns-selection-table" variant="compact">
                 <Thead>

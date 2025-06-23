@@ -14,7 +14,9 @@ import { FileSystemsCreateButton } from "./FileSystemsCreateButton";
 
 export const FileSystemsTableEmptyState: React.FC = () => {
   const { t } = useFusionAccessTranslations();
+  
   const history = useHistory();
+  
   const handleCreateFileSystem = useCallback(() => {
     history.push(FILE_SYSTEMS_CREATE_URL_PATH);
   }, [history]);

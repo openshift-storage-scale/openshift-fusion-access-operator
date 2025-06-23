@@ -15,7 +15,7 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import { useCallback } from "react";
 import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { SC_PROVISIONER } from "@/constants";
+import { FILE_SYSTEMS_HOME_URL_PATH, SC_PROVISIONER } from "@/constants";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
@@ -70,7 +70,7 @@ export const useCreateFileSystemHandler = (
 
       await createStorageClass(storageClassModel, fileSystemName);
 
-      history.push("/fusion-access/file-systems");
+      history.push(FILE_SYSTEMS_HOME_URL_PATH);
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
