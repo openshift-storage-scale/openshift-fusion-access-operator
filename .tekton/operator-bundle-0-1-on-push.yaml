@@ -31,7 +31,7 @@ spec:
   - name: dockerfile
     value: bundle.Dockerfile
   pipelineRef:
-    name: operator-bundle-base
+    name: operator-bundle-common
   taskRunTemplate:
     serviceAccountName: build-pipeline-operator-bundle-0-1
   workspaces:

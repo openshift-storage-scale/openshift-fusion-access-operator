@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: operator-bundle-base
+  name: operator-bundle-common
 spec:
   description: |
     This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -228,7 +228,7 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: ADDITIONAL_BASE_IMAGES
       value:
-      - $(tasks.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
+      - $(tasks.generate-bundle.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - prefetch-dependencies
     taskRef:
