@@ -40,11 +40,11 @@ const ConnectedStorageClusterCreate: React.FC = () => {
       documentTitle={t("Fusion Access for SAN")}
       title={t("Create storage cluster")}
       alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
       footer={
         <Split hasGutter>
           <StorageClustersCreateButton
-            {...store.ctas.createStorageCluster}
+            {...store.cta}
             onCreateStorageCluster={handleCreateStorageCluster}
           />
           <CancelButton onCancel={history.goBack} />

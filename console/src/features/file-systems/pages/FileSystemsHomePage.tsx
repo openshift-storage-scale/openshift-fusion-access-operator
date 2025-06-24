@@ -37,7 +37,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
       alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
     >
       <ResourceStatusBoundary
         loaded={storageClustersLoaded}

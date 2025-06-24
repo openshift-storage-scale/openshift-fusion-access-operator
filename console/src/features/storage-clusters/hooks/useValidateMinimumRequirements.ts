@@ -29,11 +29,11 @@ export const useValidateMinimumRequirements = (
 
     if (conditions.some(Boolean)) {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: true } },
+        type: "global/updateCta",
+        payload: { isDisabled: true },
       });
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
           variant: "warning",
@@ -59,11 +59,11 @@ export const useValidateMinimumRequirements = (
       });
     } else {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isDisabled: false } },
+        type: "global/updateCta",
+        payload: { isDisabled: false },
       });
       dispatch({
-        type: "dismissAlert",
+        type: "global/dismissAlert",
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -8,46 +8,52 @@ enableMapSet(); // Enables Map and Set support in immer
 
 export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
   switch (action.type) {
-    case "updateGlobal":
-      draft.global = { ...draft.global, ...action.payload };
+    case "global/updateDocTitle":
+      draft.docTitle = action.payload;
       break;
-    case "showAlert":
+    case "global/showAlert":
       draft.alert = action.payload;
       break;
-    case "dismissAlert":
+    case "global/dismissAlert":
       draft.alert = null;
       break;
-    case "updateCtas":
-      {
-        const { createFileSystem, createStorageCluster } = action.payload;
-        draft.ctas = {
-          createFileSystem: {
-            ...draft.ctas.createFileSystem,
-            ...createFileSystem,
-          },
-          createStorageCluster: {
-            ...draft.ctas.createStorageCluster,
-            ...createStorageCluster,
-          },
-        };
-      }
+    case "global/updateCta":
+      draft.cta = {
+        ...draft.cta,
+        ...action.payload,
+      };
       break;
     default:
       throw new Error(
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        `Unhandled action type: ${action.type}. Please check the reducer.`
+        `Unhandled action type: ${(action as { type: string }).type}. Please check the reducer.`
       );
   }
 };
 
 export const initialState: State = {
-  global: {
-    documentTitle: t("Fusion Access for SAN"),
-  },
+  docTitle: t("Fusion Access for SAN"),
   alert: null,
-  ctas: {
-    createStorageCluster: { isDisabled: true, isLoading: false },
-    createFileSystem: { isDisabled: true, isLoading: false },
+  cta: {
+    isDisabled: true,
+    isLoading: false,
   },
 };
+
+// const combineReducers = <S, Action>(
+//   ...slices: { sliceName: string; reducer: ImmerReducer<unknown, unknown> }[]
+// ): ImmerReducer<S, Action> => {
+//   return (draft, action) => {
+//     const [prefix] = action.type.split("/");
+//     if (!prefix) {
+//       throw new Error(
+//         `unprefixed action "${action.type}". Action names must match the format "slice/action"`
+//       );
+//     }
+
+//     if (!lookupTable.has(prefix)) {
+//       throw new Error(`no slice defined for action with prefix ${prefix}`);
+//     }
+
+//     lookupTable.get(prefix)!(draft, action);
+//   };
+// };

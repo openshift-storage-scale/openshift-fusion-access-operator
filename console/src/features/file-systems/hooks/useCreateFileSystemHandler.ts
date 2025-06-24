@@ -49,8 +49,8 @@ export const useCreateFileSystemHandler = (
   return useCallback(async () => {
     try {
       dispatch({
-        type: "updateCtas",
-        payload: { createFileSystem: { isLoading: true } },
+        type: "global/updateCta",
+        payload: { isLoading: true },
       });
 
       // TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
@@ -76,7 +76,7 @@ export const useCreateFileSystemHandler = (
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           variant: "danger",
           title: t("An error occurred while creating resources"),
@@ -86,8 +86,8 @@ export const useCreateFileSystemHandler = (
       });
     } finally {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isLoading: false } },
+        type: "global/updateCta",
+        payload: { isLoading: false },
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

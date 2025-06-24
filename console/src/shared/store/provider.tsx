@@ -1,6 +1,10 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { useImmerReducer, type ImmerReducer } from "use-immer";
 
+export type ActionDef<T extends `${string}/${string}`, P = undefined> = P extends undefined
+  ? { type: T }
+  : { type: T; payload: P };
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Thunk<Action = any, State = any> = (
   dispatch: React.Dispatch<Action>,
@@ -30,15 +34,13 @@ function useReducerWithThunk<State, Action>(
   return useMemo(() => [state, customDispatch], [customDispatch, state]);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StoreContextValue<State = any, Action = any> =
-  | [State, React.Dispatch<Action>]
-  | null;
+type StoreContextValue<State, Action> = [State, React.Dispatch<Action>] | null;
 
-const StoreContext = createContext<StoreContextValue>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const StoreContext = createContext<StoreContextValue<any, any>>(null);
 
 export function useStore<State = unknown, Action = unknown>() {
-  const context = useContext<StoreContextValue<State, Action>>(StoreContext);
+  const context = useContext(StoreContext) as StoreContextValue<State, Action>;
   if (!context) {
     throw new Error("useStoreContext hook must be used within <StoreProvider>");
   }
@@ -51,7 +53,7 @@ interface StoreProviderProps<State, Action> {
   initialState: State;
 }
 
-export function StoreProvider<State, Action>(
+export function StoreProvider<State = unknown, Action = unknown>(
   props: React.PropsWithChildren<StoreProviderProps<State, Action>>
 ) {
   const { children, initialState, reducer } = props;

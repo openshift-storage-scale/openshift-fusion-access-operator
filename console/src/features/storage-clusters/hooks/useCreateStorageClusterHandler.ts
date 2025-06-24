@@ -25,8 +25,8 @@ export const useCreateStorageClusterHandler = () => {
   return useCallback(async () => {
     try {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isLoading: true } },
+        type: "global/updateCta",
+        payload: { isLoading: true },
       });
       await k8sCreate<Cluster>({
         model: storageScaleClusterModel,
@@ -49,7 +49,7 @@ export const useCreateStorageClusterHandler = () => {
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           variant: "danger",
           title: t("An error occurred while creating resources"),
@@ -59,8 +59,8 @@ export const useCreateStorageClusterHandler = () => {
       });
     }
     dispatch({
-      type: "updateCtas",
-      payload: { createStorageCluster: { isLoading: false } },
+      type: "global/updateCta",
+      payload: { isLoading: false },
     });
   }, [dispatch, history, storageScaleClusterModel, t]);
 };

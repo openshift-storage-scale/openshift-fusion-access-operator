@@ -40,13 +40,13 @@ const ConnectedCreateFileSystems: React.FC = () => {
         "Create a file system to represent your required storage (based on the selected nodes’ storage)."
       )}
       alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
       footer={
         <Split hasGutter>
           <FileSystemsCreateButton
             type="submit"
             form="file-system-create-form"
-            {...store.ctas.createFileSystem}
+            {...store.cta}
           />
           <CancelButton onCancel={history.goBack} />
         </Split>

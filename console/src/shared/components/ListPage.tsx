@@ -12,16 +12,16 @@ import {
   List,
   ListItem,
 } from "@patternfly/react-core";
-import type { AlertSlice } from "@/shared/store/types";
 import { useLayoutEffect } from "react";
+import type { State } from "../store/types";
 
 interface ListPageProps {
   documentTitle: string;
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
-  alert?: AlertSlice;
-  onDismissAlert?: (alert: AlertSlice) => void;
+  alert?: State['alert'];
+  onDismissAlert?: (alert: State['alert']) => void;
   listPageBodyStyle?: Partial<UseListPageBodyStyleHackOptions>;
   footer?: React.ReactNode;
 }

@@ -40,7 +40,7 @@ export const FileSystemCreateForm = () => {
   useEffect(() => {
     if (lvdrsLoadError) {
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           title: t("Failed to load LocaVolumeDiscoveryResults"),
           description: lvdrsLoadError.message,
@@ -115,15 +115,12 @@ export const FileSystemCreateForm = () => {
 
   useEffect(() => {
     dispatch({
-      type: "updateCtas",
+      type: "global/updateCta",
       payload: {
-        createFileSystem: {
-          isDisabled:
-            !form.isValid || !fileSystemName || selectedDevices.length === 0,
-        },
+        isDisabled:
+          !form.isValid || !fileSystemName || selectedDevices.length === 0,
       },
     });
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.isValid, fileSystemName, selectedDevices.length]);
 
