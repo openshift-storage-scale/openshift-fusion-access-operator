@@ -29,7 +29,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/devicefinder-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/devicefinder-rhel10:{{revision}}
   - name: dockerfile
     value: devicefinder.Dockerfile
   - name: prefetch-input
