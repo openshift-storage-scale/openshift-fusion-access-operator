@@ -22,7 +22,7 @@ LABEL \
     summary="Fusion Access Console Plugin" \
     release="v${VERSION}" \
     version="v${VERSION}" \
-    maintainer="michele@acksyn.org" \
+    maintainer="abjain39@in.ibm.com" \
     url="https://github.com/openshift-storage-scale/openshift-fusion-access-operator.git" \
     vendor="IBM" \
     License="Apache License 2.0"

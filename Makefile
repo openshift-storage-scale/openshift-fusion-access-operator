@@ -198,8 +198,8 @@ generate-dockerfile-operator:
 	envsubst < templates/operator.Dockerfile.template > $(OPERATOR_DOCKERFILE)
 
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
-.PHONY: generate-dockefile-devicefinder
-generate-dockefile-devicefinder:
+.PHONY: generate-dockerfile-devicefinder
+generate-dockerfile-devicefinder:
 	envsubst < templates/devicefinder.Dockerfile.template > $(DEVICEFINDER_DOCKERFILE)
 
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
@@ -230,7 +230,7 @@ console-push: ## Push the console image
 	$(CONTAINER_TOOL) push $(CONSOLE_PLUGIN_IMAGE)
 
 .PHONY: devicefinder-docker-build
-devicefinder-docker-build: generate-dockefile-devicefinder ## Build docker image of the devicefinder
+devicefinder-docker-build: generate-dockerfile-devicefinder ## Build docker image of the devicefinder
 	$(CONTAINER_TOOL) build -t $(DEVICEFINDER_IMAGE) -f $(CURPATH)/${DEVICEFINDER_DOCKERFILE} .
 
 .PHONY: devicefinder-docker-push
