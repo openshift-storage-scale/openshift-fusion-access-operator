@@ -26,9 +26,4 @@ esac
 
 go version
 
-touch internal/controller/pull.txt
-if [ -f "/run/secrets/pull" ]; then
-    cp -f /run/secrets/pull internal/controller/pull.txt
-fi
-
 GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go $EXTRA -ldflags="${LDFLAGS}" cmd/main.go

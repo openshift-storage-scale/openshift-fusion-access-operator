@@ -3,11 +3,6 @@ set -e -o pipefail
 
 VERSION=$(cat VERSION.txt)
 
-if [ ! -s "internal/controller/pull.txt" ]; then
-  echo "Error: pull.txt is empty." >&2
-  exit 1
-fi
-
 make USE_IMAGE_DIGESTS="" clean bundle generate manifests docker-build docker-push \
     bundle-build bundle-push \
     console-build console-push devicefinder-docker-build devicefinder-docker-push
