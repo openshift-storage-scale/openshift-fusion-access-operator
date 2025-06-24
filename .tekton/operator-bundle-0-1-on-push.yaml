@@ -254,6 +254,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: ADDITIONAL_BASE_IMAGES
+        value: $(task.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       runAfter:
       - prefetch-dependencies
       taskRef:
