@@ -1,12 +1,16 @@
 import { useCallback } from "react";
 import { useHistory } from "react-router";
 
-type WellKnownUrlPaths =
-  | "/fusion-access"
-  | "/fusion-access/storage-cluster"
-  | "/fusion-access/storage-cluster/create"
-  | "/fusion-access/file-systems"
-  | "/fusion-access/file-systems/create";
+export const UrlPaths = {
+  FusionAccessHome: "/fusion-access",
+  StorageClusterHome: "/fusion-access/storage-cluster",
+  StorageClusterCreate: "/fusion-access/storage-cluster/create",
+  FileSystemsHome: "/fusion-access/file-systems",
+  FileSystemsCreate: "/fusion-access/file-systems/create",
+} as const;
+
+type UrlPathsKeys = keyof typeof UrlPaths;
+type UrlPathsValues = (typeof UrlPaths)[UrlPathsKeys];
 
 /**
  * Custom React hook that returns a callback function to redirect the user to a specified URL path.
@@ -19,10 +23,13 @@ type WellKnownUrlPaths =
  * // Later in an event handler:
  * redirectToDashboard();
  */
-export const useRedirectHandler = (urlPath: WellKnownUrlPaths) => {
+export const useRedirectHandler = (urlPath: UrlPathsValues) => {
   const history = useHistory();
 
-  return useCallback(() => {
-    history.push(urlPath);
-  }, [history, urlPath]);
+  return useCallback(
+    (state?: unknown) => {
+      history.push(urlPath, state);
+    },
+    [history, urlPath]
+  );
 };

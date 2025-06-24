@@ -7,8 +7,10 @@ import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBounda
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { StoreProvider, useStore } from "@/shared/store/provider";
-import { FILE_SYSTEMS_HOME_URL_PATH } from "@/constants";
-import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import {
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -51,7 +53,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
             onCreateStorageCluster={redirectToCreateStorageCluster}
           />
         ) : (
-          <Redirect to={FILE_SYSTEMS_HOME_URL_PATH} />
+          <Redirect to={UrlPaths.FileSystemsHome} />
         )}
       </ResourceStatusBoundary>
     </ListPage>

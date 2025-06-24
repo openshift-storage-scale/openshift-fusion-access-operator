@@ -7,12 +7,12 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import { FileSystemsTabbedNav } from "../components/FileSystemsTabbedNav";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
-import {
-  STORAGE_CLUSTER_HOME_URL_PATH,
-} from "@/constants";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
-import { useRedirectHandler } from "../../../shared/hooks/useRedirectHandler";
+import {
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
 
 const FileSystemsHomePage: React.FC = () => {
   return (
@@ -58,7 +58,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
         error={storageClustersError}
       >
         {(storageClusters ?? []).length === 0 ? (
-          <Redirect to={STORAGE_CLUSTER_HOME_URL_PATH} />
+          <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <FileSystemsTabbedNav />
         )}

@@ -10,7 +10,7 @@ import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumSca
 import { Split } from "@patternfly/react-core";
 import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hooks/useCreateStorageClusterHandler";
 import { CancelButton } from "@/shared/components/CancelButton";
-import { FILE_SYSTEMS_HOME_URL_PATH } from "@/constants";
+import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
   const [cluster] = useWatchSpectrumScaleCluster({ limit: 1 });
@@ -22,7 +22,7 @@ const StorageClusterCreate: React.FC = () => {
       <ConnectedStorageClusterCreate />
     </StoreProvider>
   ) : (
-    <Redirect to={FILE_SYSTEMS_HOME_URL_PATH} />
+    <Redirect to={UrlPaths.FileSystemsHome} />
   );
 };
 StorageClusterCreate.displayName = "StorageClusterCreate";

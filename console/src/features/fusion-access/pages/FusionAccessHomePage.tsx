@@ -5,10 +5,7 @@ import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBounda
 import { useWatchFusionAccess } from "@/shared/hooks/useWatchFusionAccess";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import {
-  FILE_SYSTEMS_HOME_URL_PATH,
-  STORAGE_CLUSTER_HOME_URL_PATH,
-} from "@/constants";
+import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 
 const FusionAccessHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
@@ -46,9 +43,9 @@ const FusionAccessHomePage: React.FC = () => {
     >
       <ResourceStatusBoundary loaded={loaded} error={error}>
         {(storageClusters ?? []).length === 0 ? (
-          <Redirect to={STORAGE_CLUSTER_HOME_URL_PATH} />
+          <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
-          <Redirect to={FILE_SYSTEMS_HOME_URL_PATH} />
+          <Redirect to={UrlPaths.FileSystemsHome} />
         )}
       </ResourceStatusBoundary>
     </ListPage>
