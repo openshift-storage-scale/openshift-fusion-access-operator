@@ -470,6 +470,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
       - name: image-digest
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+      - name: ADDITIONAL_BASE_IMAGES
+        value: $(task.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       runAfter:
       - coverity-availability-check
       taskRef:
