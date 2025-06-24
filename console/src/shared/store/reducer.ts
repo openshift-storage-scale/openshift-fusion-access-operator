@@ -38,22 +38,3 @@ export const initialState: State = {
     isLoading: false,
   },
 };
-
-// const combineReducers = <S, Action>(
-//   ...slices: { sliceName: string; reducer: ImmerReducer<unknown, unknown> }[]
-// ): ImmerReducer<S, Action> => {
-//   return (draft, action) => {
-//     const [prefix] = action.type.split("/");
-//     if (!prefix) {
-//       throw new Error(
-//         `unprefixed action "${action.type}". Action names must match the format "slice/action"`
-//       );
-//     }
-
-//     if (!lookupTable.has(prefix)) {
-//       throw new Error(`no slice defined for action with prefix ${prefix}`);
-//     }
-
-//     lookupTable.get(prefix)!(draft, action);
-//   };
-// };
