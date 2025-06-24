@@ -222,6 +222,9 @@ spec:
       value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+    - name: ADDITIONAL_BASE_IMAGES
+      value:
+      - $(tasks.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - prefetch-dependencies
     taskRef:
@@ -438,9 +441,6 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: image-digest
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
-    - name: ADDITIONAL_BASE_IMAGES
-      value:
-      - $(tasks.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - coverity-availability-check
     taskRef:
