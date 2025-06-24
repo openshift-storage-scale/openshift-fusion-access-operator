@@ -1,5 +1,3 @@
-import { FILE_SYSTEMS_CREATE_URL_PATH } from "@/constants";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import {
   Button,
   EmptyState,
@@ -8,18 +6,16 @@ import {
   EmptyStateFooter,
 } from "@patternfly/react-core";
 import { ExternalLinkAltIcon, FolderIcon } from "@patternfly/react-icons";
-import { useCallback } from "react";
-import { useHistory } from "react-router";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 import { FileSystemsCreateButton } from "./FileSystemsCreateButton";
 
 export const FileSystemsTableEmptyState: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  
-  const history = useHistory();
-  
-  const handleCreateFileSystem = useCallback(() => {
-    history.push(FILE_SYSTEMS_CREATE_URL_PATH);
-  }, [history]);
+
+  const redirectToCreateFileSystem = useRedirectHandler(
+    "/fusion-access/file-systems/create"
+  );
 
   return (
     <EmptyState
@@ -32,9 +28,7 @@ export const FileSystemsTableEmptyState: React.FC = () => {
       </EmptyStateBody>
       <EmptyStateFooter>
         <EmptyStateActions>
-          <FileSystemsCreateButton
-            onCreateFileSystem={handleCreateFileSystem}
-          />
+          <FileSystemsCreateButton onClick={redirectToCreateFileSystem} />
         </EmptyStateActions>
         <EmptyStateActions>
           <Button

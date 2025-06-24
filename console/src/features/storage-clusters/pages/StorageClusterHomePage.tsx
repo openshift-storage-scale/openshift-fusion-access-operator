@@ -1,4 +1,4 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClusterEmptyState } from "@/features/storage-clusters/components/StorageClusterEmptyState";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
@@ -7,10 +7,8 @@ import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBounda
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { StoreProvider, useStore } from "@/shared/store/provider";
-import {
-  FILE_SYSTEMS_HOME_URL_PATH,
-  STORAGE_CLUSTER_CREATE_URL_PATH,
-} from "@/constants";
+import { FILE_SYSTEMS_HOME_URL_PATH } from "@/constants";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -30,7 +28,9 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const history = useHistory();
+  const redirectToCreateStorageCluster = useRedirectHandler(
+    "/fusion-access/storage-cluster/create"
+  );
 
   const [storageClusters, storageClustersLoaded, storageClustersError] =
     useWatchSpectrumScaleCluster({ limit: 1 });
@@ -48,9 +48,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
       >
         {(storageClusters ?? []).length === 0 ? (
           <StorageClusterEmptyState
-            onCreateStorageCluster={() => {
-              history.push(STORAGE_CLUSTER_CREATE_URL_PATH);
-            }}
+            onCreateStorageCluster={redirectToCreateStorageCluster}
           />
         ) : (
           <Redirect to={FILE_SYSTEMS_HOME_URL_PATH} />

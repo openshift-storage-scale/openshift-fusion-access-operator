@@ -4,21 +4,21 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 
 interface CreateFileSystemButtonProps
   extends Omit<ButtonProps, "variant" | "onClick"> {
-  onCreateFileSystem?: React.MouseEventHandler<HTMLButtonElement>;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
   isDisabled?: boolean;
 }
 
 export const FileSystemsCreateButton: React.FC<CreateFileSystemButtonProps> = (
   props
 ) => {
-  const { onCreateFileSystem, isLoading, isDisabled, ...buttonProps } = props;
+  const { onClick, isLoading, isDisabled, ...buttonProps } = props;
   const { t } = useFusionAccessTranslations();
 
   return (
     <Button
       {...buttonProps}
       variant="primary"
-      onClick={onCreateFileSystem}
+      onClick={onClick}
       isLoading={isLoading}
       isDisabled={isLoading || isDisabled}
     >

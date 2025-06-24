@@ -10,6 +10,9 @@ import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBounda
 import {
   STORAGE_CLUSTER_HOME_URL_PATH,
 } from "@/constants";
+import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
+import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
+import { useRedirectHandler } from "../../../shared/hooks/useRedirectHandler";
 
 const FileSystemsHomePage: React.FC = () => {
   return (
@@ -32,12 +35,23 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
   const [storageClusters, storageClustersLoaded, storageClustersError] =
     useWatchSpectrumScaleCluster({ limit: 1 });
 
+  const [fileSystems] = useWatchFileSystem();
+
+  const redirectToCreateFileSystems = useRedirectHandler(
+    "/fusion-access/file-systems/create"
+  );
+
   return (
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
+      actions={
+        (fileSystems ?? []).length > 0 ? (
+          <FileSystemsCreateButton onClick={redirectToCreateFileSystems} />
+        ) : null
+      }
     >
       <ResourceStatusBoundary
         loaded={storageClustersLoaded}
