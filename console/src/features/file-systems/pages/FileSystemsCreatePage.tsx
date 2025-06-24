@@ -6,7 +6,6 @@ import { FormContextProvider, Split } from "@patternfly/react-core";
 import type { State, Actions } from "@/shared/store/types";
 import { FileSystemCreateForm } from "../components/FileSystemCreateForm";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { useCreateFileSystemHandler } from "../hooks/useCreateFileSystemHandler";
 import { CancelButton } from "@/shared/components/CancelButton";
 import { useHistory } from "react-router";
 
