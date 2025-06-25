@@ -19,6 +19,7 @@ package kernelmodule
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -51,6 +52,7 @@ const (
 	KMMImageConfigKeyTLSInsecure        = "kmm_tls_insecure"
 	KMMImageConfigKeyTLSSkipVerify      = "kmm_tls_skip_verify"
 	KMMImageConfigKeyRegistrySecretName = "kmm_image_registry_secret_name" //nolint:gosec
+	KMMRegistryPushPullSecretName       = "kmm-registry-push-pull-secret"  //nolint:gosec
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -61,17 +63,21 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	// This can all be dropped with KMM 2.4
+	KMMImageConfig, err := getKMMImageConfig(ctx, cl, ns)
+	if err != nil {
+		return fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
+	}
+
 	var secret *corev1.Secret
-	if secret, err = getPatchedGlobalPullSecret(ctx, cl, ns); err != nil {
-		return fmt.Errorf("failed to getPatchedGlobalPullSecret in CreateOrUpdateKMMResources: %w", err)
+	if secret, err = getMergedRegistrySecret(ctx, cl, ns, &KMMImageConfig); err != nil {
+		return fmt.Errorf("failed to getMergedRegistrySecret in CreateOrUpdateKMMResources: %w", err)
 	}
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, secret, func(existing, desired *corev1.Secret) error {
 		existing.Type = desired.Type
 		existing.Data = desired.Data
 		return nil
 	}); err != nil {
-		return fmt.Errorf("failed to update global pull secret in CreateOrUpdateKMMResources: %w", err)
+		return fmt.Errorf("failed to update secret in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	dockerConfigmap := NewDockerConfigmap(ns)
@@ -87,10 +93,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to get coreImage in CreateOrUpdateKMMResources: %w", err)
 	}
 	signModules := doSigningSecretsExist(ctx, cl, ns)
-	KMMImageConfig, err := getKMMImageConfig(ctx, cl, ns)
-	if err != nil {
-		return fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
-	}
+
 	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules, &KMMImageConfig)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
@@ -194,10 +197,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 				ServiceAccountName: ServiceAccountName,
 			},
 			ImageRepoSecret: func() *corev1.LocalObjectReference {
-				if kmmImageConfig.RegistrySecretName != "" {
-					return &corev1.LocalObjectReference{Name: kmmImageConfig.RegistrySecretName}
-				}
-				return nil
+				return &corev1.LocalObjectReference{Name: KMMRegistryPushPullSecretName}
 			}(),
 			Selector: selector,
 		},
@@ -255,27 +255,43 @@ func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) 
 	return config, nil
 }
 
-// getPatchedGlobalPullSecret will return the patched global pull secret with the ibm pull secrets
-func getPatchedGlobalPullSecret(ctx context.Context, cl client.Client, namespace string) (*corev1.Secret, error) {
+// getMergedRegistrySecret will return the merged secret (registry used for kmm and core images)
+func getMergedRegistrySecret(ctx context.Context, cl client.Client, namespace string, kmmImageConfig *KMMImageConfig) (*corev1.Secret, error) {
 	ibmPullSecret := &corev1.Secret{}
 	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: IBMENTITLEMENTNAME}, ibmPullSecret); err != nil {
-		return nil, fmt.Errorf("failed to get ibmPullSecret pull secret %s in getPatchedGlobalPullSecret: %w", IBMENTITLEMENTNAME, err)
+		return nil, fmt.Errorf("failed to get ibmPullSecret pull secret %s in getMergedRegistrySecret: %w", IBMENTITLEMENTNAME, err)
 	}
-	globalPullSecret := &corev1.Secret{}
-	if err := cl.Get(ctx, types.NamespacedName{Namespace: "openshift-config", Name: "pull-secret"}, globalPullSecret); err != nil {
-		return nil, fmt.Errorf("failed to get global pull secret in getPatchedGlobalPullSecret: %w", err)
+	registrySecret := &corev1.Secret{}
+	if kmmImageConfig.RegistrySecretName != "" {
+		if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: kmmImageConfig.RegistrySecretName}, registrySecret); err != nil {
+			return nil, fmt.Errorf("failed to get secret %s in getMergedRegistrySecret: %w", kmmImageConfig.RegistrySecretName, err)
+		}
+	} else {
+		builderSecretName, err := getServiceAccountDockercfgSecretName(ctx, cl, namespace, "builder")
+		if err != nil {
+			return nil, fmt.Errorf("error fetching dockercfg secret in getMergedRegistrySecret: %w", err)
+		}
+		if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: builderSecretName}, registrySecret); err != nil {
+			return nil, fmt.Errorf("failed to get secret (for internal registry) %s in getMergedRegistrySecret: %w", builderSecretName, err)
+		}
+	}
+	KMMRegistryPushPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      KMMRegistryPushPullSecretName,
+			Namespace: namespace,
+		},
+	}
+	KMMRegistryPushPullSecret, err := utils.MergeDockerSecrets(KMMRegistryPushPullSecret, ibmPullSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge ibm pull secret: %w", err)
 	}
 
-	mergedSecret, err := utils.MergeSecrets(globalPullSecret, ibmPullSecret)
+	KMMRegistryPushPullSecret, err = utils.MergeDockerSecrets(KMMRegistryPushPullSecret, registrySecret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to merge global pull secret and ibm pull secret: %w", err)
+		return nil, fmt.Errorf("failed to merge registry secret: %w", err)
 	}
-	// make sure we use the global metadata
-	mergedSecret.ObjectMeta = metav1.ObjectMeta{
-		Name:      "pull-secret",
-		Namespace: "openshift-config",
-	}
-	return mergedSecret, nil
+
+	return KMMRegistryPushPullSecret, nil
 }
 
 // getIBMCoreImage gets the core init image with the source code in them
@@ -340,4 +356,29 @@ COPY --from=builder /usr/lpp/mmfs/bin/lxtrace-${KERNEL_FULL_VERSION} /opt/lxtrac
 			"dockerfile": dockerFileValue,
 		},
 	}
+}
+
+// getServiceAccountDockercfgSecretName fetches the Docker config secret name for a given service account
+func getServiceAccountDockercfgSecretName(ctx context.Context, cl client.Client, namespace, serviceAccountName string) (string, error) {
+	// Define the secret name pattern based on the service account name
+	secretPattern := fmt.Sprintf("^%s-dockercfg-.*$", serviceAccountName)
+
+	// List all secrets in the same namespace as the service account
+	secrets := &corev1.SecretList{}
+	if err := cl.List(ctx, secrets, &client.ListOptions{Namespace: namespace}); err != nil {
+		return "", fmt.Errorf("failed to list secrets in namespace %s: %w", namespace, err)
+	}
+
+	// Iterate through secrets to find the one matching the pattern
+	for i := range secrets.Items {
+		secret := &secrets.Items[i] // Use pointer to secret
+		// Match the secret name with the pattern
+		matched, _ := regexp.MatchString(secretPattern, secret.Name)
+		if matched {
+			return secret.Name, nil
+		}
+	}
+
+	// Return an error if no secret matches the pattern
+	return "", fmt.Errorf("no dockercfg secret found for service account %s in namespace %s", serviceAccountName, namespace)
 }
