@@ -401,44 +401,57 @@ func mergeDockerConfigJSON(destRaw, srcRaw []byte) ([]byte, error) {
 	return json.Marshal(destCfg)
 }
 
-func MergeSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
+func convertDockercfgToDockerconfigjson(dockercfg []byte) ([]byte, error) {
+	var cfg map[string]any
+	if err := json.Unmarshal(dockercfg, &cfg); err != nil {
+		return nil, fmt.Errorf("invalid dockercfg: %w", err)
+	}
+
+	// Assume it’s dockercfg if there's no "auths" key and top-level keys look like registries
+	if _, isDockerconfigjson := cfg["auths"]; isDockerconfigjson {
+		// Already in dockerconfigjson format
+		return dockercfg, nil
+	}
+
+	// Convert dockercfg format to dockerconfigjson
+	converted := map[string]any{
+		"auths": cfg,
+	}
+	return json.Marshal(converted)
+}
+
+func MergeDockerSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
 	if dest == nil || src == nil {
 		return nil, fmt.Errorf("cannot merge nil secrets")
 	}
 
-	// Optionally enforce type match
-	if dest.Type != "" && src.Type != "" && dest.Type != src.Type {
-		return nil, fmt.Errorf("cannot merge secrets of different types: %s vs %s", dest.Type, src.Type)
+	// Enforce source type to be dockerconfig
+	if src.Type != corev1.SecretTypeDockerConfigJson && src.Type != corev1.SecretTypeDockercfg {
+		return nil, fmt.Errorf("source secret is not of Docker config type")
 	}
 
-	// If dest.Type is empty, inherit from src
+	// If dest.Type is empty, set it to dockerconfigJson
 	if dest.Type == "" {
-		dest.Type = src.Type
+		dest.Type = corev1.SecretTypeDockerConfigJson
 	}
 
-	// Merge Data
+	// Initialize dest Data
 	if dest.Data == nil {
 		dest.Data = make(map[string][]byte)
 	}
 
-	for k, v := range src.Data {
-		if k == ".dockerconfigjson" {
-			mergedJSON, err := mergeDockerConfigJSON(dest.Data[k], v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to merge .dockerconfigjson: %w", err)
-			}
-			dest.Data[k] = mergedJSON
-		} else {
-			dest.Data[k] = v
+	for _, v := range src.Data {
+		// if k == ".dockerconfigjson" || k == ".dockercfg" {
+		normalizedSrc, err := convertDockercfgToDockerconfigjson(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to converto to .dockerconfigjson: %w", err)
 		}
-	}
-	// Optionally merge StringData too
-	if dest.StringData == nil {
-		dest.StringData = make(map[string]string)
-	}
-	for k, v := range src.StringData {
-		dest.StringData[k] = v
-	}
 
+		mergedJSON, err := mergeDockerConfigJSON(dest.Data[".dockerconfigjson"], normalizedSrc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge .dockerconfigjson: %w", err)
+		}
+		dest.Data[".dockerconfigjson"] = mergedJSON
+	}
 	return dest, nil
 }

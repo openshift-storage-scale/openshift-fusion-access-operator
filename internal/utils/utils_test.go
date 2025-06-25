@@ -507,66 +507,22 @@ var _ = Describe("IsExternalManifestURLAllowed", func() {
 	})
 })
 
-var _ = Describe("MergeSecrets", func() {
-
-	Context("when both secrets are valid", func() {
-		var dest, src *corev1.Secret
-
-		BeforeEach(func() {
-			dest = &corev1.Secret{
-				Data: map[string][]byte{
-					"username": []byte("admin"),
-				},
-				StringData: map[string]string{
-					"note": "original",
-				},
-			}
-			src = &corev1.Secret{
-				Data: map[string][]byte{
-					"password": []byte("secret"),
-					"username": []byte("overwritten"), // should override
-				},
-				StringData: map[string]string{
-					"note":    "updated", // should override
-					"comment": "new",
-				},
-			}
-		})
-
-		It("merges Data and StringData correctly", func() {
-			merged, err := MergeSecrets(dest, src)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(merged.Data).To(HaveKeyWithValue("username", []byte("overwritten")))
-			Expect(merged.Data).To(HaveKeyWithValue("password", []byte("secret")))
-			Expect(merged.StringData).To(HaveKeyWithValue("note", "updated"))
-			Expect(merged.StringData).To(HaveKeyWithValue("comment", "new"))
-		})
-	})
+var _ = Describe("MergeDockerSecrets", func() {
 
 	Context("when dest is nil", func() {
 		It("returns an error", func() {
-			_, err := MergeSecrets(nil, &corev1.Secret{})
+			_, err := MergeDockerSecrets(nil, &corev1.Secret{})
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	Context("when src is nil", func() {
 		It("returns an error", func() {
-			_, err := MergeSecrets(&corev1.Secret{}, nil)
+			_, err := MergeDockerSecrets(&corev1.Secret{}, nil)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
-	Context("when both Data and StringData are empty or nil", func() {
-		It("initializes maps and doesn't panic", func() {
-			dest := &corev1.Secret{}
-			src := &corev1.Secret{}
-			merged, err := MergeSecrets(dest, src)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(merged.Data).To(BeEmpty())
-			Expect(merged.StringData).To(BeEmpty())
-		})
-	})
 	Context("when merging .dockerconfigjson", func() {
 		It("merges distinct auths from both secrets", func() {
 			dest := &corev1.Secret{
@@ -595,7 +551,7 @@ var _ = Describe("MergeSecrets", func() {
 				},
 			}
 
-			merged, err := MergeSecrets(dest, src)
+			merged, err := MergeDockerSecrets(dest, src)
 			Expect(err).ToNot(HaveOccurred())
 
 			var mergedJSON map[string]any
@@ -636,7 +592,7 @@ var _ = Describe("MergeSecrets", func() {
 				},
 			}
 
-			merged, err := MergeSecrets(dest, src)
+			merged, err := MergeDockerSecrets(dest, src)
 			Expect(err).ToNot(HaveOccurred())
 
 			var mergedJSON map[string]any
@@ -666,7 +622,7 @@ var _ = Describe("MergeSecrets", func() {
 				},
 			}
 
-			merged, err := MergeSecrets(dest, src)
+			merged, err := MergeDockerSecrets(dest, src)
 			Expect(err).ToNot(HaveOccurred())
 
 			var mergedJSON map[string]any
@@ -675,6 +631,195 @@ var _ = Describe("MergeSecrets", func() {
 			auths := mergedJSON["auths"].(map[string]any)
 			Expect(auths).To(HaveKey("custom.io"))
 		})
+	})
+
+	Context("when src secret is of dockercfg type", func() {
+		It("converts dockercfg to dockerconfigjson and merges distinct entries correctly", func() {
+			// Destination secret: Docker config json
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"docker.io": map[string]any{
+								"auth": "abc123",
+							},
+						},
+					}),
+				},
+			}
+
+			// Source secret: dockercfg
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockercfg,
+				Data: map[string][]byte{
+					".dockercfg": []byte(`{
+						"ghcr.io": {
+							"auth": "xyz789"
+						}
+					}`),
+				},
+			}
+
+			// Perform merge
+			merged, err := MergeDockerSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Unmarshal merged .dockerconfigjson
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			// Verify merged auths
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("docker.io"))
+			Expect(auths).To(HaveKey("ghcr.io"))
+
+			Expect(auths["docker.io"].(map[string]any)["auth"]).To(Equal("abc123"))
+			Expect(auths["ghcr.io"].(map[string]any)["auth"]).To(Equal("xyz789"))
+		})
+
+		It("overwrites duplicate auth entries with src values", func() {
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": mustMarshal(map[string]any{
+						"auths": map[string]any{
+							"docker.io": map[string]any{
+								"auth": "old-auth",
+							},
+						},
+					}),
+				},
+			}
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockercfg,
+				Data: map[string][]byte{
+					".dockercfg": []byte(`{
+						"docker.io": {
+							"auth": "new-auth"
+						}
+					}`),
+				},
+			}
+
+			merged, err := MergeDockerSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("docker.io"))
+			Expect(auths["docker.io"].(map[string]any)["auth"]).To(Equal("new-auth"))
+		})
+
+		It("handles missing or empty .dockerconfig gracefully", func() {
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{},
+			}
+
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeDockercfg,
+				Data: map[string][]byte{
+					".dockercfg": []byte(`{
+						"custom.io": {
+							"auth": "abc"
+						}
+					}`),
+				},
+			}
+
+			merged, err := MergeDockerSecrets(dest, src)
+			Expect(err).ToNot(HaveOccurred())
+
+			var mergedJSON map[string]any
+			Expect(json.Unmarshal(merged.Data[".dockerconfigjson"], &mergedJSON)).To(Succeed())
+
+			auths := mergedJSON["auths"].(map[string]any)
+			Expect(auths).To(HaveKey("custom.io"))
+		})
+	})
+
+	Context("when src secret is not of Docker config type", func() {
+		It("returns an error", func() {
+			// Invalid source type
+			src := &corev1.Secret{
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{},
+			}
+			dest := &corev1.Secret{
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{},
+			}
+			_, err := MergeDockerSecrets(dest, src)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("source secret is not of Docker config type"))
+		})
+	})
+})
+
+var _ = Describe("convertDockercfgToDockerconfigjson", func() {
+	It("converts a valid .dockercfg to .dockerconfigjson", func() {
+		dockercfg := []byte(`{
+			"https://index.docker.io/v1/": {
+				"auth": "dXNlcjpwYXNz",
+				"email": "user@example.com"
+			}
+		}`)
+
+		converted, err := convertDockercfgToDockerconfigjson(dockercfg)
+		Expect(err).ToNot(HaveOccurred())
+
+		var result map[string]any
+		err = json.Unmarshal(converted, &result)
+		Expect(err).ToNot(HaveOccurred())
+
+		auths, ok := result["auths"].(map[string]any)
+		Expect(ok).To(BeTrue())
+		Expect(auths).To(HaveKey("https://index.docker.io/v1/"))
+	})
+
+	It("passes through valid .dockerconfigjson unchanged", func() {
+		dockerconfigjson := []byte(`{
+			"auths": {
+				"https://index.docker.io/v1/": {
+					"auth": "dXNlcjpwYXNz"
+				}
+			}
+		}`)
+
+		converted, err := convertDockercfgToDockerconfigjson(dockerconfigjson)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(converted).To(MatchJSON(dockerconfigjson)) // Should be unchanged
+	})
+
+	It("returns error on invalid JSON", func() {
+		invalid := []byte(`{invalid-json}`)
+
+		_, err := convertDockercfgToDockerconfigjson(invalid)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("handles empty input gracefully", func() {
+		empty := []byte(``)
+
+		_, err := convertDockercfgToDockerconfigjson(empty)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns empty auths if dockercfg is empty JSON object", func() {
+		emptyCfg := []byte(`{}`)
+
+		converted, err := convertDockercfgToDockerconfigjson(emptyCfg)
+		Expect(err).ToNot(HaveOccurred())
+
+		var result map[string]any
+		err = json.Unmarshal(converted, &result)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(result).To(HaveKey("auths"))
+		Expect(result["auths"]).To(BeEmpty())
 	})
 })
 
