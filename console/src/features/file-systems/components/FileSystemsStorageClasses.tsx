@@ -6,6 +6,7 @@ import {
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Skeleton, Stack, StackItem } from "@patternfly/react-core";
+import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 type FileSystemStorageClassesProps = {
   fileSystem: FileSystem;
@@ -14,12 +15,9 @@ type FileSystemStorageClassesProps = {
   isDisabled?: boolean;
 };
 
-const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
-  fileSystem,
-  loaded,
-  storageClasses,
-  isDisabled = false,
-}) => {
+export const FileSystemStorageClasses: React.FC<
+  FileSystemStorageClassesProps
+> = ({ fileSystem, loaded, storageClasses, isDisabled = false }) => {
   const { t } = useFusionAccessTranslations();
   if (!loaded) {
     return <Skeleton screenreaderText={t("Loading storage classes")} />;
@@ -27,7 +25,7 @@ const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
 
   const scs = getFileSystemScs(fileSystem, storageClasses);
   if (!scs.length) {
-    return <span className="text-secondary">-</span>;
+    return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
   return (
@@ -48,5 +46,4 @@ const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
     </Stack>
   );
 };
-
-export default FileSystemStorageClasses;
+FileSystemStorageClasses.displayName = "FileSystemStorageClasses";

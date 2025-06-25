@@ -7,12 +7,13 @@ import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocal
 import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import type { TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useValidateMinimumRequirements } from "./useValidateMinimumRequirements";
+import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
 
 export interface NodesSelectionTableViewModel {
   columns: TableColumn<IoK8sApiCoreV1Node>[];
-  isLoaded: boolean;
-  loadError: string | null;
-  nodes: IoK8sApiCoreV1Node[] | null;
+  loaded: boolean;
+  error: Error | null;
+  nodes: NormalizedWatchK8sResult<IoK8sApiCoreV1Node[]>;
   selectedNodes: IoK8sApiCoreV1Node[];
   sharedDisksCount: number;
   sharedDisksCountMessage: string;
@@ -22,36 +23,29 @@ export const useNodesSelectionTableViewModel =
   (): NodesSelectionTableViewModel => {
     const { t } = useFusionAccessTranslations();
 
-    const [lvdrs, lvdrsLoaded, lvdrsLoadError] =
-      useWatchLocalVolumeDiscoveryResult();
+    const lvdrs = useWatchLocalVolumeDiscoveryResult();
 
-    const [nodes, nodesLoaded, nodesLoadError] = useWatchNode({
+    const nodes = useWatchNode({
       withLabels: [WORKER_NODE_ROLE_LABEL],
     });
 
-    const isLoaded = useMemo(
-      () => nodesLoaded && lvdrsLoaded,
-      [lvdrsLoaded, nodesLoaded]
+    const loaded = useMemo(
+      () => nodes.loaded && lvdrs.loaded,
+      [lvdrs.loaded, nodes.loaded]
     );
 
-    const loadError = useMemo(
-      () =>
-        (nodesLoadError instanceof Error
-          ? nodesLoadError.message
-          : nodesLoadError) ||
-        (lvdrsLoadError instanceof Error
-          ? lvdrsLoadError.message
-          : lvdrsLoadError),
-      [lvdrsLoadError, nodesLoadError]
+    const error = useMemo(
+      () => nodes.error || lvdrs.error,
+      [lvdrs.error, nodes.error]
     );
 
     const selectedNodes = useMemo(
-      () => (nodes ?? []).filter((n) => hasLabel(n, STORAGE_ROLE_LABEL)),
+      () => (nodes.data ?? []).filter((n) => hasLabel(n, STORAGE_ROLE_LABEL)),
       [nodes]
     );
 
     const sharedDisksCount = useMemo(() => {
-      const wwnSetsList = (lvdrs ?? [])
+      const wwnSetsList = (lvdrs.data ?? [])
         .filter((lvdr) =>
           selectedNodes.find((n) => n.metadata?.name === lvdr.spec.nodeName)
         )
@@ -114,8 +108,8 @@ export const useNodesSelectionTableViewModel =
     const vm = useMemo(
       () => ({
         columns,
-        isLoaded,
-        loadError,
+        loaded,
+        error,
         nodes,
         selectedNodes,
         sharedDisksCount,
@@ -123,8 +117,8 @@ export const useNodesSelectionTableViewModel =
       }),
       [
         columns,
-        isLoaded,
-        loadError,
+        loaded,
+        error,
         nodes,
         selectedNodes,
         sharedDisksCount,

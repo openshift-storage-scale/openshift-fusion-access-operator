@@ -24,7 +24,15 @@ import { useStorageClusterLvdrs } from "../hooks/useStorageClusterLvdrs";
 import type { Lun } from "../types/Lun";
 import { useCreateFileSystemHandler } from "../hooks/useCreateFileSystemHandler";
 
-export const FileSystemCreateForm = () => {
+const useSelectedLuns = (serializedLuns: string) =>
+  useMemo(() => JSON.parse(serializedLuns || "[]") as Lun[], [serializedLuns]);
+
+const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);
+
+const NAME_FIELD_VALIDATION_REGEX =
+  /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
+
+export const FileSystemCreateForm: React.FC = () => {
   const [, dispatch] = useStore<State, Actions>();
 
   const form = useFormContext();
@@ -35,29 +43,29 @@ export const FileSystemCreateForm = () => {
 
   const fileSystemNameErrorMessage = form.getError("name");
 
-  const [lvdrs, lvdrsLoaded, lvdrsLoadError] = useStorageClusterLvdrs();
+  const selectedLuns = useSelectedLuns(form.getValue("selected-luns"));
+
+  const lvdrs = useStorageClusterLvdrs();
 
   useEffect(() => {
-    if (lvdrsLoadError) {
+    if (lvdrs.error) {
       dispatch({
         type: "global/showAlert",
         payload: {
           title: t("Failed to load LocaVolumeDiscoveryResults"),
-          description: lvdrsLoadError.message,
+          description: lvdrs.error.message,
           isDismissable: true,
           variant: "danger",
         },
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lvdrsLoadError, t]);
-
-  const selectedLuns = useSelectedLuns(form.getValue("selected-luns"));
+  }, [lvdrs.error, t]);
 
   // we show only disks that are present in all nodes
   const discoveredDevices =
-    lvdrs[0]?.status?.discoveredDevices?.filter(({ WWN }) =>
-      lvdrs.every((r) =>
+    lvdrs.data?.[0]?.status?.discoveredDevices?.filter(({ WWN }) =>
+      lvdrs.data?.every((r) =>
         r.status?.discoveredDevices?.some((d) => d.WWN === WWN)
       )
     ) ?? [];
@@ -66,17 +74,12 @@ export const FileSystemCreateForm = () => {
     selectedLuns.find((l) => l.id === getWwn(d))
   );
 
-  const availableLuns = discoveredDevices.map((disk) => {
-    const size = convert(disk.size, "B").to("GiB");
-    const r = {
-      name: disk.path,
-      id: getWwn(disk),
-      // Note: Usage of 'GB' is intentional here
-      capacity: size.toFixed(2) + " GB",
-    };
-
-    return r;
-  });
+  const availableLuns = discoveredDevices.map((disk) => ({
+    name: disk.path,
+    id: getWwn(disk),
+    // Note: Usage of 'GB' is intentional here
+    capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
+  }));
 
   const handleSelectLun = useCallback(
     (lun: Lun) =>
@@ -137,7 +140,7 @@ export const FileSystemCreateForm = () => {
   const handleCreateFileSystem = useCreateFileSystemHandler(
     fileSystemName,
     selectedDevices,
-    lvdrs
+    lvdrs.data ?? []
   );
 
   return (
@@ -191,7 +194,7 @@ export const FileSystemCreateForm = () => {
               />
             }
           >
-            {!lvdrsLoaded ? (
+            {!lvdrs.loaded ? (
               <EmptyState
                 titleText={t("Loading LUNs")}
                 headingLevel="h4"
@@ -238,7 +241,7 @@ export const FileSystemCreateForm = () => {
                 titleText={t("No available LUNs")}
                 headingLevel="h4"
                 icon={FolderIcon}
-              ></EmptyState>
+              />
             )}
           </FormGroup>
         </Form>
@@ -247,11 +250,3 @@ export const FileSystemCreateForm = () => {
   );
 };
 FileSystemCreateForm.displayName = "FileSystemCreateForm";
-
-const useSelectedLuns = (serializedLuns: string) =>
-  useMemo(() => JSON.parse(serializedLuns || "[]") as Lun[], [serializedLuns]);
-
-const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);
-
-const NAME_FIELD_VALIDATION_REGEX =
-  /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;

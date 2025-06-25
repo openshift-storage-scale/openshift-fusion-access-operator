@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useState, useMemo } from "react";
-import type { ViewModelSlice } from "@/internal/types/ViewModelSlice";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import { immutableStateUpdateHelper } from "@/shared/store/helpers";
 
 interface DeleteModalState {
   fileSystem?: FileSystem;
@@ -17,8 +17,12 @@ interface DeleteModalActions {
 }
 
 export const useDeleteModalSlice = (
-  initialState: DeleteModalState
-): ViewModelSlice<DeleteModalState, DeleteModalActions> => {
+  initialState: DeleteModalState = {
+    isOpen: false,
+    isDeleting: false,
+    errors: [],
+  }
+): DeleteModalState & DeleteModalActions => {
   const [deleteModalState, setDeleteModalState] =
     useState<DeleteModalState>(initialState);
 
@@ -41,22 +45,12 @@ export const useDeleteModalSlice = (
 
   return useMemo(
     () => ({
-      state: deleteModalState,
-      actions: {
-        setFileSystem,
-        setIsDeleting,
-        setIsOpen,
-        setErrors,
-      },
+      ...deleteModalState,
+      setFileSystem,
+      setIsDeleting,
+      setIsOpen,
+      setErrors,
     }),
     [deleteModalState]
   );
 };
-
-const immutableStateUpdateHelper =
-  <S>(value: unknown, prop: keyof S) =>
-  (currentState: S) => {
-    const draft = window.structuredClone(currentState);
-    draft[prop] = typeof value === "function" ? value(draft[prop]) : value;
-    return draft;
-  };

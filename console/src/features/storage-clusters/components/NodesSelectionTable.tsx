@@ -12,10 +12,7 @@ import {
 import { InfoIcon } from "@patternfly/react-icons";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/kubernetes/1.30/types";
-import {
-  useNodesSelectionTableViewModel,
-  type NodesSelectionTableViewModel,
-} from "../hooks/useNodesSelectionTableViewModel";
+import { useNodesSelectionTableViewModel } from "../hooks/useNodesSelectionTableViewModel";
 import { NodesSelectionEmptyState } from "./NodesSelectionEmptyState";
 import { NodesSelectionTableRow } from "./NodesSelectionTableRow";
 
@@ -38,10 +35,10 @@ export const NodesSelectionTable: React.FC = () => {
       <StackItem isFilled>
         <VirtualizedTable<IoK8sApiCoreV1Node, TableColumn<IoK8sApiCoreV1Node>[]>
           columns={vm.columns}
-          data={vm.nodes ?? []}
-          unfilteredData={vm.nodes ?? []}
-          loaded={vm.isLoaded}
-          loadError={vm.loadError}
+          data={vm.nodes.data ?? []}
+          unfilteredData={vm.nodes.data ?? []}
+          loaded={vm.loaded}
+          loadError={vm.error}
           EmptyMsg={NodesSelectionEmptyState}
           Row={NodesSelectionTableRow}
           rowData={vm.columns}

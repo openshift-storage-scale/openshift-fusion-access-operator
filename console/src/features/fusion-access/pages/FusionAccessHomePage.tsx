@@ -10,30 +10,28 @@ import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 const FusionAccessHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
 
-  const [fusionAccess, fusionAccessLoaded, fusionAccessLoadError] =
-    useWatchFusionAccess();
+  const fusionAccess = useWatchFusionAccess();
 
-  const [storageClusters, storageClustersLoaded, storageClustersLoadError] =
-    useWatchSpectrumScaleCluster({
-      limit: 1,
-    });
+  const storageClusters = useWatchSpectrumScaleCluster({
+    limit: 1,
+  });
 
   const fusionAccessStatus = useMemo(
-    () => fusionAccess?.status?.status,
-    [fusionAccess?.status?.status]
+    () => fusionAccess.data?.status?.status,
+    [fusionAccess.data?.status?.status]
   );
 
   const loaded = useMemo(
     () =>
-      fusionAccessLoaded &&
-      fusionAccessStatus === "Ready" &&
-      storageClustersLoaded,
-    [fusionAccessLoaded, fusionAccessStatus, storageClustersLoaded]
+      fusionAccess.loaded &&
+      storageClusters.loaded &&
+      fusionAccessStatus === "Ready",
+    [fusionAccess.loaded, fusionAccessStatus, storageClusters.loaded]
   );
 
   const error = useMemo(
-    () => fusionAccessLoadError || storageClustersLoadError,
-    [fusionAccessLoadError, storageClustersLoadError]
+    () => fusionAccess.error || storageClusters.error,
+    [fusionAccess.error, storageClusters.error]
   );
 
   return (
@@ -42,7 +40,7 @@ const FusionAccessHomePage: React.FC = () => {
       title={t("Fusion Access for SAN")}
     >
       <ResourceStatusBoundary loaded={loaded} error={error}>
-        {(storageClusters ?? []).length === 0 ? (
+        {(storageClusters.data ?? []).length === 0 ? (
           <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <Redirect to={UrlPaths.FileSystemsHome} />

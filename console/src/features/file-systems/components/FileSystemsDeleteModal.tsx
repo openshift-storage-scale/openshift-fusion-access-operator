@@ -11,23 +11,25 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystemsTabViewModel } from "../hooks/useFileSystemsTabViewModel";
+import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useDeleteFileSystemsHandler } from "../hooks/useDeleteFileSystemHandler";
 
 interface FileSystemsDeleteModalProps {
-  vm: FileSystemsTabViewModel["deleteModal"];
+  vm: FileSystemsTableViewModel["deleteModal"];
 }
 
 export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
   props
 ) => {
   const { vm } = props;
+
   const { t } = useFusionAccessTranslations();
+
   const handleDeleteFileSystem = useDeleteFileSystemsHandler(vm);
 
   return (
     <Modal
-      isOpen={vm.state.isOpen}
+      isOpen={vm.isOpen}
       aria-describedby="modal-delete-filesystem"
       variant="medium"
     >
@@ -37,17 +39,15 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
           <StackItem isFilled>
             <Trans t={t} ns="public">
               Are you sure you want to delete{" "}
-              <strong>
-                {{ resourceName: vm.state.fileSystem?.metadata?.name }}
-              </strong>{" "}
+              <strong>{{ resourceName: vm.fileSystem?.metadata?.name }}</strong>{" "}
               in namespace{" "}
               <strong>
-                {{ namespace: vm.state.fileSystem?.metadata?.namespace }}
+                {{ namespace: vm.fileSystem?.metadata?.namespace }}
               </strong>
               ?
             </Trans>
           </StackItem>
-          {(vm.state.errors ?? []).length > 0 && (
+          {(vm.errors ?? []).length > 0 && (
             <StackItem>
               <Alert
                 isInline
@@ -55,7 +55,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
                 title={t("An error occurred while deleting resources.")}
               >
                 <Stack>
-                  {vm.state.errors.map((e, index) => (
+                  {vm.errors.map((e, index) => (
                     <StackItem key={index}>{e}</StackItem>
                   ))}
                 </Stack>
@@ -71,17 +71,17 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
           onClick={async () => {
             await handleDeleteFileSystem();
           }}
-          isLoading={vm.state.isDeleting}
-          isDisabled={vm.state.isDeleting}
+          isLoading={vm.isDeleting}
+          isDisabled={vm.isDeleting}
         >
-          {vm.state.isDeleting ? t("Deleting") : t("Delete")}
+          {vm.isDeleting ? t("Deleting") : t("Delete")}
         </Button>
-        {!vm.state.isDeleting && (
+        {!vm.isDeleting && (
           <Button
             key="cancel"
             variant="link"
-            onClick={() => vm.actions.setIsOpen(false)}
-            isDisabled={vm.state.isDeleting}
+            onClick={() => vm.setIsOpen(false)}
+            isDisabled={vm.isDeleting}
           >
             {t("Cancel")}
           </Button>

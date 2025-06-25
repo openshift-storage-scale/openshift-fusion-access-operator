@@ -7,11 +7,10 @@ type CreateFileSystemButtonProps = Omit<ButtonProps, "variant">;
 export const FileSystemsCreateButton: React.FC<CreateFileSystemButtonProps> = (
   props
 ) => {
-  const { onClick, isLoading, isDisabled, ...buttonProps } = props;
   const { t } = useFusionAccessTranslations();
 
   return (
-    <Button {...buttonProps} variant="primary">
+    <Button {...props} variant="primary">
       {t("Create file system")}
     </Button>
   );

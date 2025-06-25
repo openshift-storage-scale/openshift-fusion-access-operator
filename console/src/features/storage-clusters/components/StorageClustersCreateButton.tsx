@@ -7,11 +7,10 @@ type CreateStorageClusterButtonProps = Omit<ButtonProps, "variant">;
 export const StorageClustersCreateButton: React.FC<
   CreateStorageClusterButtonProps
 > = (props) => {
-  const { onClick, ...buttonProps } = props;
   const { t } = useFusionAccessTranslations();
 
   return (
-    <Button {...buttonProps} variant="primary">
+    <Button {...props} variant="primary">
       {t("Create storage cluster")}
     </Button>
   );

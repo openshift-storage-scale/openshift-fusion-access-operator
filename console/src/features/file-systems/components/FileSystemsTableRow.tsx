@@ -1,7 +1,4 @@
-import { VALUE_NOT_AVAILABLE } from "@/constants";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getName } from "@/shared/utils/console/K8sResourceCommon";
+import { useState } from "react";
 import {
   type RowProps,
   TableData,
@@ -14,98 +11,94 @@ import {
   DropdownItem,
 } from "@patternfly/react-core";
 import { EllipsisVIcon } from "@patternfly/react-icons";
-import { getFilesystemStatus, isFilesystemInUse } from "../utils/filesystem";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
-import FileSystemStatus from "./FileSystemsStatus";
-import FileSystemStorageClasses from "./FileSystemsStorageClasses";
-import { useState } from "react";
-import type { FileSystemsTabViewModel } from "../hooks/useFileSystemsTabViewModel";
+import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
+import { FileSystemStatus } from "./FileSystemsStatus";
+import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 
 type FileSystemsTabTableRowProps = RowProps<
   FileSystem,
-  FileSystemsTabViewModel
+  Pick<FileSystemsTableViewModel, "columns" | "deleteModal" | "routes">
 >;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
   props
 ) => {
-  const { activeColumnIDs, obj: fileSystem, rowData: vm } = props;
+  const { activeColumnIDs, obj: fileSystem, rowData } = props;
 
-  const { t } = useFusionAccessTranslations();
+  const { columns, deleteModal, routes } = rowData;
+
+  const vm = useFileSystemTableRowViewModel(fileSystem);
 
   const [isOpenActionsMenu, setIsOpenActionsMenu] = useState(false);
 
-  const name = getName(fileSystem);
-  const status = getFilesystemStatus(fileSystem, t);
-
-  // Currently we support creating only a single file system pool
-  const rawCapacity =
-    fileSystem.status?.pools?.[0].totalDiskSize ?? VALUE_NOT_AVAILABLE;
-
-  const isInUse = isFilesystemInUse(
-    fileSystem,
-    vm.storageClasses.state.data ?? [],
-    vm.persistentVolumeClaims.state.data ?? []
-  );
+  const { t } = useFusionAccessTranslations();
 
   return (
     <>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[0].id}
-        className={vm.columns[0].props.className}
+        id={columns[0].id}
+        className={columns[0].props.className}
       >
-        {name}
+        {vm.name}
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[1].id}
-        className={vm.columns[1].props.className}
+        id={columns[1].id}
+        className={columns[1].props.className}
       >
-        <FileSystemStatus status={status} />
+        <FileSystemStatus
+          title={vm.title}
+          description={vm.description}
+          icon={vm.Icon}
+        />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[2].id}
-        className={vm.columns[2].props.className}
+        id={columns[2].id}
+        className={columns[2].props.className}
       >
-        {rawCapacity}
+        {vm.rawCapacity}
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[3].id}
-        className={vm.columns[3].props.className}
+        id={columns[3].id}
+        className={columns[3].props.className}
       >
         <FileSystemStorageClasses
-          isDisabled={status.id === "deleting"}
+          isDisabled={vm.status === "deleting"}
           fileSystem={fileSystem}
-          loaded={vm.storageClasses.state.loaded}
-          storageClasses={vm.storageClasses.state.data ?? []}
+          loaded={vm.storageClasses.loaded}
+          storageClasses={vm.storageClasses.data ?? []}
         />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[4].id}
-        className={vm.columns[4].props.className}
+        id={columns[4].id}
+        className={columns[4].props.className}
       >
         <FileSystemsDashboardLink
-          isDisabled={status.id === "deleting"}
+          isDisabled={vm.status === "deleting"}
           fileSystem={fileSystem}
-          routes={vm.routes.state.data ?? []}
-          loaded={vm.routes.state.loaded}
+          routes={routes.data ?? []}
+          loaded={routes.loaded}
         />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[5].id}
-        className={vm.columns[5].props.className}
+        id={columns[5].id}
+        className={columns[5].props.className}
       >
-        {!vm.persistentVolumeClaims.state.loaded ? (
+        {!vm.persistentVolumeClaims.loaded ? (
           <Skeleton screenreaderText={t("Loading actions")} />
         ) : (
           <Dropdown
@@ -117,9 +110,9 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
                 aria-label="filesystem actions"
                 variant="plain"
                 isDisabled={
-                  status.id === "deleting" ||
-                  status.id === "creating" ||
-                  isInUse
+                  vm.status === "deleting" ||
+                  vm.status === "creating" ||
+                  vm.isInUse
                 }
                 onClick={() => setIsOpenActionsMenu(!isOpenActionsMenu)}
                 isExpanded={isOpenActionsMenu}
@@ -135,12 +128,12 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
               <DropdownItem
                 onClick={() => {
                   setIsOpenActionsMenu(false);
-                  vm.deleteModal.actions.setFileSystem(fileSystem);
-                  vm.deleteModal.actions.setIsOpen(true);
+                  deleteModal.setFileSystem(fileSystem);
+                  deleteModal.setIsOpen(true);
                 }}
-                isDisabled={status.id === "deleting" || isInUse}
+                isDisabled={vm.status === "deleting" || vm.isInUse}
                 description={
-                  isInUse ? <div>{t("Filesystem is in use")}</div> : null
+                  vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null
                 }
               >
                 {t("Delete")}

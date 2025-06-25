@@ -18,7 +18,7 @@ export const useValidateMinimumRequirements = (
   const { t } = useFusionAccessTranslations();
 
   useEffect(() => {
-    if (!vm.isLoaded) {
+    if (!vm.loaded) {
       return;
     }
 
@@ -67,5 +67,5 @@ export const useValidateMinimumRequirements = (
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, vm.isLoaded, vm.selectedNodes.length, vm.sharedDisksCount]);
+  }, [t, vm.loaded, vm.selectedNodes.length, vm.sharedDisksCount]);
 };

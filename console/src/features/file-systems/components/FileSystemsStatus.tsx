@@ -1,28 +1,30 @@
-import type { FilesystemStatus } from "@/features/file-systems/utils/filesystem";
 import { Button, Popover } from "@patternfly/react-core";
 
 type FileSystemStatusProps = {
-  status: FilesystemStatus;
+  title: string;
+  description?: string;
+  icon: React.ReactNode;
 };
 
-const FileSystemStatus: React.FC<FileSystemStatusProps> = ({ status }) => {
-  if (status.description) {
+export const FileSystemStatus: React.FC<FileSystemStatusProps> = (props) => {
+  const { title, description, icon } = props;
+
+  if (description) {
     return (
       <Popover
         aria-label="Status popover"
-        bodyContent={<div>{status.description}</div>}
+        bodyContent={<div>{description}</div>}
       >
-        <Button variant="link" isInline icon={status.icon}>
-          {status.title}
+        <Button variant="link" isInline icon={icon}>
+          {title}
         </Button>
       </Popover>
     );
   }
   return (
     <>
-      {status.icon} {status.title}
+      {icon} {title}
     </>
   );
 };
-
-export default FileSystemStatus;
+FileSystemStatus.displayName = "FileSystemStatus";

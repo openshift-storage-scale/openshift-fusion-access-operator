@@ -13,8 +13,8 @@ import { CancelButton } from "@/shared/components/CancelButton";
 import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
-  const [cluster] = useWatchSpectrumScaleCluster({ limit: 1 });
-  return (cluster ?? []).length === 0 ? (
+  const storageCluster = useWatchSpectrumScaleCluster({ limit: 1 });
+  return (storageCluster.data ?? []).length === 0 ? (
     <StoreProvider<State, Actions>
       reducer={reducer}
       initialState={initialState}

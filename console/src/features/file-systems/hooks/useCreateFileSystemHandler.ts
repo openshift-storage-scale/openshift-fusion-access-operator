@@ -1,21 +1,24 @@
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
-import type {
-  LocalVolumeDiscoveryResult,
-  DiscoveredDevice,
-} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
+import { useCallback } from "react";
 import {
   k8sCreate,
   useK8sModel,
   type K8sModel,
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { useHistory } from "react-router";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useCallback } from "react";
+import { SC_PROVISIONER } from "@/constants";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
+import type {
+  LocalVolumeDiscoveryResult,
+  DiscoveredDevice,
+} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
 import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { FILE_SYSTEMS_HOME_URL_PATH, SC_PROVISIONER } from "@/constants";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+
+// TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
+const NAMESPACE = "ibm-spectrum-scale";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
@@ -26,7 +29,9 @@ export const useCreateFileSystemHandler = (
 
   const { t } = useFusionAccessTranslations();
 
-  const history = useHistory();
+  const redirectToFileSystemsHome = useRedirectHandler(
+    "/fusion-access/file-systems"
+  );
 
   const [localDiskModel] = useK8sModel({
     group: "scale.spectrum.ibm.com",
@@ -53,26 +58,23 @@ export const useCreateFileSystemHandler = (
         payload: { isLoading: true },
       });
 
-      // TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
-      const namespace = "ibm-spectrum-scale";
-
       const localDisks = await createLocalDisks(
         selectedDevices,
         lvdrs,
         localDiskModel,
-        namespace
+        NAMESPACE
       );
 
       await createFileSystem(
         fileSystemName,
         localDisks,
         fileSystemModel,
-        namespace
+        NAMESPACE
       );
 
       await createStorageClass(storageClassModel, fileSystemName);
 
-      history.push(FILE_SYSTEMS_HOME_URL_PATH);
+      redirectToFileSystemsHome();
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
@@ -129,7 +131,7 @@ function createFileSystem(
               ) as string[],
             },
           ],
-          // TODO(jkilzi): Check these 2 props below are correct. Marked in TS as required fields.
+          // TODO(jkilzi): Check these 2 props below are correct.
           replication: "1-way",
           type: "shared",
         },

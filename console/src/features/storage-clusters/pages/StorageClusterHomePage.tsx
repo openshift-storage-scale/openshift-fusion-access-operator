@@ -34,8 +34,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
     "/fusion-access/storage-cluster/create"
   );
 
-  const [storageClusters, storageClustersLoaded, storageClustersError] =
-    useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
 
   return (
     <ListPage
@@ -45,10 +44,10 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
       onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
     >
       <ResourceStatusBoundary
-        loaded={storageClustersLoaded}
-        error={storageClustersError}
+        loaded={storageClusters.loaded}
+        error={storageClusters.error}
       >
-        {(storageClusters ?? []).length === 0 ? (
+        {(storageClusters.data ?? []).length === 0 ? (
           <StorageClusterEmptyState
             onCreateStorageCluster={redirectToCreateStorageCluster}
           />

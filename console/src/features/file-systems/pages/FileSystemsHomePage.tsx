@@ -32,10 +32,9 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const [storageClusters, storageClustersLoaded, storageClustersError] =
-    useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
 
-  const [fileSystems] = useWatchFileSystem();
+  const fileSystems = useWatchFileSystem();
 
   const redirectToCreateFileSystems = useRedirectHandler(
     "/fusion-access/file-systems/create"
@@ -48,16 +47,16 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
       actions={
-        (fileSystems ?? []).length > 0 ? (
+        (fileSystems.data ?? []).length > 0 ? (
           <FileSystemsCreateButton onClick={redirectToCreateFileSystems} />
         ) : null
       }
     >
       <ResourceStatusBoundary
-        loaded={storageClustersLoaded}
-        error={storageClustersError}
+        loaded={storageClusters.loaded}
+        error={storageClusters.error}
       >
-        {(storageClusters ?? []).length === 0 ? (
+        {(storageClusters.data ?? []).length === 0 ? (
           <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <FileSystemsTabbedNav />
