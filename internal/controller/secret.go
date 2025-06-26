@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const FUSIONPULLSECRETNAME = "fusion-pullsecret" //nolint:gosec
+const FUSIONPULLSECRETNAME = "fusion-pullsecret"            //nolint:gosec
+const EXTRAFUSIONPULLSECRETNAME = "fusion-pullsecret-extra" //nolint:gosec
 const IBMENTITLEMENTNAME = "ibm-entitlement-key"
 const IBMREGISTRY = "cp.icr.io"
 const IBMREGISTRYUSER = "cp"
@@ -89,6 +91,13 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, full kuber
 	}
 	destSecretName := IBMENTITLEMENTNAME //nolint:gosec
 
+	extraPullSecret, err := full.CoreV1().Secrets(ns).Get(ctx, EXTRAFUSIONPULLSECRETNAME, metav1.GetOptions{})
+	if err != nil {
+		log.Log.Info(
+			"No extra pull secret found",
+		)
+	}
+
 	for _, destNamespace := range IbmEntitlementSecrets(ns) {
 		ibmPullSecret := newSecret(
 			destSecretName,
@@ -97,7 +106,13 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, full kuber
 			"kubernetes.io/dockerconfigjson",
 			nil,
 		)
-		_, err := full.CoreV1().Secrets(destNamespace).Get(ctx, destSecretName, metav1.GetOptions{})
+		if extraPullSecret != nil {
+			mergedSecret, err := utils.MergeDockerSecrets(ibmPullSecret, extraPullSecret)
+			if err == nil {
+				ibmPullSecret = mergedSecret
+			}
+		}
+		_, err = full.CoreV1().Secrets(destNamespace).Get(ctx, destSecretName, metav1.GetOptions{})
 		if err != nil {
 			if kerrors.IsNotFound(err) {
 				// Resource does not exist, create it
