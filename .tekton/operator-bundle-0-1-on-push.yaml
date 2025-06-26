@@ -10,6 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       ("templates/bundle.Dockerfile.template".pathChanged() ||
       ".tekton/operator-bundle-0-1-on-push.yaml".pathChanged() ||
+      ".tekton/operator-bundle-common.yaml".pathChanged() ||
       "bundle/***".pathChanged() ||
       "nudges/***".pathChanged() ||
       "scripts/generate-bundle-for-konflux.sh".pathChanged())

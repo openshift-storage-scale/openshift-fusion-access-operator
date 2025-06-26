@@ -11,6 +11,7 @@ metadata:
       "console/***".pathChanged() ||
       "VERSION.txt".pathChanged() ||
       ".tekton/console-plugin-0-1-on-push.yaml".pathChanged() ||
+      ".tekton/console-plugin-common.yaml".pathChanged() ||
       "templates/console-plugin.Dockerfile.template".pathChanged()
       )
   creationTimestamp: null
