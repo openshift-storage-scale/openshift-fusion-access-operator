@@ -90,7 +90,7 @@ spec:
     type: string
   - description: Script base image
     name: script-base-image
-    default: "quay.io/konflux-ci/operator-sdk-builder:latest"
+    default: "quay.io/konflux-ci/operator-sdk-builder:latest@sha256:df11e9d5193d267f9c92061ef132b4c2f80e70642ae4fb5f40ade46405970559"
     type: string
   results:
   - description: ""
