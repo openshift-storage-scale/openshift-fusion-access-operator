@@ -17,7 +17,9 @@ metadata:
       "internal/controller/***".pathChanged() ||
       "internal/utils/***".pathChanged() ||
       "templates/operator.Dockerfile.template".pathChanged() ||
-      ".tekton/controller-rhel9-operator-0-1-on-pull-request.yaml".pathChanged())
+      ".tekton/controller-rhel9-operator-0-1-on-pull-request.yaml".pathChanged() ||
+      ".tekton/controller-rhel9-operator-common.yaml".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: operator-0-1
