@@ -181,6 +181,14 @@ check_image_exists "${DEVICEFINDER_IMAGE}"
 check_image_exists "${BUNDLE_IMG}"
 
 echo ""
+echo "Build and push the openshift-storage-scale-* container images. This is needed because they"
+echo "are still named differently from the konflux images:"
+unset CONSOLE_PLUGIN_IMAGE
+unset OPERATOR_IMG
+unset DEVICEFINDER_IMAGE
+unset BUNDLE_IMG
+make docker-build console-build devicefinder-docker-build docker-push console-push devicefinder-docker-push
+echo ""
 echo "The catalog has been pushed to: ${CATALOG_IMG}"
 echo ""
 echo "If you are happy about the changes you can run:"
