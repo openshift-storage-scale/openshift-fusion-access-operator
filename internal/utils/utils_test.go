@@ -453,7 +453,7 @@ data:
 			Expect(matches).ToNot(BeEmpty())
 
 			for _, match := range matches {
-				fmt.Printf("Checking for image in file: %s -> ", match)
+				GinkgoWriter.Printf("Checking for image in file: %s -> ", match)
 				yaml, err := os.ReadFile(match)
 				Expect(err).NotTo(HaveOccurred())
 				result, err := ParseYAMLAndExtractTestImage(string(yaml))
