@@ -222,7 +222,7 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: ADDITIONAL_BASE_IMAGES
       value:
-      - "quay.io/konflux-ci/operator-sdk-builder:latest"
+      - $(tasks.generate-dockerfile.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - prefetch-dependencies
     taskRef:
