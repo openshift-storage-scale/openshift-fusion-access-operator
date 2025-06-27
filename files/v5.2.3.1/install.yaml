@@ -10702,6 +10702,29 @@ metadata:
   namespace: ibm-spectrum-scale-operator
 ---
 apiVersion: v1
+data:
+  buildgpl: |-
+    #!/bin/sh
+    kerv=$(uname -r)
+    rsync -av /host/var/lib/firmware/lxtrace-* /usr/lpp/mmfs/bin/
+    if ! lsmod | grep -q "^mmfslinux"; then
+      echo "Error: Kernel module is not loaded yet"
+      exit 1
+    fi
+    mkdir -p /lib/modules/$kerv/extra
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
+    exit 0
+  hostPathDirectories: /
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: ibm-spectrum-scale
+    app.kubernetes.io/name: cluster
+  name: buildgpl
+  namespace: ibm-spectrum-scale
+---
+apiVersion: v1
 kind: Service
 metadata:
   annotations:
@@ -10901,6 +10924,8 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.memory
+        - name: MM_DISABLE_MODULE_MANAGEMENT
+          value: "1"
         image: icr.io/cpopen/ibm-spectrum-scale-operator@sha256:f5e924345268b30ec5060308dbaba3c02135f199b0265eb93cba28512d07c1bb
         livenessProbe:
           httpGet:
@@ -11105,6 +11130,23 @@ volumes:
 - persistentVolumeClaim
 - projected
 - secret
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: spectrumscale.csi.ibm.com
+spec:
+  attachRequired: true
+  fsGroupPolicy: File
+  podInfoOnMount: true
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ibm-spectrum-scale-csi-config
+  namespace: ibm-spectrum-scale-csi
+data:
+  VAR_DRIVER_PRIMARY_FILESYSTEM : "DISABLED"
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
