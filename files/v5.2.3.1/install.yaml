@@ -2145,7 +2145,7 @@ spec:
                   accept:
                     description: |-
                       Read the license and specify "true" to accept or "false" to not accept.
-                      https://www.ibm.com/support/customer/csol/terms/?id=L-WWVS-K7K7DR
+                      https://www.ibm.com/support/customer/csol/terms/?id=L-TUSS-597F38
                       BY DOWNLOADING, INSTALLING, COPYING, ACCESSING, CLICKING ON AN "ACCEPT" BUTTON, OR OTHERWISE USING THE PROGRAM, LICENSEE AGREES TO THE TERMS OF THIS AGREEMENT. IF YOU ARE ACCEPTING THESE TERMS ON BEHALF OF LICENSEE, YOU REPRESENT AND WARRANT THAT YOU HAVE FULL AUTHORITY TO BIND LICENSEE TO THESE TERMS. IF YOU DO NOT AGREE TO THESE TERMS,
                       * DO NOT DOWNLOAD, INSTALL, COPY, ACCESS, CLICK ON AN "ACCEPT" BUTTON, OR USE THE PROGRAM; AND
                       * PROMPTLY RETURN THE UNUSED MEDIA AND DOCUMENTATION TO THE PARTY FROM WHOM IT WAS OBTAINED FOR A REFUND OF THE AMOUNT PAID. IF THE PROGRAM WAS DOWNLOADED, DESTROY ALL COPIES OF THE PROGRAM.
@@ -10681,18 +10681,18 @@ data:
     apiVersion: scale.spectrum.ibm.com/v1alpha1
     kind: ClusterManagerConfig
     images:
-      coreECE: quay.io/openshift-storage-scale/erasure-code/ibm-spectrum-scale-daemon:5.2.3.1.dev3
-      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:5.2.3.1.dev3
-      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:5.2.3.1.dev3
-      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:5.2.3.1.dev3
-      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:5.2.3.1.dev3
-      postgres: quay.io/openshift-storage-scale/postgres:5.2.3.1.dev3
-      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:5.2.3.1.dev3
-      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:5.2.3.1.dev3
-      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:5.2.3.1.dev3
-      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:5.2.3.1.dev3
-      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:5.2.3.1.dev3
-      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:5.2.3.1.dev3
+      coreECE: cp.icr.io/cp/gpfs/erasure-code/ibm-spectrum-scale-daemon@sha256:fdaf30b234bcb4ec6c5304b4d942b2c8b7d92175756d3db580c58f34ac2bf761
+      coreDME: cp.icr.io/cp/gpfs/data-management/ibm-spectrum-scale-daemon@sha256:243d01d63492f43266fbeef623db711df5f40e878f900e39ef6bde36a6148315
+      coreDAE: cp.icr.io/cp/gpfs/data-access/ibm-spectrum-scale-daemon@sha256:fa2a0b9f958854a23d48ba4ff0ae613466095d038eda41afeadfbe507a30895c
+      coreInit: cp.icr.io/cp/gpfs/ibm-spectrum-scale-core-init@sha256:c7bac83afa194b9f37a4edc59628779a0ddede43a2978328a68be65851d81044
+      gui: cp.icr.io/cp/gpfs/ibm-spectrum-scale-gui@sha256:6b3752adbac5769a6dbc8195f44a70025c0c3787fbc280ca74e339fc4e4a0b9d
+      postgres: cp.icr.io/cp/gpfs/postgres@sha256:0bcc5bbbb2aa9c9b4c6505845918c7eb55d783cf5c1f434fac33012579fb149d
+      logs: cp.icr.io/cp/gpfs/ibm-spectrum-scale-logs@sha256:279a442141b6dd9edf65600bb4f914ee0532756c64194d8296175dac1a4b1cc7
+      pmcollector: cp.icr.io/cp/gpfs/ibm-spectrum-scale-pmcollector@sha256:111aeaca9a03288f2762e40cd41b025ab84bae534e7eb3fc1dd5968a4df6afa9
+      sysmon: cp.icr.io/cp/gpfs/ibm-spectrum-scale-monitor@sha256:e31e842a7da0a3f3df9a23e71a37f31f1351007a233b7247c6000d39b28b54d3
+      grafanaBridge: cp.icr.io/cp/gpfs/ibm-spectrum-scale-grafana-bridge@sha256:38219958b3f75b6b97552867b92193212e119bd52a11bc13e64bf0db791264c3
+      coreDNS: cp.icr.io/cp/gpfs/ibm-spectrum-scale-coredns@sha256:6a317b23fee629c0b07eb95d34ab7593bb38d41bffc5d1cd4cb2870539c66cd4
+      mustGather: icr.io/cpopen/ibm-spectrum-scale-must-gather@sha256:8a98651e5a3f48e3b2f957cbc2bbb93564ce3764a0613817ec1ae08a9668b074
 kind: ConfigMap
 metadata:
   labels:
@@ -10794,26 +10794,26 @@ spec:
         - name: SHORTNAME_NODE_MAPPING
           value: "yes"
         - name: CSI_SNAPSHOTTER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-snapshotter:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/csi-snapshotter@sha256:5f4bb469fec51147ce157329dab598c758da1b018bad6dad26f0ff469326d769
         - name: CSI_ATTACHER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-attacher:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/csi-attacher@sha256:69888dba58159c8bc0d7c092b9fb97900c9ca8710d088b0b7ea7bd9052df86f6
         - name: CSI_PROVISIONER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-provisioner:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/csi-provisioner@sha256:d5e46da8aff7d73d6f00c761dae94472bcda6e78f4f17b3802dc89d44de0111b
         - name: CSI_LIVENESSPROBE_IMAGE
-          value: quay.io/openshift-storage-scale/csi/livenessprobe:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/livenessprobe@sha256:2c5f9dc4ea5ac5509d93c664ae7982d4ecdec40ca7b0638c24e5b16243b8360f
         - name: CSI_NODE_REGISTRAR_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/csi-node-driver-registrar@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d
         - name: CSI_RESIZER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-resizer:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/csi-resizer@sha256:8ddd178ba5d08973f1607f9b84619b58320948de494b31c9d7cd5375b316d6d4
         - name: CSI_DRIVER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:5.2.3.1.dev3
+          value: cp.icr.io/cp/gpfs/csi/ibm-spectrum-scale-csi-driver@sha256:ac0bfeb5b4a435efd42130f64eb58779570ffa152dacbeaa039cb6ddd623c634
         - name: METRICS_BIND_ADDRESS
           value: "8383"
         - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-csi-operator:5.2.3.1.dev3
+        image: icr.io/cpopen/ibm-spectrum-scale-csi-operator@sha256:a0ed108918fe45ebb54d34685dd3fc9802c22296235f03b97674335e72b50a77
         imagePullPolicy: IfNotPresent
         livenessProbe:
           exec:
@@ -10926,7 +10926,7 @@ spec:
               resource: limits.memory
         - name: MM_DISABLE_MODULE_MANAGEMENT
           value: "1"
-        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:5.2.3.1.dev3
+        image: icr.io/cpopen/ibm-spectrum-scale-operator@sha256:f5e924345268b30ec5060308dbaba3c02135f199b0265eb93cba28512d07c1bb
         livenessProbe:
           httpGet:
             path: /healthz
