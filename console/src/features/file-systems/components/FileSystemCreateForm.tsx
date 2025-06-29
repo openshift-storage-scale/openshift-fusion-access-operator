@@ -1,7 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
-import convert from "convert";
 import {
-  useFormContext,
   Stack,
   StackItem,
   Form,
@@ -17,131 +14,12 @@ import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
-import type { DiscoveredDevice } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import { useStorageClusterLvdrs } from "../hooks/useStorageClusterLvdrs";
-import type { Lun } from "../types/Lun";
-import { useCreateFileSystemHandler } from "../hooks/useCreateFileSystemHandler";
-
-const useSelectedLuns = (serializedLuns: string) =>
-  useMemo(() => JSON.parse(serializedLuns || "[]") as Lun[], [serializedLuns]);
-
-const getWwn = (device: DiscoveredDevice) => device.WWN.slice("uuid.".length);
-
-const NAME_FIELD_VALIDATION_REGEX =
-  /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
+import { useFileSystemCreateFormViewModel } from "../hooks/useFileSystemCreateFormViewModel";
 
 export const FileSystemCreateForm: React.FC = () => {
-  const [, dispatch] = useStore<State, Actions>();
-
-  const form = useFormContext();
+  const vm = useFileSystemCreateFormViewModel();
 
   const { t } = useFusionAccessTranslations();
-
-  const fileSystemName = form.getValue("name");
-
-  const fileSystemNameErrorMessage = form.getError("name");
-
-  const selectedLuns = useSelectedLuns(form.getValue("selected-luns"));
-
-  const lvdrs = useStorageClusterLvdrs();
-
-  useEffect(() => {
-    if (lvdrs.error) {
-      dispatch({
-        type: "global/showAlert",
-        payload: {
-          title: t("Failed to load LocaVolumeDiscoveryResults"),
-          description: lvdrs.error.message,
-          isDismissable: true,
-          variant: "danger",
-        },
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lvdrs.error, t]);
-
-  // we show only disks that are present in all nodes
-  const discoveredDevices =
-    lvdrs.data?.[0]?.status?.discoveredDevices?.filter(({ WWN }) =>
-      lvdrs.data?.every((r) =>
-        r.status?.discoveredDevices?.some((d) => d.WWN === WWN)
-      )
-    ) ?? [];
-
-  const selectedDevices = discoveredDevices.filter((d) =>
-    selectedLuns.find((l) => l.id === getWwn(d))
-  );
-
-  const availableLuns = discoveredDevices.map((disk) => ({
-    name: disk.path,
-    id: getWwn(disk),
-    // Note: Usage of 'GB' is intentional here
-    capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
-  }));
-
-  const handleSelectLun = useCallback(
-    (lun: Lun) =>
-      (_event: React.FormEvent<HTMLInputElement>, isSelecting: boolean) => {
-        const nextSelectedLuns = isSelecting
-          ? selectedLuns.concat(lun)
-          : selectedLuns.filter(({ id }) => id !== lun.id);
-        form.setValue("selected-luns", JSON.stringify(nextSelectedLuns));
-      },
-    [selectedLuns, form]
-  );
-
-  const handleSelectAllLuns = useCallback(
-    (_event: React.FormEvent<HTMLInputElement>, isSelecting: boolean) => {
-      const nextSelectedLuns = isSelecting ? availableLuns : [];
-      form.setValue("selected-luns", JSON.stringify(nextSelectedLuns));
-    },
-    [availableLuns, form]
-  );
-
-  useEffect(() => {
-    if (!form.isTouched("name")) {
-      return;
-    }
-    if (NAME_FIELD_VALIDATION_REGEX.test(fileSystemName)) {
-      form.setError("name", undefined);
-    } else {
-      form.setError(
-        "name",
-        t("Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}", {
-          NAME_FIELD_VALIDATION_REGEX,
-        })
-      );
-    }
-  }, [fileSystemName, form, t]);
-
-  useEffect(() => {
-    dispatch({
-      type: "global/updateCta",
-      payload: {
-        isDisabled:
-          !form.isValid || !fileSystemName || selectedDevices.length === 0,
-      },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.isValid, fileSystemName, selectedDevices.length]);
-
-  const columns = useMemo(
-    () =>
-      ({
-        NAME: t("Name"),
-        ID: t("ID"),
-        CAPACITY: t("Capacity"),
-      }) as const,
-    [t]
-  );
-
-  const handleCreateFileSystem = useCreateFileSystemHandler(
-    fileSystemName,
-    selectedDevices,
-    lvdrs.data ?? []
-  );
 
   return (
     <Stack hasGutter>
@@ -149,10 +27,7 @@ export const FileSystemCreateForm: React.FC = () => {
         <Form
           isWidthLimited
           id="file-system-create-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleCreateFileSystem();
-          }}
+          onSubmit={vm.handleSubmitForm}
         >
           <FormGroup isRequired label="Name" fieldId="name">
             <TextInput
@@ -161,22 +36,19 @@ export const FileSystemCreateForm: React.FC = () => {
               name="name"
               isRequired
               minLength={1}
-              value={fileSystemName}
+              value={vm.fileSystemName}
               placeholder="file-system-1"
-              validated={fileSystemNameErrorMessage ? "error" : "default"}
-              onChange={(_, newName) => {
-                form.setValue("name", newName);
-                form.setTouched("name", true);
-              }}
+              validated={vm.fileSystemNameErrorMessage ? "error" : "default"}
+              onChange={vm.handleFileSystemNameChange}
             />
-            {fileSystemNameErrorMessage ? (
+            {vm.fileSystemNameErrorMessage ? (
               <FormHelperText>
                 <HelperText>
                   <HelperTextItem
                     icon={<ExclamationCircleIcon />}
                     variant="error"
                   >
-                    {fileSystemNameErrorMessage}
+                    {vm.fileSystemNameErrorMessage}
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>
@@ -194,51 +66,48 @@ export const FileSystemCreateForm: React.FC = () => {
               />
             }
           >
-            {!lvdrs.loaded ? (
+            {!vm.luns.loaded ? (
               <EmptyState
                 titleText={t("Loading LUNs")}
                 headingLevel="h4"
                 icon={Spinner}
               />
-            ) : availableLuns.length ? (
+            ) : vm.luns.data.length ? (
               <Table id="luns-selection-table" variant="compact">
                 <Thead>
                   <Tr>
                     <Th
                       aria-label="Select all LUNs"
                       select={{
-                        isSelected:
-                          availableLuns.length === selectedLuns.length,
-                        onSelect: handleSelectAllLuns,
+                        isSelected: vm.luns.data.every((l) => l.isSelected),
+                        onSelect: vm.handleSelectAllLuns,
                       }}
                     />
-                    {Object.entries(columns).map(([name, value]) => (
+                    {Object.entries(vm.columns).map(([name, value]) => (
                       <Th key={name}>{value}</Th>
                     ))}
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {availableLuns.map((lun, rowIndex) => (
+                  {vm.luns.data.map((lun, rowIndex) => (
                     <Tr key={lun.id}>
                       <Td
                         select={{
                           rowIndex,
-                          isSelected: selectedLuns.some(
-                            ({ id }) => id === lun.id
-                          ),
-                          onSelect: handleSelectLun(lun),
+                          isSelected: vm.luns.isSelected(lun),
+                          onSelect: vm.handleSelectLun(lun),
                         }}
                       />
-                      <Td dataLabel={columns.NAME}>{lun.name}</Td>
-                      <Td dataLabel={columns.ID}>{lun.id}</Td>
-                      <Td dataLabel={columns.CAPACITY}>{lun.capacity}</Td>
+                      <Td dataLabel={vm.columns.NAME}>{lun.name}</Td>
+                      <Td dataLabel={vm.columns.ID}>{lun.id}</Td>
+                      <Td dataLabel={vm.columns.CAPACITY}>{lun.capacity}</Td>
                     </Tr>
                   ))}
                 </Tbody>
               </Table>
             ) : (
               <EmptyState
-                titleText={t("No available LUNs")}
+                titleText={t("No LUNs available")}
                 headingLevel="h4"
                 icon={FolderIcon}
               />

@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Trans } from "react-i18next";
 import {
   Alert,
@@ -29,12 +28,18 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
 
   return (
     <Modal
+      elementToFocus="#modal-confirmation-button"
       isOpen={vm.isOpen}
-      aria-describedby="modal-delete-filesystem"
+      aria-describedby="delete-filesystem-confirmation-modal"
+      aria-labelledby="delete-filesystem-title"
       variant="medium"
     >
-      <ModalHeader title={t("Delete Filesystem?")} titleIconVariant="warning" />
-      <ModalBody>
+      <ModalHeader
+        title={t("Delete Filesystem?")}
+        titleIconVariant="warning"
+        labelId="delete-filesystem-title"
+      />
+      <ModalBody tabIndex={0} id="delete-filesystem-confirmation-modal">
         <Stack hasGutter>
           <StackItem isFilled>
             <Trans t={t} ns="public">
@@ -66,6 +71,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
       </ModalBody>
       <ModalFooter>
         <Button
+          id="modal-confirmation-button"
           key="confirm"
           variant="danger"
           onClick={async () => {
@@ -76,16 +82,14 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
         >
           {vm.isDeleting ? t("Deleting") : t("Delete")}
         </Button>
-        {!vm.isDeleting && (
-          <Button
-            key="cancel"
-            variant="link"
-            onClick={() => vm.setIsOpen(false)}
-            isDisabled={vm.isDeleting}
-          >
-            {t("Cancel")}
-          </Button>
-        )}
+        <Button
+          id="modal-cancel-button"
+          key="cancel"
+          variant="link"
+          onClick={() => vm.setIsOpen(false)}
+        >
+          {t("Cancel")}
+        </Button>
       </ModalFooter>
     </Modal>
   );

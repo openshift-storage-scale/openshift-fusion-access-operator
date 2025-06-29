@@ -125,7 +125,7 @@ export const useDeleteFileSystemsHandler = (
             exists = false;
           }
         }
-
+        
         const diskDeletions = await Promise.allSettled(
           disks.map((d) =>
             k8sDelete({
@@ -140,21 +140,20 @@ export const useDeleteFileSystemsHandler = (
             })
           )
         );
-
+        
         const failedDiskRemovals = diskDeletions.some(
           (d) => d.status === "rejected"
         );
-
+        
         if (failedDiskRemovals) {
-          vm.setIsDeleting(false);
           vm.setErrors([
             t("Failed to delete the following local disks:"),
             ...diskDeletions.reduce((acc, curr, idx) => {
               if (curr.status === "rejected") {
                 const description =
-                  curr.reason instanceof Error
-                    ? curr.reason.message
-                    : (curr.reason as string);
+                curr.reason instanceof Error
+                ? curr.reason.message
+                : (curr.reason as string);
                 acc.push(`${disks?.[idx] || ""} - ${description}`);
               }
               return acc;
@@ -163,6 +162,7 @@ export const useDeleteFileSystemsHandler = (
           return;
         }
       }
+      vm.setIsDeleting(false);
       vm.setIsOpen(false);
     } catch (e) {
       vm.setIsDeleting(false);

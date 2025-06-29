@@ -1,15 +1,17 @@
-import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
+import { useMemo } from "react";
 import {
   GreenCheckCircleIcon,
   YellowExclamationTriangleIcon,
   RedExclamationCircleIcon,
   type StorageClass,
+  type ColoredIconProps,
 } from "@openshift-console/dynamic-plugin-sdk";
+import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
+import type { SVGIconProps } from "@patternfly/react-icons/dist/esm/createIcon";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { getName } from "@/shared/utils/console/K8sResourceCommon";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
-import { useMemo } from "react";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import {
   useNormalizedK8sWatchResource,
@@ -28,7 +30,9 @@ export interface FileSystemTableRowViewModel {
     | "failed";
   title: string;
   description?: string;
-  Icon: React.ReactNode;
+  Icon:
+    | React.ComponentClass<SVGIconProps, unknown>
+    | React.FC<ColoredIconProps>;
   rawCapacity: string;
   persistentVolumeClaims: NormalizedWatchK8sResult<
     IoK8sApiCoreV1PersistentVolumeClaim[]

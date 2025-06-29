@@ -5,37 +5,37 @@ import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-access/Lo
 import { WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL } from "@/constants";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
 
-export const useStorageClusterLvdrs = (): NormalizedWatchK8sResult<
+export const useStorageNodesLvdrs = (): NormalizedWatchK8sResult<
   LocalVolumeDiscoveryResult[]
 > => {
   const lvdrs = useWatchLocalVolumeDiscoveryResult();
 
-  const selectedNodes = useWatchNode({
+  const storageNodes = useWatchNode({
     withLabels: [WORKER_NODE_ROLE_LABEL, STORAGE_ROLE_LABEL],
   });
 
-  const results = useMemo(
+  const storageNodesLvdrs = useMemo(
     () =>
       (lvdrs.data ?? []).filter((lvdr) =>
-        (selectedNodes.data ?? []).find(
+        (storageNodes.data ?? []).find(
           (node) => node.metadata?.name === lvdr.spec.nodeName
         )
       ),
-    [lvdrs, selectedNodes]
+    [lvdrs, storageNodes]
   );
 
   return useMemo(
     () => ({
-      data: results,
-      loaded: lvdrs.loaded && selectedNodes.loaded,
-      error: lvdrs.error || selectedNodes.error,
+      data: storageNodesLvdrs,
+      loaded: lvdrs.loaded && storageNodes.loaded,
+      error: lvdrs.error || storageNodes.error,
     }),
     [
       lvdrs.error,
       lvdrs.loaded,
-      results,
-      selectedNodes.error,
-      selectedNodes.loaded,
+      storageNodesLvdrs,
+      storageNodes.error,
+      storageNodes.loaded,
     ]
   );
 };

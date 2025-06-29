@@ -1,20 +1,12 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
 import { useDeleteModalSlice } from "./useDeleteModalSlice";
 import { useRoutesSlice } from "./useRoutesSlice";
-import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
 
-export interface FileSystemsTableViewModel {
-  columns: TableColumn<FileSystem>[];
-  deleteModal: ReturnType<typeof useDeleteModalSlice>;
-  fileSystems: NormalizedWatchK8sResult<FileSystem[]>;
-  routes: ReturnType<typeof useRoutesSlice>;
-}
-
-export const useFileSystemsTableViewModel = (): FileSystemsTableViewModel => {
+export const useFileSystemsTableViewModel = () => {
   const { t } = useFusionAccessTranslations();
 
   const columns: TableColumn<FileSystem>[] = useMemo(
@@ -55,17 +47,31 @@ export const useFileSystemsTableViewModel = (): FileSystemsTableViewModel => {
 
   const deleteModal = useDeleteModalSlice();
 
+  const handleDelete = useCallback(
+    (fileSystem: FileSystem) => () => {
+      deleteModal.setFileSystem(fileSystem);
+      deleteModal.setIsOpen(true);
+    },
+    [deleteModal]
+  );
+
   const fileSystems = useWatchFileSystem();
 
   const routes = useRoutesSlice();
 
   return useMemo(
-    () => ({
-      columns,
-      deleteModal,
-      fileSystems,
-      routes,
-    }),
-    [columns, deleteModal, fileSystems, routes]
+    () =>
+      ({
+        columns,
+        deleteModal,
+        fileSystems,
+        handleDelete,
+        routes,
+      }) as const,
+    [columns, deleteModal, fileSystems, handleDelete, routes]
   );
 };
+
+export type FileSystemsTableViewModel = ReturnType<
+  typeof useFileSystemsTableViewModel
+>;

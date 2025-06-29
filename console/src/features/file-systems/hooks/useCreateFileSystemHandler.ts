@@ -8,22 +8,18 @@ import {
 import { SC_PROVISIONER } from "@/constants";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import type {
-  LocalVolumeDiscoveryResult,
-  DiscoveredDevice,
-} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
 import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import type { LunsViewModel } from "./useLunsViewModel";
 
 // TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
 const NAMESPACE = "ibm-spectrum-scale";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
-  selectedDevices: DiscoveredDevice[],
-  lvdrs: LocalVolumeDiscoveryResult[]
+  luns: LunsViewModel
 ) => {
   const [, dispatch] = useStore<State, Actions>();
 
@@ -52,6 +48,10 @@ export const useCreateFileSystemHandler = (
   });
 
   return useCallback(async () => {
+    if (!luns.nodeName) {
+      return;
+    }
+
     try {
       dispatch({
         type: "global/updateCta",
@@ -59,8 +59,7 @@ export const useCreateFileSystemHandler = (
       });
 
       const localDisks = await createLocalDisks(
-        selectedDevices,
-        lvdrs,
+        luns,
         localDiskModel,
         NAMESPACE
       );
@@ -94,12 +93,10 @@ export const useCreateFileSystemHandler = (
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    lvdrs,
     fileSystemModel,
     fileSystemName,
     history,
     localDiskModel,
-    selectedDevices,
     storageClassModel,
     t,
   ]);
@@ -141,26 +138,14 @@ function createFileSystem(
 }
 
 function createLocalDisks(
-  selectedDevices: DiscoveredDevice[],
-  lvdrs: LocalVolumeDiscoveryResult[],
+  luns: LunsViewModel,
   localDiskModel: K8sModel,
   namespace: string
 ) {
   const promises: Promise<LocalDisk>[] = [];
-  for (const device of selectedDevices) {
-    // find a node that contains this device
-    const discoveryResult = lvdrs.find((r) =>
-      r.status?.discoveredDevices?.find((d) => d.WWN === device.WWN)
-    );
-
-    if (!discoveryResult) {
-      throw new Error(
-        "No storage node contains the selected LUN with WWN: " + device.WWN
-      );
-    }
-
+  for (const lun of luns.data) {
     const localDiskName =
-      `${device.path.slice("/dev/".length)}-${device.WWN}`.replaceAll(".", "-");
+      `${lun.name.slice("/dev/".length)}-${lun.wwn}`.replaceAll(".", "-");
     const promise = k8sCreate<LocalDisk>({
       model: localDiskModel,
       data: {
@@ -169,8 +154,8 @@ function createLocalDisks(
         metadata: { name: localDiskName, namespace },
         spec: {
           existingDataSkipVerify: true, // TODO(jkilzi): REMOVE it! Destroys data with no warning.
-          device: device.path,
-          node: discoveryResult.spec.nodeName,
+          device: lun.name,
+          node: luns.nodeName!,
         },
       },
     });

@@ -1,27 +1,21 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import {
   type RowProps,
   TableData,
 } from "@openshift-console/dynamic-plugin-sdk";
-import {
-  Skeleton,
-  Dropdown,
-  MenuToggle,
-  DropdownList,
-  DropdownItem,
-} from "@patternfly/react-core";
-import { EllipsisVIcon } from "@patternfly/react-icons";
+import { Skeleton } from "@patternfly/react-core";
+import { KebabMenu, type KebabMenuProps } from "@/shared/components/KebabMenu";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
+import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
 import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
 import { FileSystemStatus } from "./FileSystemsStatus";
-import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 
 type FileSystemsTabTableRowProps = RowProps<
   FileSystem,
-  Pick<FileSystemsTableViewModel, "columns" | "deleteModal" | "routes">
+  Pick<FileSystemsTableViewModel, "columns" | "handleDelete" | "routes">
 >;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
@@ -29,13 +23,28 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
 ) => {
   const { activeColumnIDs, obj: fileSystem, rowData } = props;
 
-  const { columns, deleteModal, routes } = rowData;
+  const { columns, handleDelete, routes } = rowData;
 
   const vm = useFileSystemTableRowViewModel(fileSystem);
 
-  const [isOpenActionsMenu, setIsOpenActionsMenu] = useState(false);
+  const isActionsMenuDisabled = useMemo(
+    () => vm.status === "deleting" || vm.status === "creating" || vm.isInUse,
+    [vm.isInUse, vm.status]
+  );
 
   const { t } = useFusionAccessTranslations();
+
+  const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
+    () => [
+      {
+        key: "delete",
+        onClick: handleDelete(fileSystem),
+        description: vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null,
+        children: t("Delete"),
+      },
+    ],
+    [fileSystem, handleDelete, t, vm.isInUse]
+  );
 
   return (
     <>
@@ -55,7 +64,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         <FileSystemStatus
           title={vm.title}
           description={vm.description}
-          icon={vm.Icon}
+          icon={<vm.Icon />}
         />
       </TableData>
 
@@ -101,45 +110,10 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         {!vm.persistentVolumeClaims.loaded ? (
           <Skeleton screenreaderText={t("Loading actions")} />
         ) : (
-          <Dropdown
-            isOpen={isOpenActionsMenu}
-            onOpenChange={setIsOpenActionsMenu}
-            toggle={(toggleRef) => (
-              <MenuToggle
-                ref={toggleRef}
-                aria-label="filesystem actions"
-                variant="plain"
-                isDisabled={
-                  vm.status === "deleting" ||
-                  vm.status === "creating" ||
-                  vm.isInUse
-                }
-                onClick={() => setIsOpenActionsMenu(!isOpenActionsMenu)}
-                isExpanded={isOpenActionsMenu}
-              >
-                <EllipsisVIcon />
-              </MenuToggle>
-            )}
-            shouldFocusToggleOnSelect
-            popperProps={{ position: "right" }}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            <DropdownList>
-              <DropdownItem
-                onClick={() => {
-                  setIsOpenActionsMenu(false);
-                  deleteModal.setFileSystem(fileSystem);
-                  deleteModal.setIsOpen(true);
-                }}
-                isDisabled={vm.status === "deleting" || vm.isInUse}
-                description={
-                  vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null
-                }
-              >
-                {t("Delete")}
-              </DropdownItem>
-            </DropdownList>
-          </Dropdown>
+          <KebabMenu
+            isDisabled={isActionsMenuDisabled}
+            items={kebabMenuActions}
+          />
         )}
       </TableData>
     </>

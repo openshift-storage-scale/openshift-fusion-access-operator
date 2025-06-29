@@ -11,13 +11,13 @@ import {
 export const FileSystemsTable: React.FC = () => {
   const vm = useFileSystemsTableViewModel();
 
-  const { columns, deleteModal, routes } = vm;
+  const { columns, handleDelete, routes } = vm;
 
   return (
     <>
       <VirtualizedTable<
         FileSystem,
-        Pick<FileSystemsTableViewModel, "columns" | "deleteModal" | "routes">
+        Pick<FileSystemsTableViewModel, "columns" | "handleDelete" | "routes">
       >
         columns={vm.columns}
         data={vm.fileSystems.data ?? []}
@@ -26,7 +26,7 @@ export const FileSystemsTable: React.FC = () => {
         loadError={vm.fileSystems.error}
         EmptyMsg={FileSystemsTableEmptyState}
         Row={FileSystemsTabTableRow}
-        rowData={{ columns, deleteModal, routes }}
+        rowData={{ columns, handleDelete, routes }}
       />
       <FileSystemsDeleteModal vm={vm.deleteModal} />
     </>
