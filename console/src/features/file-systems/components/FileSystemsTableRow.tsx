@@ -27,11 +27,6 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
 
   const vm = useFileSystemTableRowViewModel(fileSystem);
 
-  const isActionsMenuDisabled = useMemo(
-    () => vm.status === "deleting" || vm.status === "creating" || vm.isInUse,
-    [vm.isInUse, vm.status]
-  );
-
   const { t } = useFusionAccessTranslations();
 
   const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
@@ -82,10 +77,9 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         className={columns[3].props.className}
       >
         <FileSystemStorageClasses
-          isDisabled={vm.status === "deleting"}
+          isNotAvailable={["deleting", "creating"].includes(vm.status)}
           fileSystem={fileSystem}
-          loaded={vm.storageClasses.loaded}
-          storageClasses={vm.storageClasses.data ?? []}
+          storageClasses={vm.storageClasses.data}
         />
       </TableData>
 
@@ -95,10 +89,9 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         className={columns[4].props.className}
       >
         <FileSystemsDashboardLink
-          isDisabled={vm.status === "deleting"}
+          isNotAvailable={["deleting", "creating"].includes(vm.status)}
           fileSystem={fileSystem}
-          routes={routes.data ?? []}
-          loaded={routes.loaded}
+          routes={routes.data}
         />
       </TableData>
 
@@ -111,7 +104,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
           <Skeleton screenreaderText={t("Loading actions")} />
         ) : (
           <KebabMenu
-            isDisabled={isActionsMenuDisabled}
+            isDisabled={["deleting", "creating"].includes(vm.status)}
             items={kebabMenuActions}
           />
         )}

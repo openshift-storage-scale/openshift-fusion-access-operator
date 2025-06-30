@@ -12,6 +12,7 @@ import {
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useDeleteFileSystemsHandler } from "../hooks/useDeleteFileSystemHandler";
+import { useCallback } from "react";
 
 interface FileSystemsDeleteModalProps {
   vm: FileSystemsTableViewModel["deleteModal"];
@@ -26,13 +27,15 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
 
   const handleDeleteFileSystem = useDeleteFileSystemsHandler(vm);
 
+  const handleClose = useCallback(() => vm.setIsOpen(false), [vm]);
+
   return (
     <Modal
-      elementToFocus="#modal-confirmation-button"
       isOpen={vm.isOpen}
       aria-describedby="delete-filesystem-confirmation-modal"
       aria-labelledby="delete-filesystem-title"
       variant="medium"
+      onClose={handleClose}
     >
       <ModalHeader
         title={t("Delete Filesystem?")}
@@ -42,15 +45,19 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
       <ModalBody tabIndex={0} id="delete-filesystem-confirmation-modal">
         <Stack hasGutter>
           <StackItem isFilled>
-            <Trans t={t} ns="public">
-              Are you sure you want to delete{" "}
-              <strong>{{ resourceName: vm.fileSystem?.metadata?.name }}</strong>{" "}
-              in namespace{" "}
-              <strong>
-                {{ namespace: vm.fileSystem?.metadata?.namespace }}
-              </strong>
-              ?
-            </Trans>
+            {!vm.errors.length ? (
+              <Trans t={t} ns="public">
+                Are you sure you want to delete{" "}
+                <strong>
+                  {{ resourceName: vm.fileSystem?.metadata?.name }}
+                </strong>{" "}
+                in namespace{" "}
+                <strong>
+                  {{ namespace: vm.fileSystem?.metadata?.namespace }}
+                </strong>
+                ?
+              </Trans>
+            ) : null}
           </StackItem>
           {(vm.errors ?? []).length > 0 && (
             <StackItem>
@@ -70,26 +77,41 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
         </Stack>
       </ModalBody>
       <ModalFooter>
-        <Button
-          id="modal-confirmation-button"
-          key="confirm"
-          variant="danger"
-          onClick={async () => {
-            await handleDeleteFileSystem();
-          }}
-          isLoading={vm.isDeleting}
-          isDisabled={vm.isDeleting}
-        >
-          {vm.isDeleting ? t("Deleting") : t("Delete")}
-        </Button>
-        <Button
-          id="modal-cancel-button"
-          key="cancel"
-          variant="link"
-          onClick={() => vm.setIsOpen(false)}
-        >
-          {t("Cancel")}
-        </Button>
+        {!vm.errors.length ? (
+          <Button
+            id="modal-cta-button"
+            key="confirm"
+            variant="danger"
+            onClick={async () => {
+              await handleDeleteFileSystem();
+            }}
+            isLoading={vm.isDeleting}
+            isDisabled={vm.isDeleting}
+          >
+            {vm.isDeleting ? t("Deleting") : t("Confirm")}
+          </Button>
+        ) : (
+          <Button
+            id="modal-cta-button"
+            key="ok"
+            variant="primary"
+            onClick={handleClose}
+            isLoading={vm.isDeleting}
+            isDisabled={vm.isDeleting}
+          >
+            {t("OK")}
+          </Button>
+        )}
+        {vm.isDeleting ? null : (
+          <Button
+            id="modal-cancel-button"
+            key="cancel"
+            variant="link"
+            onClick={handleClose}
+          >
+            {t("Cancel")}
+          </Button>
+        )}
       </ModalFooter>
     </Modal>
   );
