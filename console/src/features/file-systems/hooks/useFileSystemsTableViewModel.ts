@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
+import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
 import { useDeleteModal } from "./useDeleteModal";
 import { useRoutes } from "./useRoutes";
 

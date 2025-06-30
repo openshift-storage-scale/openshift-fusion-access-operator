@@ -3,7 +3,7 @@ import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
 import { Async } from "@/shared/components/Async";
 import { useWatchFusionAccess } from "@/shared/hooks/useWatchFusionAccess";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
@@ -14,7 +14,7 @@ const FusionAccessHomePage: React.FC = () => {
 
   const fusionAccess = useWatchFusionAccess();
 
-  const storageClusters = useWatchSpectrumScaleCluster({
+  const storageClusters = useWatchStorageCluster({
     limit: 1,
   });
 

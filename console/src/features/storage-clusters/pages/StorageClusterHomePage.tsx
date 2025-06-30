@@ -2,7 +2,7 @@ import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClusterEmptyState } from "@/features/storage-clusters/components/StorageClusterEmptyState";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { Async } from "@/shared/components/Async";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
@@ -36,7 +36,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
     "/fusion-access/storage-cluster/create"
   );
 
-  const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchStorageCluster({ limit: 1 });
 
   return (
     <ListPage

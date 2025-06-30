@@ -5,10 +5,10 @@ import type { State, Actions } from "@/shared/store/types";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { FileSystemsTabbedNav } from "../components/FileSystemsTabbedNav";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { Async } from "@/shared/components/Async";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
+import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
 import {
   UrlPaths,
   useRedirectHandler,
@@ -34,7 +34,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchStorageCluster({ limit: 1 });
 
   const fileSystems = useWatchFileSystem();
 

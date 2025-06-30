@@ -6,13 +6,13 @@ import { NodesSelectionTable } from "@/features/storage-clusters/components/Node
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClustersCreateButton } from "@/features/storage-clusters/components/StorageClustersCreateButton";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { Button, Split } from "@patternfly/react-core";
 import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hooks/useCreateStorageClusterHandler";
 import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
-  const storageCluster = useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageCluster = useWatchStorageCluster({ limit: 1 });
   return (storageCluster.data ?? []).length === 0 ? (
     <StoreProvider<State, Actions>
       reducer={reducer}

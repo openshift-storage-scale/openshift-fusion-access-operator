@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import {
   useNormalizedK8sWatchResource,
   type NormalizedWatchK8sResult,
@@ -8,11 +8,12 @@ import type { Route } from "../types/Route";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 export const useRoutes = (): NormalizedWatchK8sResult<Route[]> => {
-  const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchStorageCluster({ limit: 1 });
 
   // Currently, we support creation of a single StorageCluster.
+  const [storageCluster] = storageClusters.data ?? [];
   const storageClusterName =
-    storageClusters.data?.[0]?.metadata?.name ?? VALUE_NOT_AVAILABLE;
+    storageCluster?.metadata?.name ?? VALUE_NOT_AVAILABLE;
 
   const routes = useNormalizedK8sWatchResource<Route>({
     groupVersionKind: {
