@@ -1,6 +1,5 @@
 dependencies:
-- type: olm.gvk
+- type: olm.package
   value:
-    group: kmm.sigs.x-k8s.io
-    kind: Module
-    version: v1beta1
+    packageName: kernel-module-management
+    version: ">=2.4.0"
