@@ -7,9 +7,8 @@ import { ListPage } from "@/shared/components/ListPage";
 import { StorageClustersCreateButton } from "@/features/storage-clusters/components/StorageClustersCreateButton";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { Split } from "@patternfly/react-core";
+import { Button, Split } from "@patternfly/react-core";
 import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hooks/useCreateStorageClusterHandler";
-import { CancelButton } from "@/shared/components/CancelButton";
 import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
@@ -47,7 +46,9 @@ const ConnectedStorageClusterCreate: React.FC = () => {
             {...store.cta}
             onClick={handleCreateStorageCluster}
           />
-          <CancelButton onCancel={history.goBack} />
+          <Button variant="link" onClick={history.goBack}>
+            {t("Cancel")}
+          </Button>
         </Split>
       }
     >

@@ -2,11 +2,10 @@ import { StoreProvider, useStore } from "@/shared/store/provider";
 import { reducer, initialState } from "@/shared/store/reducer";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { FormContextProvider, Split } from "@patternfly/react-core";
+import { Button, FormContextProvider, Split } from "@patternfly/react-core";
 import type { State, Actions } from "@/shared/store/types";
 import { FileSystemCreateForm } from "../components/FileSystemCreateForm";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { CancelButton } from "@/shared/components/CancelButton";
 import { useHistory } from "react-router";
 
 const FileSystemsCreate: React.FC = () => {
@@ -47,7 +46,9 @@ const ConnectedCreateFileSystems: React.FC = () => {
             form="file-system-create-form"
             {...store.cta}
           />
-          <CancelButton onCancel={history.goBack} />
+          <Button variant="link" onClick={history.goBack}>
+            {t("Cancel")}
+          </Button>
         </Split>
       }
     >
