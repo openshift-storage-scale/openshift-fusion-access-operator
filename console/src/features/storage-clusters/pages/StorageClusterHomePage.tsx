@@ -3,7 +3,7 @@ import { ListPage } from "@/shared/components/ListPage";
 import { StorageClusterEmptyState } from "@/features/storage-clusters/components/StorageClusterEmptyState";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { Async } from "@/shared/components/Async";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { StoreProvider, useStore } from "@/shared/store/provider";
@@ -11,6 +11,8 @@ import {
   UrlPaths,
   useRedirectHandler,
 } from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -43,9 +45,11 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
       alert={store.alert}
       onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
     >
-      <ResourceStatusBoundary
+      <Async
         loaded={storageClusters.loaded}
         error={storageClusters.error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
       >
         {(storageClusters.data ?? []).length === 0 ? (
           <StorageClusterEmptyState
@@ -54,7 +58,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
         ) : (
           <Redirect to={UrlPaths.FileSystemsHome} />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };

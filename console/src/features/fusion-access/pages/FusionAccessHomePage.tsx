@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { Async } from "@/shared/components/Async";
 import { useWatchFusionAccess } from "@/shared/hooks/useWatchFusionAccess";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 
 const FusionAccessHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
@@ -39,13 +41,18 @@ const FusionAccessHomePage: React.FC = () => {
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
     >
-      <ResourceStatusBoundary loaded={loaded} error={error}>
+      <Async
+        loaded={loaded}
+        error={error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
+      >
         {(storageClusters.data ?? []).length === 0 ? (
           <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <Redirect to={UrlPaths.FileSystemsHome} />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };

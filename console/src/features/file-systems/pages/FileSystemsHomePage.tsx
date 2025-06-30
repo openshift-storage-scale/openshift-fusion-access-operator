@@ -6,13 +6,15 @@ import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { FileSystemsTabbedNav } from "../components/FileSystemsTabbedNav";
 import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { Async } from "@/shared/components/Async";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
 import {
   UrlPaths,
   useRedirectHandler,
 } from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 
 const FileSystemsHomePage: React.FC = () => {
   return (
@@ -52,16 +54,18 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
         ) : null
       }
     >
-      <ResourceStatusBoundary
+      <Async
         loaded={storageClusters.loaded}
         error={storageClusters.error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
       >
         {(storageClusters.data ?? []).length === 0 ? (
           <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <FileSystemsTabbedNav />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };
