@@ -16,41 +16,41 @@ interface DeleteModalActions {
   setErrors: Dispatch<SetStateAction<DeleteModalState["errors"]>>;
 }
 
-export const useDeleteModalSlice = (
+export const useDeleteModal = (
   initialState: DeleteModalState = {
     isOpen: false,
     isDeleting: false,
     errors: [],
   }
 ): DeleteModalState & DeleteModalActions => {
-  const [deleteModalState, setDeleteModalState] =
+  const [state, setState] =
     useState<DeleteModalState>(initialState);
 
   const setFileSystem: DeleteModalActions["setFileSystem"] = (value) =>
-    setDeleteModalState(
+    setState(
       immutableStateUpdateHelper<DeleteModalState>(value, "fileSystem")
     );
   const setIsDeleting: DeleteModalActions["setIsDeleting"] = (value) =>
-    setDeleteModalState(
+    setState(
       immutableStateUpdateHelper<DeleteModalState>(value, "isDeleting")
     );
   const setIsOpen: DeleteModalActions["setIsOpen"] = (value) =>
-    setDeleteModalState(
+    setState(
       immutableStateUpdateHelper<DeleteModalState>(value, "isOpen")
     );
   const setErrors: DeleteModalActions["setErrors"] = (value) =>
-    setDeleteModalState(
+    setState(
       immutableStateUpdateHelper<DeleteModalState>(value, "errors")
     );
 
   return useMemo(
     () => ({
-      ...deleteModalState,
+      ...state,
       setFileSystem,
       setIsDeleting,
       setIsOpen,
       setErrors,
     }),
-    [deleteModalState]
+    [state]
   );
 };

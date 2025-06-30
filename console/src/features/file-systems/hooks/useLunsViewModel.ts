@@ -110,10 +110,6 @@ export const useLunsViewModel = () => {
     [data, isSelected, loaded, nodeName, setAllSelected, setSelected]
   );
 
-  useEffect(() => {
-    console.log("LunsViewModel: ", vm);
-  }, [vm]);
-
   return vm;
 };
 

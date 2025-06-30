@@ -3,8 +3,8 @@ import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystems";
-import { useDeleteModalSlice } from "./useDeleteModalSlice";
-import { useRoutesSlice } from "./useRoutesSlice";
+import { useDeleteModal } from "./useDeleteModal";
+import { useRoutes } from "./useRoutes";
 
 export const useFileSystemsTableViewModel = () => {
   const { t } = useFusionAccessTranslations();
@@ -45,7 +45,7 @@ export const useFileSystemsTableViewModel = () => {
     [t]
   );
 
-  const deleteModal = useDeleteModalSlice();
+  const deleteModal = useDeleteModal();
 
   const handleDelete = useCallback(
     (fileSystem: FileSystem) => () => {
@@ -57,7 +57,7 @@ export const useFileSystemsTableViewModel = () => {
 
   const fileSystems = useWatchFileSystem();
 
-  const routes = useRoutesSlice();
+  const routes = useRoutes();
 
   return useMemo(
     () =>

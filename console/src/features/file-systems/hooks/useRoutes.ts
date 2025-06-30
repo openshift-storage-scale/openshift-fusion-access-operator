@@ -7,7 +7,7 @@ import {
 import type { Route } from "../types/Route";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 
-export const useRoutesSlice = (): NormalizedWatchK8sResult<Route[]> => {
+export const useRoutes = (): NormalizedWatchK8sResult<Route[]> => {
   const storageClusters = useWatchSpectrumScaleCluster({ limit: 1 });
 
   // Currently, we support creation of a single StorageCluster.
