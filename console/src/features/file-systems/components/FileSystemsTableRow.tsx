@@ -77,7 +77,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         className={columns[3].props.className}
       >
         <FileSystemStorageClasses
-          isNotAvailable={["deleting", "creating"].includes(vm.status)}
+          isNotAvailable={vm.status !== "ready"}
           fileSystem={fileSystem}
           storageClasses={vm.storageClasses.data}
         />
@@ -89,7 +89,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         className={columns[4].props.className}
       >
         <FileSystemsDashboardLink
-          isNotAvailable={["deleting", "creating"].includes(vm.status)}
+          isNotAvailable={vm.status !== "ready"}
           fileSystem={fileSystem}
           routes={routes.data}
         />
