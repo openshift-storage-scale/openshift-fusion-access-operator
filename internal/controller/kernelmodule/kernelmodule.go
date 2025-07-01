@@ -123,6 +123,13 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 	var selector map[string]string
 
 	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
+
+	// We need to truncate the image hash so the module image tag fits into 128 chars, otherwise it is an invalid docker reference
+	const maxHashLength = 32
+	if len(ibmImageHash) > maxHashLength {
+		ibmImageHash = ibmImageHash[:maxHashLength]
+	}
+
 	ibmImageHashLabel := getIBMCoreImageHashForLabel(ibmScaleImage)
 	if ibmImageHashLabel != "" {
 		selector = map[string]string{
