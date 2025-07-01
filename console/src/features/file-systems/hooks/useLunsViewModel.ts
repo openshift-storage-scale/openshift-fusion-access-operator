@@ -4,6 +4,9 @@ import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
+import { useWatchLocalDisk } from "@/shared/hooks/useWatchLocalDisk";
+import type { DiscoveredDevice } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
+import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 
 export interface Lun {
   isSelected: boolean;
@@ -36,31 +39,37 @@ export const useLunsViewModel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageNodesLvdrs.error, t]);
 
-  const discoveredDevices = useMemo(
-    // We're taking just the first LVDR from the storage nodes because
-    // all of them MUST report the same disks as required during storage
-    // cluster creation
-    () => storageNodesLvdrs.data?.[0]?.status?.discoveredDevices,
+  // We're taking just the first LVDR from the storage nodes because
+  // all of them MUST report the same disks as required during storage
+  // cluster creation
+  const [storageNodesLvdr] = useMemo(
+    () => storageNodesLvdrs.data ?? [],
     [storageNodesLvdrs.data]
   );
+
+  const localDisks = useWatchLocalDisk();
 
   const [luns, setLuns] = useState<Lun[]>([]);
 
   useEffect(() => {
-    if (storageNodesLvdrs.loaded && discoveredDevices) {
+    const discoveredDevices = storageNodesLvdr?.status?.discoveredDevices ?? [];
+    if (
+      storageNodesLvdrs.loaded &&
+      localDisks.loaded &&
+      discoveredDevices.length
+    ) {
       setLuns(
-        discoveredDevices.map((disk) => {
-          return {
-            isSelected: false,
-            id: disk.path,
-            name: disk.WWN.slice("uuid.".length),
-            // Note: Usage of 'GB' is intentional here
-            capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
-          };
-        })
+        discoveredDevices
+          .filter(outDevicesUsedByLocalDisks(localDisks.data ?? []))
+          .map(toLun)
       );
     }
-  }, [discoveredDevices, storageNodesLvdrs.loaded]);
+  }, [
+    localDisks.data,
+    localDisks.loaded,
+    storageNodesLvdr?.status?.discoveredDevices,
+    storageNodesLvdrs.loaded,
+  ]);
 
   const isSelected = useCallback(
     (lun: Lun) => luns.find((l) => l.id === lun.id)?.isSelected ?? false,
@@ -92,7 +101,7 @@ export const useLunsViewModel = () => {
   }, []);
 
   const data = luns;
-  const nodeName = storageNodesLvdrs.data?.[0]?.spec.nodeName;
+  const nodeName = storageNodesLvdr?.spec.nodeName;
   const loaded = storageNodesLvdrs.loaded && typeof nodeName === "string";
 
   const vm = useMemo(
@@ -112,3 +121,22 @@ export const useLunsViewModel = () => {
 };
 
 export type LunsViewModel = ReturnType<typeof useLunsViewModel>;
+
+const outDevicesUsedByLocalDisks =
+  (localDisks: LocalDisk[]) => (disk: DiscoveredDevice) =>
+    localDisks.length
+      ? localDisks.find(
+          (localDisk) =>
+            !localDisk.metadata?.name?.endsWith(disk.WWN.slice("uuid.".length))
+        )
+      : true;
+
+const toLun = (disk: DiscoveredDevice): Lun => {
+  return {
+    isSelected: false,
+    id: disk.path,
+    name: disk.WWN.slice("uuid.".length),
+    // Note: Usage of 'GB' is intentional here
+    capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
+  };
+};
