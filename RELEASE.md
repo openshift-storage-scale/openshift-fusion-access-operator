@@ -24,3 +24,40 @@ This is totally temporary for now. We'll automate this later
    to quay.io
 
 1. Amend the install docs and announce it on slack
+
+- Steps for offical release on ISV
+
+Images will be the following on the non authenticated path:
+
+- icr.io/cpopen/fusion-access/devicefinder-rhel9
+- icr.io/cpopen/fusion-access/console-plugin-rhel9
+- icr.io/cpopen/controller-rhel9-operator
+- icr.io/cpopen/controller-rhel9-operator-bundle
+- icr.io/cpopen/fusion-access/devicefinder-rhel10
+- icr.io/cpopen/fusion-access/console-plugin-rhel10
+- icr.io/cpopen/controller-rhel10-operator
+- icr.io/cpopen/controller-rhel10-operator-bundle
+
+We do the build as usual, upload it quay.io/openshift-storage-scale and add a
+tag with the VERSION.txt so it won't be garbage collected.
+
+Poke ssou to pull them by digest and upload them to the icr, so the commands will
+be something like:
+skopeo copy docker://quay.io/openshift-storage-scale/devicefinder-rhel9@sha256:.... docker://icr.io/cpopen/fusion-access/devicefinder-rhel9
+skopeo copy docker://quay.io/openshift-storage-scale/console-plugin-rhel9@sha256:.... docker://icr.io/cpopen/fusion-access/console-plugin-rhel9
+skopeo copy docker://quay.io/openshift-storage-scale/controller-rhel9-operator@sha256:.... docker://icr.io/cpopen/controller-rhel9-operator
+
+Once they are uploaded to icr, we must generate a bundle/folder + image so that it points to the icr images.
+Then we rebuild the latest catalog and do a smoke test, so we can also have qe take a look. Once everything is okay
+we commit the released-bundle and use that to generate a PR for ther certified-operators repo
+
+Then we can do the ISV release on the web page:
+
+- run the preflight checks for all three images:
+  preflight-linux-amd64 check container icr.io/cpopen/fusion-access/devicefinder-rhel9@sha256:fef20a... \
+  --pyxis-api-token= --certification-component-id=... \
+  --certification-project-id=... --submit --loglevel trace
+
+- After the preflight is submitted we can create the PR to the certified-operators
+
+- Once the PR is merged we can publish (or it might happen automatically, to be checked)
