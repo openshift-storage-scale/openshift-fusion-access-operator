@@ -159,6 +159,7 @@ export const useDeleteFileSystemsHandler = (
               return acc;
             }, [] as string[]),
           ]);
+          vm.setIsDeleting(false);
           return;
         }
       }

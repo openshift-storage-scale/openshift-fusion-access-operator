@@ -7,10 +7,9 @@ import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
 
 export interface Lun {
   isSelected: boolean;
-  name: string;
   id: string;
+  name: string;
   capacity: string;
-  wwn: string;
 }
 
 export const useLunsViewModel = () => {
@@ -53,9 +52,8 @@ export const useLunsViewModel = () => {
         discoveredDevices.map((disk) => {
           return {
             isSelected: false,
-            id: disk.WWN.slice("uuid.".length),
-            name: disk.path,
-            wwn: disk.WWN,
+            id: disk.path,
+            name: disk.WWN.slice("uuid.".length),
             // Note: Usage of 'GB' is intentional here
             capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
           };

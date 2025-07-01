@@ -98,8 +98,8 @@ export const FileSystemCreateForm: React.FC = () => {
                           onSelect: vm.handleSelectLun(lun),
                         }}
                       />
-                      <Td dataLabel={vm.columns.NAME}>{lun.name}</Td>
                       <Td dataLabel={vm.columns.ID}>{lun.id}</Td>
+                      <Td dataLabel={vm.columns.NAME}>{lun.name}</Td>
                       <Td dataLabel={vm.columns.CAPACITY}>{lun.capacity}</Td>
                     </Tr>
                   ))}
