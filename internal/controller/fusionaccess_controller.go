@@ -357,7 +357,7 @@ func (r *FusionAccessReconciler) Reconcile(
 	secret, err := getPullSecretContent(FUSIONPULLSECRETNAME, ns, ctx, r.fullClient)
 	if err != nil {
 		log.Log.Info(
-			"Pull secret not found, skipping entitlement secret creation, we will watch this secret",
+			"Pull secret not found, skipping entitlement secret creation, we will watch this secret - testme",
 		)
 	} else {
 		// Create entitlement secrets
