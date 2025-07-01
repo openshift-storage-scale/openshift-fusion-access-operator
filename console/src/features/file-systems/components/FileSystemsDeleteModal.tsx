@@ -12,7 +12,6 @@ import {
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useDeleteFileSystemsHandler } from "../hooks/useDeleteFileSystemHandler";
-import { useCallback } from "react";
 
 interface FileSystemsDeleteModalProps {
   vm: FileSystemsTableViewModel["deleteModal"];
@@ -27,15 +26,13 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
 
   const handleDeleteFileSystem = useDeleteFileSystemsHandler(vm);
 
-  const handleClose = useCallback(() => vm.setIsOpen(false), [vm]);
-
   return (
     <Modal
       isOpen={vm.isOpen}
       aria-describedby="delete-filesystem-confirmation-modal"
       aria-labelledby="delete-filesystem-title"
       variant="medium"
-      onClose={handleClose}
+      onClose={vm.handleClose}
     >
       <ModalHeader
         title={t("Delete Filesystem?")}
@@ -82,9 +79,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
             id="modal-cta-button"
             key="confirm"
             variant="danger"
-            onClick={async () => {
-              await handleDeleteFileSystem();
-            }}
+            onClick={handleDeleteFileSystem}
             isLoading={vm.isDeleting}
             isDisabled={vm.isDeleting}
           >
@@ -95,7 +90,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
             id="modal-cta-button"
             key="ok"
             variant="primary"
-            onClick={handleClose}
+            onClick={vm.handleClose}
             isLoading={vm.isDeleting}
             isDisabled={vm.isDeleting}
           >
@@ -107,7 +102,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
             id="modal-cancel-button"
             key="cancel"
             variant="link"
-            onClick={handleClose}
+            onClick={vm.handleClose}
           >
             {t("Cancel")}
           </Button>

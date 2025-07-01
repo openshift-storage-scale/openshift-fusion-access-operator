@@ -21,6 +21,7 @@ interface DeleteModalActions {
   setIsOpen: Dispatch<SetStateAction<DeleteModalState["isOpen"]>>;
   setErrors: Dispatch<SetStateAction<DeleteModalState["errors"]>>;
   handleDelete: (fileSystem: FileSystem) => VoidFunction;
+  handleClose: VoidFunction;
 }
 
 export const useDeleteModal = (
@@ -40,6 +41,7 @@ export const useDeleteModal = (
     setState(immutableStateUpdateHelper<DeleteModalState>(value, "isOpen"));
   const setErrors: DeleteModalActions["setErrors"] = (value) =>
     setState(immutableStateUpdateHelper<DeleteModalState>(value, "errors"));
+  const handleClose = useCallback(() => setIsOpen(false), []);
   const handleDelete = useCallback(
     (fileSystem: FileSystem) => () => {
       setState((prevState) => {
@@ -55,12 +57,13 @@ export const useDeleteModal = (
   return useMemo(
     () => ({
       ...state,
+      handleClose,
       handleDelete,
       setFileSystem,
       setIsDeleting,
       setIsOpen,
       setErrors,
     }),
-    [handleDelete, state]
+    [handleClose, handleDelete, state]
   );
 };
