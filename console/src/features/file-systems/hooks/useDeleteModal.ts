@@ -1,4 +1,10 @@
-import { type Dispatch, type SetStateAction, useState, useMemo } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { immutableStateUpdateHelper } from "@/shared/store/helpers";
 
@@ -14,6 +20,7 @@ interface DeleteModalActions {
   setIsDeleting: Dispatch<SetStateAction<DeleteModalState["isDeleting"]>>;
   setIsOpen: Dispatch<SetStateAction<DeleteModalState["isOpen"]>>;
   setErrors: Dispatch<SetStateAction<DeleteModalState["errors"]>>;
+  handleDelete: (fileSystem: FileSystem) => VoidFunction;
 }
 
 export const useDeleteModal = (
@@ -23,34 +30,37 @@ export const useDeleteModal = (
     errors: [],
   }
 ): DeleteModalState & DeleteModalActions => {
-  const [state, setState] =
-    useState<DeleteModalState>(initialState);
+  const [state, setState] = useState<DeleteModalState>(initialState);
 
   const setFileSystem: DeleteModalActions["setFileSystem"] = (value) =>
-    setState(
-      immutableStateUpdateHelper<DeleteModalState>(value, "fileSystem")
-    );
+    setState(immutableStateUpdateHelper<DeleteModalState>(value, "fileSystem"));
   const setIsDeleting: DeleteModalActions["setIsDeleting"] = (value) =>
-    setState(
-      immutableStateUpdateHelper<DeleteModalState>(value, "isDeleting")
-    );
+    setState(immutableStateUpdateHelper<DeleteModalState>(value, "isDeleting"));
   const setIsOpen: DeleteModalActions["setIsOpen"] = (value) =>
-    setState(
-      immutableStateUpdateHelper<DeleteModalState>(value, "isOpen")
-    );
+    setState(immutableStateUpdateHelper<DeleteModalState>(value, "isOpen"));
   const setErrors: DeleteModalActions["setErrors"] = (value) =>
-    setState(
-      immutableStateUpdateHelper<DeleteModalState>(value, "errors")
-    );
+    setState(immutableStateUpdateHelper<DeleteModalState>(value, "errors"));
+  const handleDelete = useCallback(
+    (fileSystem: FileSystem) => () => {
+      setState((prevState) => {
+        const draft = window.structuredClone(prevState);
+        draft.fileSystem = fileSystem;
+        draft.isOpen = true;
+        return draft;
+      });
+    },
+    []
+  );
 
   return useMemo(
     () => ({
       ...state,
+      handleDelete,
       setFileSystem,
       setIsDeleting,
       setIsOpen,
       setErrors,
     }),
-    [state]
+    [handleDelete, state]
   );
 };

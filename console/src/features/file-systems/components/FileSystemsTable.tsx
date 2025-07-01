@@ -2,23 +2,19 @@ import { VirtualizedTable } from "@openshift-console/dynamic-plugin-sdk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { FileSystemsDeleteModal } from "./FileSystemsDeleteModal";
 import { FileSystemsTableEmptyState } from "./FileSystemsTableEmptyState";
-import { FileSystemsTabTableRow } from "./FileSystemsTableRow";
-import {
-  useFileSystemsTableViewModel,
-  type FileSystemsTableViewModel,
-} from "../hooks/useFileSystemsTableViewModel";
+import { FileSystemsTabTableRow, type RowData } from "./FileSystemsTableRow";
+import { useFileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 
 export const FileSystemsTable: React.FC = () => {
   const vm = useFileSystemsTableViewModel();
 
-  const { columns, handleDelete, routes } = vm;
+  const { columns, deleteModal, routes } = vm;
+
+  const { handleDelete } = deleteModal;
 
   return (
     <>
-      <VirtualizedTable<
-        FileSystem,
-        Pick<FileSystemsTableViewModel, "columns" | "handleDelete" | "routes">
-      >
+      <VirtualizedTable<FileSystem, RowData>
         columns={vm.columns}
         data={vm.fileSystems.data ?? []}
         unfilteredData={vm.fileSystems.data ?? []}

@@ -47,14 +47,6 @@ export const useFileSystemsTableViewModel = () => {
 
   const deleteModal = useDeleteModal();
 
-  const handleDelete = useCallback(
-    (fileSystem: FileSystem) => () => {
-      deleteModal.setFileSystem(fileSystem);
-      deleteModal.setIsOpen(true);
-    },
-    [deleteModal]
-  );
-
   const fileSystems = useWatchFileSystem();
 
   const routes = useRoutes();
@@ -65,10 +57,9 @@ export const useFileSystemsTableViewModel = () => {
         columns,
         deleteModal,
         fileSystems,
-        handleDelete,
         routes,
       }) as const,
-    [columns, deleteModal, fileSystems, handleDelete, routes]
+    [columns, deleteModal, fileSystems, routes]
   );
 };
 

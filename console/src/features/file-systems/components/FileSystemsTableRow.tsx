@@ -13,10 +13,10 @@ import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
 import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
 import { FileSystemStatus } from "./FileSystemsStatus";
 
-type FileSystemsTabTableRowProps = RowProps<
-  FileSystem,
-  Pick<FileSystemsTableViewModel, "columns" | "handleDelete" | "routes">
->;
+export type RowData = Pick<FileSystemsTableViewModel, "columns" | "routes"> &
+  Pick<FileSystemsTableViewModel["deleteModal"], "handleDelete">;
+
+type FileSystemsTabTableRowProps = RowProps<FileSystem, RowData>;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
   props
