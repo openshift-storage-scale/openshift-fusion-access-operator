@@ -136,7 +136,6 @@ function createFileSystem(
               ) as string[],
             },
           ],
-          // TODO(jkilzi): Check these 2 props below are correct.
           replication: "1-way",
           type: "shared",
         },
@@ -161,7 +160,6 @@ function createLocalDisks(
         kind: "LocalDisk",
         metadata: { name: localDiskName, namespace },
         spec: {
-          existingDataSkipVerify: true, // TODO(jkilzi): REMOVE it! Destroys data with no warning.
           device: lun.id,
           node: luns.nodeName!,
         },
