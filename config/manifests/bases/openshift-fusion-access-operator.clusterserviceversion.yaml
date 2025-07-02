@@ -95,7 +95,7 @@ spec:
   - name: Fusion Access for SAN
     url: https://access.ibmfusion.eu/
   - name: Documentation
-    url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/index
+    url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/fusion_access_san/index
   maintainers:
   - email: michele@redhat.com
     name: mbaldessari
