@@ -49,6 +49,14 @@ export const useCreateFileSystemHandler = (
 
   return useCallback(async () => {
     if (!luns.nodeName) {
+      dispatch({
+        type: "global/showAlert",
+        payload: {
+          title: "Node name is required to create a file system.",
+          isDismissable: true,
+          variant: "warning",
+        },
+      });
       return;
     }
 

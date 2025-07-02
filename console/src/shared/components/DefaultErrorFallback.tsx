@@ -23,7 +23,7 @@ export const DefaultErrorFallback: React.FC<DefaultErrorFallback> = (props) => {
   const actions: Array<
     Pick<ButtonProps, "onClick" | "variant"> & { text: string }
   > = [
-    { variant: "link", onClick: window.location.reload, text: t("Refresh") },
+    { variant: "link", onClick: () => window.location.reload(), text: t("Refresh") },
   ];
 
   return (

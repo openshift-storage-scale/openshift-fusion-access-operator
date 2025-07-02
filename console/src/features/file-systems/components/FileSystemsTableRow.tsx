@@ -11,7 +11,7 @@ import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableView
 import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
 import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
-import { FileSystemStatus } from "./FileSystemsStatus";
+import { FileSystemsStatus } from "./FileSystemsStatus";
 
 export type RowData = Pick<FileSystemsTableViewModel, "columns" | "routes"> &
   Pick<FileSystemsTableViewModel["deleteModal"], "handleDelete">;
@@ -56,7 +56,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         id={columns[1].id}
         className={columns[1].props.className}
       >
-        <FileSystemStatus
+        <FileSystemsStatus
           title={vm.title}
           description={vm.description}
           icon={<vm.Icon />}

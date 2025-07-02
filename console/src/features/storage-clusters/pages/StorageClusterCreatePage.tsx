@@ -1,4 +1,4 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
 import { reducer, initialState } from "@/shared/store/reducer";
@@ -9,7 +9,10 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { Button, Split } from "@patternfly/react-core";
 import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hooks/useCreateStorageClusterHandler";
-import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
+import {
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
   const storageCluster = useWatchStorageCluster({ limit: 1 });
@@ -32,7 +35,9 @@ const ConnectedStorageClusterCreate: React.FC = () => {
   const { t } = useFusionAccessTranslations();
   const [store, dispatch] = useStore<State, Actions>();
   const handleCreateStorageCluster = useCreateStorageClusterHandler();
-  const history = useHistory();
+  const redirectoStorageClusterHome = useRedirectHandler(
+    "/fusion-access/storage-cluster"
+  );
 
   return (
     <ListPage
@@ -46,7 +51,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
             {...store.cta}
             onClick={handleCreateStorageCluster}
           />
-          <Button variant="link" onClick={history.goBack}>
+          <Button variant="link" onClick={redirectoStorageClusterHome}>
             {t("Cancel")}
           </Button>
         </Split>

@@ -18,7 +18,7 @@ export const FileSystemsDashboardLink: React.FC<
   }
 
   const fileSystemName = fileSystem.metadata?.name ?? "";
-  const host = routes[0].spec.host;
+  const { host } = routes[0].spec;
 
   return (
     <Button

@@ -6,7 +6,7 @@ import { Button, FormContextProvider, Split } from "@patternfly/react-core";
 import type { State, Actions } from "@/shared/store/types";
 import { FileSystemCreateForm } from "../components/FileSystemCreateForm";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { useHistory } from "react-router";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 
 const FileSystemsCreate: React.FC = () => {
   return (
@@ -28,7 +28,9 @@ const ConnectedCreateFileSystems: React.FC = () => {
 
   const { t } = useFusionAccessTranslations();
 
-  const history = useHistory();
+  const redirectToFilesystemsHome = useRedirectHandler(
+    "/fusion-access/file-systems"
+  );
 
   return (
     <ListPage
@@ -46,7 +48,7 @@ const ConnectedCreateFileSystems: React.FC = () => {
             form="file-system-create-form"
             {...store.cta}
           />
-          <Button variant="link" onClick={history.goBack}>
+          <Button variant="link" onClick={redirectToFilesystemsHome}>
             {t("Cancel")}
           </Button>
         </Split>

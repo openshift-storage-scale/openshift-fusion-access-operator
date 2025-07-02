@@ -6,7 +6,7 @@ type FileSystemStatusProps = {
   icon: React.ReactNode;
 };
 
-export const FileSystemStatus: React.FC<FileSystemStatusProps> = (props) => {
+export const FileSystemsStatus: React.FC<FileSystemStatusProps> = (props) => {
   const { title, description, icon } = props;
 
   if (description) {
@@ -39,4 +39,4 @@ export const FileSystemStatus: React.FC<FileSystemStatusProps> = (props) => {
     </>
   );
 };
-FileSystemStatus.displayName = "FileSystemStatus";
+FileSystemsStatus.displayName = "FileSystemsStatus";
