@@ -14,7 +14,7 @@ import { getName } from "@/shared/utils/console/K8sResourceCommon";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
-import { isFilesystemInUse } from "../utils/filesystem";
+import { isFilesystemInUse } from "../utils/Filesystem";
 
 export const useFileSystemTableRowViewModel = (fileSystem: FileSystem) => {
   const { t } = useFusionAccessTranslations();

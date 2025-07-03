@@ -4,7 +4,7 @@ import {
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Stack, StackItem } from "@patternfly/react-core";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getFileSystemScs } from "@/features/file-systems/utils/filesystem";
+import { getFileSystemScs } from "@/features/file-systems/utils/Filesystem";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 type FileSystemStorageClassesProps = {
