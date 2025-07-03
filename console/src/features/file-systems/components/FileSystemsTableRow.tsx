@@ -1,152 +1,112 @@
-import { VALUE_NOT_AVAILABLE } from "@/constants";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getName } from "@/shared/utils/console/K8sResourceCommon";
+import { useMemo } from "react";
 import {
   type RowProps,
   TableData,
 } from "@openshift-console/dynamic-plugin-sdk";
-import {
-  Skeleton,
-  Dropdown,
-  MenuToggle,
-  DropdownList,
-  DropdownItem,
-} from "@patternfly/react-core";
-import { EllipsisVIcon } from "@patternfly/react-icons";
-import { getFilesystemStatus, isFilesystemInUse } from "../utils/filesystem";
+import { Skeleton } from "@patternfly/react-core";
+import { KebabMenu, type KebabMenuProps } from "@/shared/components/KebabMenu";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
+import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
-import FileSystemStatus from "./FileSystemsStatus";
-import FileSystemStorageClasses from "./FileSystemsStorageClasses";
-import { useState } from "react";
-import type { FileSystemsTabViewModel } from "../hooks/useFileSystemsTabViewModel";
+import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
+import { FileSystemsStatus } from "./FileSystemsStatus";
 
-type FileSystemsTabTableRowProps = RowProps<
-  FileSystem,
-  FileSystemsTabViewModel
->;
+export type RowData = Pick<FileSystemsTableViewModel, "columns" | "routes"> &
+  Pick<FileSystemsTableViewModel["deleteModal"], "handleDelete">;
+
+type FileSystemsTabTableRowProps = RowProps<FileSystem, RowData>;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
   props
 ) => {
-  const { activeColumnIDs, obj: fileSystem, rowData: vm } = props;
+  const { activeColumnIDs, obj: fileSystem, rowData } = props;
+
+  const { columns, handleDelete, routes } = rowData;
+
+  const vm = useFileSystemTableRowViewModel(fileSystem);
 
   const { t } = useFusionAccessTranslations();
 
-  const [isOpenActionsMenu, setIsOpenActionsMenu] = useState(false);
-
-  const name = getName(fileSystem);
-  const status = getFilesystemStatus(fileSystem, t);
-
-  // Currently we support creating only a single file system pool
-  const rawCapacity =
-    fileSystem.status?.pools?.[0].totalDiskSize ?? VALUE_NOT_AVAILABLE;
-
-  const isInUse = isFilesystemInUse(
-    fileSystem,
-    vm.storageClasses.state.data ?? [],
-    vm.persistentVolumeClaims.state.data ?? []
+  const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
+    () => [
+      {
+        key: "delete",
+        onClick: handleDelete(fileSystem),
+        description: vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null,
+        children: t("Delete"),
+      },
+    ],
+    [fileSystem, handleDelete, t, vm.isInUse]
   );
 
   return (
     <>
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[0].id}
-        className={vm.columns[0].props.className}
+        id={columns[0].id}
+        className={columns[0].props.className}
       >
-        {name}
+        {vm.name}
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[1].id}
-        className={vm.columns[1].props.className}
+        id={columns[1].id}
+        className={columns[1].props.className}
       >
-        <FileSystemStatus status={status} />
+        <FileSystemsStatus
+          title={vm.title}
+          description={vm.description}
+          icon={<vm.Icon />}
+        />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[2].id}
-        className={vm.columns[2].props.className}
+        id={columns[2].id}
+        className={columns[2].props.className}
       >
-        {rawCapacity}
+        {vm.rawCapacity}
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[3].id}
-        className={vm.columns[3].props.className}
+        id={columns[3].id}
+        className={columns[3].props.className}
       >
         <FileSystemStorageClasses
-          isDisabled={status.id === "deleting"}
+          isNotAvailable={vm.status !== "ready"}
           fileSystem={fileSystem}
-          loaded={vm.storageClasses.state.loaded}
-          storageClasses={vm.storageClasses.state.data ?? []}
+          storageClasses={vm.storageClasses.data}
         />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[4].id}
-        className={vm.columns[4].props.className}
+        id={columns[4].id}
+        className={columns[4].props.className}
       >
         <FileSystemsDashboardLink
-          isDisabled={status.id === "deleting"}
+          isNotAvailable={vm.status !== "ready"}
           fileSystem={fileSystem}
-          routes={vm.routes.state.data ?? []}
-          loaded={vm.routes.state.loaded}
+          routes={routes.data}
         />
       </TableData>
 
       <TableData
         activeColumnIDs={activeColumnIDs}
-        id={vm.columns[5].id}
-        className={vm.columns[5].props.className}
+        id={columns[5].id}
+        className={columns[5].props.className}
       >
-        {!vm.persistentVolumeClaims.state.loaded ? (
+        {!vm.persistentVolumeClaims.loaded ? (
           <Skeleton screenreaderText={t("Loading actions")} />
         ) : (
-          <Dropdown
-            isOpen={isOpenActionsMenu}
-            onOpenChange={setIsOpenActionsMenu}
-            toggle={(toggleRef) => (
-              <MenuToggle
-                ref={toggleRef}
-                aria-label="filesystem actions"
-                variant="plain"
-                isDisabled={
-                  status.id === "deleting" ||
-                  status.id === "creating" ||
-                  isInUse
-                }
-                onClick={() => setIsOpenActionsMenu(!isOpenActionsMenu)}
-                isExpanded={isOpenActionsMenu}
-              >
-                <EllipsisVIcon />
-              </MenuToggle>
-            )}
-            shouldFocusToggleOnSelect
-            popperProps={{ position: "right" }}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            <DropdownList>
-              <DropdownItem
-                onClick={() => {
-                  setIsOpenActionsMenu(false);
-                  vm.deleteModal.actions.setFileSystem(fileSystem);
-                  vm.deleteModal.actions.setIsOpen(true);
-                }}
-                isDisabled={status.id === "deleting" || isInUse}
-                description={
-                  isInUse ? <div>{t("Filesystem is in use")}</div> : null
-                }
-              >
-                {t("Delete")}
-              </DropdownItem>
-            </DropdownList>
-          </Dropdown>
+          <KebabMenu
+            isDisabled={["deleting", "creating"].includes(vm.status)}
+            items={kebabMenuActions}
+          />
         )}
       </TableData>
     </>

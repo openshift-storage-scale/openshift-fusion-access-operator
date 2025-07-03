@@ -2,7 +2,7 @@ import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 import type { Cluster } from "@/shared/types/ibm-spectrum-scale/Cluster";
 
-export const useWatchSpectrumScaleCluster = (
+export const useWatchStorageCluster = (
   options: Omit<WatchK8sResource, "groupVersionKind" | "isList"> = {}
 ) =>
   useNormalizedK8sWatchResource<Cluster>({

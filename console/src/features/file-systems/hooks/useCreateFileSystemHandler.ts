@@ -1,30 +1,33 @@
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
-import type {
-  LocalVolumeDiscoveryResult,
-  DiscoveredDevice,
-} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
+import { useCallback } from "react";
 import {
   k8sCreate,
   useK8sModel,
   type K8sModel,
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { useHistory } from "react-router";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useCallback } from "react";
+import { SC_PROVISIONER } from "@/constants";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
 import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { SC_PROVISIONER } from "@/constants";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import type { LunsViewModel } from "./useLunsViewModel";
+
+// TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
+const NAMESPACE = "ibm-spectrum-scale";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
-  discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
-  selectedDevices: DiscoveredDevice[]
+  luns: LunsViewModel
 ) => {
   const [, dispatch] = useStore<State, Actions>();
+
   const { t } = useFusionAccessTranslations();
-  const history = useHistory();
+
+  const redirectToFileSystemsHome = useRedirectHandler(
+    "/fusion-access/file-systems"
+  );
 
   const [localDiskModel] = useK8sModel({
     group: "scale.spectrum.ibm.com",
@@ -45,36 +48,44 @@ export const useCreateFileSystemHandler = (
   });
 
   return useCallback(async () => {
+    if (!luns.nodeName) {
+      dispatch({
+        type: "global/showAlert",
+        payload: {
+          title: "Node name is required to create a file system.",
+          isDismissable: true,
+          variant: "warning",
+        },
+      });
+      return;
+    }
+
     try {
       dispatch({
-        type: "updateCtas",
-        payload: { createFileSystem: { isLoading: true } },
+        type: "global/updateCta",
+        payload: { isLoading: true },
       });
 
-      // TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
-      const namespace = "ibm-spectrum-scale";
-
       const localDisks = await createLocalDisks(
-        discoveryResultsForStorageNodes,
-        selectedDevices,
+        luns,
         localDiskModel,
-        namespace
+        NAMESPACE
       );
 
       await createFileSystem(
+        fileSystemName,
         localDisks,
         fileSystemModel,
-        fileSystemName,
-        namespace
+        NAMESPACE
       );
 
       await createStorageClass(storageClassModel, fileSystemName);
 
-      history.push("/fusion-access/file-systems");
+      redirectToFileSystemsHome();
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           variant: "danger",
           title: t("An error occurred while creating resources"),
@@ -84,27 +95,26 @@ export const useCreateFileSystemHandler = (
       });
     } finally {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isLoading: false } },
+        type: "global/updateCta",
+        payload: { isLoading: false },
       });
     }
   }, [
-    discoveryResultsForStorageNodes,
     dispatch,
     fileSystemModel,
     fileSystemName,
-    history,
     localDiskModel,
-    selectedDevices,
+    luns,
+    redirectToFileSystemsHome,
     storageClassModel,
     t,
   ]);
 };
 
 function createFileSystem(
+  fileSystemName: string,
   localDisks: PromiseSettledResult<LocalDisk>[],
   fileSystemModel: K8sModel,
-  fileSystemName: string,
   namespace: string
 ): Promise<FileSystem> {
   return k8sCreate<FileSystem>({
@@ -127,7 +137,6 @@ function createFileSystem(
               ) as string[],
             },
           ],
-          // TODO(jkilzi): Check these 2 props below are correct. Marked in TS as required fields.
           replication: "1-way",
           type: "shared",
         },
@@ -137,25 +146,14 @@ function createFileSystem(
 }
 
 function createLocalDisks(
-  discoveryResultsForStorageNodes: LocalVolumeDiscoveryResult[],
-  selectedDevices: DiscoveredDevice[],
+  luns: LunsViewModel,
   localDiskModel: K8sModel,
   namespace: string
 ) {
   const promises: Promise<LocalDisk>[] = [];
-  for (const device of selectedDevices) {
-    // find a node that contains this device
-    const discoveryResult = discoveryResultsForStorageNodes.find((r) =>
-      r.status?.discoveredDevices?.find((d) => d.WWN === device.WWN)
-    );
-    if (!discoveryResult) {
-      throw new Error(
-        "No storage node contains the selected LUN with WWN: " + device.WWN
-      );
-    }
-
+  for (const lun of luns.data) {
     const localDiskName =
-      `${device.path.slice("/dev/".length)}-${device.WWN}`.replaceAll(".", "-");
+      `${lun.id.slice("/dev/".length)}-${lun.name}`.replaceAll(".", "-");
     const promise = k8sCreate<LocalDisk>({
       model: localDiskModel,
       data: {
@@ -163,9 +161,8 @@ function createLocalDisks(
         kind: "LocalDisk",
         metadata: { name: localDiskName, namespace },
         spec: {
-          existingDataSkipVerify: true, // TODO(jkilzi): REMOVE it! Destroys data with no warning.
-          device: device.path,
-          node: discoveryResult.spec.nodeName,
+          device: lun.id,
+          node: luns.nodeName!,
         },
       },
     });

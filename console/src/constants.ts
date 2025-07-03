@@ -1,5 +1,8 @@
 import { t } from "@/shared/hooks/useFusionAccessTranslations";
 
+// This link will need to be updated in-between versions 
+export const LEARN_MORE_LINK =
+  "https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/fusion_access_san/index";
 export const MINIMUM_AMOUNT_OF_NODES = 3;
 export const MINIMUM_AMOUNT_OF_NODES_LITERAL = t("three");
 export const MINIMUM_AMOUNT_OF_SHARED_DISKS = 1;
@@ -15,12 +18,3 @@ export const MIN_AMOUNT_OF_NODES_MSG_DIGEST =
   "5da6449cd9450de311ce1e19f6a9a01be8710958";
 export const FS_ALLOW_DELETE_LABEL = "scale.spectrum.ibm.com/allowDelete";
 export const SC_PROVISIONER = "spectrumscale.csi.ibm.com";
-
-// URL paths
-export const FUSION_ACCESS_HOME_URL_PATH = "/fusion-access";
-export const STORAGE_CLUSTER_HOME_URL_PATH = "/fusion-access/storage-cluster";
-export const STORAGE_CLUSTER_CREATE_URL_PATH =
-  "/fusion-access/storage-cluster/create";
-export const FILE_SYSTEMS_HOME_URL_PATH = "/fusion-access/file-systems";
-export const FILE_SYSTEMS_CREATE_URL_PATH =
-  "/fusion-access/file-systems/create";

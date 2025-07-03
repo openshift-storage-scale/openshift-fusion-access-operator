@@ -1,16 +1,19 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClusterEmptyState } from "@/features/storage-clusters/components/StorageClusterEmptyState";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
+import { Async } from "@/shared/components/Async";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import {
-  FILE_SYSTEMS_HOME_URL_PATH,
-  STORAGE_CLUSTER_CREATE_URL_PATH,
-} from "@/constants";
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
+import { LEARN_MORE_LINK } from "@/constants";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -30,32 +33,34 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const history = useHistory();
+  const redirectToCreateStorageCluster = useRedirectHandler(
+    "/fusion-access/storage-cluster/create"
+  );
 
-  const [storageClusters, storageClustersLoaded, storageClustersError] =
-    useWatchSpectrumScaleCluster({ limit: 1 });
+  const storageClusters = useWatchStorageCluster({ limit: 1 });
 
   return (
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
       alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
     >
-      <ResourceStatusBoundary
-        loaded={storageClustersLoaded}
-        error={storageClustersError}
+      <Async
+        loaded={storageClusters.loaded}
+        error={storageClusters.error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
       >
-        {(storageClusters ?? []).length === 0 ? (
+        {(storageClusters.data ?? []).length === 0 ? (
           <StorageClusterEmptyState
-            onCreateStorageCluster={() => {
-              history.push(STORAGE_CLUSTER_CREATE_URL_PATH);
-            }}
+            onCreateStorageCluster={redirectToCreateStorageCluster}
+            learnMoreHref={LEARN_MORE_LINK}
           />
         ) : (
-          <Redirect to={FILE_SYSTEMS_HOME_URL_PATH} />
+          <Redirect to={UrlPaths.FileSystemsHome} />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };

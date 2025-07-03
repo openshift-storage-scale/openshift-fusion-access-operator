@@ -1,38 +1,39 @@
 import { useMemo } from "react";
 import { Redirect } from "react-router";
 import { ListPage } from "@/shared/components/ListPage";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { Async } from "@/shared/components/Async";
 import { useWatchFusionAccess } from "@/shared/hooks/useWatchFusionAccess";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 
 const FusionAccessHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
 
-  const [fusionAccess, fusionAccessLoaded, fusionAccessLoadError] =
-    useWatchFusionAccess();
+  const fusionAccess = useWatchFusionAccess();
 
-  const [storageClusters, storageClustersLoaded, storageClustersLoadError] =
-    useWatchSpectrumScaleCluster({
-      limit: 1,
-    });
+  const storageClusters = useWatchStorageCluster({
+    limit: 1,
+  });
 
   const fusionAccessStatus = useMemo(
-    () => fusionAccess?.status?.status,
-    [fusionAccess?.status?.status]
+    () => fusionAccess.data?.status?.status,
+    [fusionAccess.data?.status?.status]
   );
-  
+
   const loaded = useMemo(
     () =>
-      fusionAccessLoaded &&
-      fusionAccessStatus === "Ready" &&
-      storageClustersLoaded,
-    [fusionAccessLoaded, fusionAccessStatus, storageClustersLoaded]
+      fusionAccess.loaded &&
+      storageClusters.loaded &&
+      fusionAccessStatus === "Ready",
+    [fusionAccess.loaded, fusionAccessStatus, storageClusters.loaded]
   );
 
   const error = useMemo(
-    () => fusionAccessLoadError || storageClustersLoadError,
-    [fusionAccessLoadError, storageClustersLoadError]
+    () => fusionAccess.error || storageClusters.error,
+    [fusionAccess.error, storageClusters.error]
   );
 
   return (
@@ -40,13 +41,18 @@ const FusionAccessHomePage: React.FC = () => {
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
     >
-      <ResourceStatusBoundary loaded={loaded} error={error}>
-        {(storageClusters ?? []).length === 0 ? (
-          <Redirect to="/fusion-access/storage-cluster" />
+      <Async
+        loaded={loaded}
+        error={error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
+      >
+        {(storageClusters.data ?? []).length === 0 ? (
+          <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
-          <Redirect to="/fusion-access/file-systems" />
+          <Redirect to={UrlPaths.FileSystemsHome} />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };

@@ -37,9 +37,7 @@ export const StorageClusterEmptyState: React.FC<
       </EmptyStateBody>
       <EmptyStateFooter>
         <EmptyStateActions>
-          <StorageClustersCreateButton
-            onCreateStorageCluster={onCreateStorageCluster}
-          />
+          <StorageClustersCreateButton onClick={onCreateStorageCluster} />
         </EmptyStateActions>
         <EmptyStateActions>
           <Button

@@ -12,16 +12,16 @@ import {
   List,
   ListItem,
 } from "@patternfly/react-core";
-import type { AlertSlice } from "@/shared/store/types";
 import { useLayoutEffect } from "react";
+import type { State } from "../store/types";
 
 interface ListPageProps {
   documentTitle: string;
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
-  alert?: AlertSlice;
-  onDismissAlert?: (alert: AlertSlice) => void;
+  alert?: State['alert'];
+  onDismissAlert?: (alert: State['alert']) => void;
   listPageBodyStyle?: Partial<UseListPageBodyStyleHackOptions>;
   footer?: React.ReactNode;
 }
@@ -104,8 +104,6 @@ interface UseListPageBodyStyleHackOptions {
   justification: "start" | "end" | "center" | "space-between" | "space-around";
 }
 
-const LIST_PAGE_BODY_DEFAULT_CLASSES =
-  "co-m-pane__body co-m-pane__body--no-top-margin";
 const LIST_PAGE_BODY_SELECTOR = "#content-scrollable > .co-m-pane__body";
 
 const useListPageBodyStyleHack = (
@@ -123,10 +121,6 @@ const useListPageBodyStyleHack = (
     const ref = document.querySelector<HTMLDivElement>(LIST_PAGE_BODY_SELECTOR);
 
     if (ref) {
-      // reset classes first
-      ref.className = LIST_PAGE_BODY_DEFAULT_CLASSES;
-
-      // then set new classes
       const classes = [
         isFlex ? "pf-v6-u-display-flex" : "",
         isFilled ? "pf-v6-u-flex-grow-1" : "",

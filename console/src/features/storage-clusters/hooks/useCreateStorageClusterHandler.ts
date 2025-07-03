@@ -4,8 +4,8 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import type { Cluster } from "@/shared/types/ibm-spectrum-scale/Cluster";
 import { STORAGE_ROLE_LABEL } from "@/constants";
 import { useStore } from "@/shared/store/provider";
-import { useHistory } from "react-router";
 import type { State, Actions } from "@/shared/store/types";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 
 const [storageRoleLabelKey, storageRoleLabelValue] =
   STORAGE_ROLE_LABEL.split("=");
@@ -13,8 +13,8 @@ const nodeSelector = { [storageRoleLabelKey]: storageRoleLabelValue };
 
 export const useCreateStorageClusterHandler = () => {
   const [, dispatch] = useStore<State, Actions>();
+
   const { t } = useFusionAccessTranslations();
-  const history = useHistory();
 
   const [storageScaleClusterModel] = useK8sModel({
     group: "scale.spectrum.ibm.com",
@@ -22,11 +22,15 @@ export const useCreateStorageClusterHandler = () => {
     kind: "Cluster",
   });
 
+  const redirectToFileSystemsHome = useRedirectHandler(
+    "/fusion-access/file-systems"
+  );
+
   return useCallback(async () => {
     try {
       dispatch({
-        type: "updateCtas",
-        payload: { createStorageCluster: { isLoading: true } },
+        type: "global/updateCta",
+        payload: { isLoading: true },
       });
       await k8sCreate<Cluster>({
         model: storageScaleClusterModel,
@@ -45,11 +49,11 @@ export const useCreateStorageClusterHandler = () => {
           },
         },
       });
-      history.push("/fusion-access/file-systems");
+      redirectToFileSystemsHome();
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "showAlert",
+        type: "global/showAlert",
         payload: {
           variant: "danger",
           title: t("An error occurred while creating resources"),
@@ -59,8 +63,8 @@ export const useCreateStorageClusterHandler = () => {
       });
     }
     dispatch({
-      type: "updateCtas",
-      payload: { createStorageCluster: { isLoading: false } },
+      type: "global/updateCta",
+      payload: { isLoading: false },
     });
-  }, [dispatch, history, storageScaleClusterModel, t]);
+  }, [dispatch, redirectToFileSystemsHome, storageScaleClusterModel, t]);
 };

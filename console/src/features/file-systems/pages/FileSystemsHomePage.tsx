@@ -1,17 +1,20 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import { reducer, initialState } from "@/shared/store/reducer";
 import type { State, Actions } from "@/shared/store/types";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { FileSystemsTabbedNav } from "../components/FileSystemsTabbedNav";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
+import { Async } from "@/shared/components/Async";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { ResourceStatusBoundary } from "@/shared/components/ResourceStatusBoundary";
+import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
 import {
-  FILE_SYSTEMS_CREATE_URL_PATH,
-  STORAGE_CLUSTER_HOME_URL_PATH,
-} from "@/constants";
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
+import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
+import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 
 const FileSystemsHomePage: React.FC = () => {
   return (
@@ -31,36 +34,38 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
 
   const [store, dispatch] = useStore<State, Actions>();
 
-  const history = useHistory();
+  const storageClusters = useWatchStorageCluster({ limit: 1 });
 
-  const [storageClusters, storageClustersLoaded, storageClustersError] =
-    useWatchSpectrumScaleCluster({ limit: 1 });
+  const fileSystems = useWatchFileSystem();
+
+  const redirectToCreateFileSystems = useRedirectHandler(
+    "/fusion-access/file-systems/create"
+  );
 
   return (
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
       alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
       actions={
-        <FileSystemsCreateButton
-          key="create-filesystem"
-          onCreateFileSystem={() => {
-            history.push(FILE_SYSTEMS_CREATE_URL_PATH);
-          }}
-        />
+        (fileSystems.data ?? []).length > 0 ? (
+          <FileSystemsCreateButton onClick={redirectToCreateFileSystems} />
+        ) : null
       }
     >
-      <ResourceStatusBoundary
-        loaded={storageClustersLoaded}
-        error={storageClustersError}
+      <Async
+        loaded={storageClusters.loaded}
+        error={storageClusters.error}
+        renderErrorFallback={DefaultErrorFallback}
+        renderLoadingFallback={DefaultLoadingFallback}
       >
-        {(storageClusters ?? []).length === 0 ? (
-          <Redirect to={STORAGE_CLUSTER_HOME_URL_PATH} />
+        {(storageClusters.data ?? []).length === 0 ? (
+          <Redirect to={UrlPaths.StorageClusterHome} />
         ) : (
           <FileSystemsTabbedNav />
         )}
-      </ResourceStatusBoundary>
+      </Async>
     </ListPage>
   );
 };
