@@ -4,7 +4,7 @@ import {
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Stack, StackItem } from "@patternfly/react-core";
 import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getFileSystemScs } from "@/features/file-systems/utils/Filesystem";
+import { getFileSystemStorageClasses } from "@/features/file-systems/utils/FileSystems";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 type FileSystemStorageClassesProps = {
@@ -20,7 +20,7 @@ export const FileSystemStorageClasses: React.FC<
     return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
-  const scs = getFileSystemScs(fileSystem, storageClasses);
+  const scs = getFileSystemStorageClasses(fileSystem, storageClasses);
   if (!storageClasses.length || isNotAvailable) {
     return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }

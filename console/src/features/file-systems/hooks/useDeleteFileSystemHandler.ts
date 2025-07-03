@@ -9,7 +9,7 @@ import {
 } from "@openshift-console/dynamic-plugin-sdk";
 import { FS_ALLOW_DELETE_LABEL } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { getFileSystemScs as getFileSystemStorageClasses } from "../utils/Filesystem";
+import { getFileSystemStorageClasses } from "../utils/FileSystems";
 import type { FileSystemsTableViewModel } from "./useFileSystemsTableViewModel";
 import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
 

@@ -14,7 +14,7 @@ import { getName } from "@/shared/utils/console/K8sResourceCommon";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
-import { isFilesystemInUse } from "../utils/Filesystem";
+import { getFileSystemStorageClasses } from "../utils/FileSystems";
 
 export const useFileSystemTableRowViewModel = (fileSystem: FileSystem) => {
   const { t } = useFusionAccessTranslations();
@@ -194,3 +194,17 @@ export const useFileSystemTableRowViewModel = (fileSystem: FileSystem) => {
 export type FileSystemTableRowViewModel = ReturnType<
   typeof useFileSystemTableRowViewModel
 >;
+
+export const isFilesystemInUse = (
+  fileSystem: FileSystem,
+  scs: StorageClass[],
+  pvcs: IoK8sApiCoreV1PersistentVolumeClaim[]
+) => {
+  const fsScs = getFileSystemStorageClasses(fileSystem, scs).map(
+    (sc) => sc.metadata?.name
+  );
+  return pvcs.some(
+    (pvc) =>
+      pvc.spec?.storageClassName && fsScs.includes(pvc.spec?.storageClassName)
+  );
+};
