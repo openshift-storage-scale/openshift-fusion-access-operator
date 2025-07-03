@@ -25,13 +25,12 @@ export const useLunsViewModel = () => {
   useEffect(() => {
     if (storageNodesLvdrs.error) {
       dispatch({
-        type: "global/showAlert",
+        type: "global/addAlert",
         payload: {
           title: t(
             "Failed to load LocaVolumeDiscoveryResults for storage nodes"
           ),
           description: storageNodesLvdrs.error.message,
-          isDismissable: true,
           variant: "danger",
         },
       });

@@ -1,20 +1,22 @@
 import {
   MINIMUM_AMOUNT_OF_SHARED_DISKS,
   MINIMUM_AMOUNT_OF_NODES,
-  MIN_AMOUNT_OF_NODES_MSG_DIGEST,
   MINIMUM_AMOUNT_OF_SHARED_DISKS_LITERAL,
   MINIMUM_AMOUNT_OF_NODES_LITERAL,
 } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { NodesSelectionTableViewModel } from "./useNodesSelectionTableViewModel";
 
 export const useValidateMinimumRequirements = (
   vm: NodesSelectionTableViewModel
 ) => {
-  const [, dispatch] = useStore<State, Actions>();
+  const [store, dispatch] = useStore<State, Actions>();
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
   const { t } = useFusionAccessTranslations();
 
   useEffect(() => {
@@ -33,10 +35,9 @@ export const useValidateMinimumRequirements = (
         payload: { isDisabled: true },
       });
       dispatch({
-        type: "global/showAlert",
+        type: "global/addAlert",
         payload: {
-          key: MIN_AMOUNT_OF_NODES_MSG_DIGEST,
-          variant: "warning",
+          key: "minimum-shared-disks-and-nodes",
           title: t("Storage cluster requirements"),
           description: [
             conditions[0]
@@ -54,7 +55,8 @@ export const useValidateMinimumRequirements = (
                 )
               : "",
           ].filter(Boolean),
-          isDismissable: false,
+          variant: "warning",
+          dismiss: () => dispatch({ type: "global/dismissAlert" }),
         },
       });
     } else {
@@ -62,9 +64,9 @@ export const useValidateMinimumRequirements = (
         type: "global/updateCta",
         payload: { isDisabled: false },
       });
-      dispatch({
-        type: "global/dismissAlert",
-      });
+      storeRef.current.alerts
+        .find((alert) => alert.key === "minimum-shared-disks-and-nodes")
+        ?.dismiss!();
     }
   }, [dispatch, t, vm.loaded, vm.selectedNodes.length, vm.sharedDisksCount]);
 };

@@ -53,12 +53,11 @@ export const useCreateStorageClusterHandler = () => {
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "global/showAlert",
+        type: "global/addAlert",
         payload: {
-          variant: "danger",
           title: t("An error occurred while creating resources"),
           description,
-          isDismissable: true,
+          variant: "danger",
         },
       });
     }

@@ -32,7 +32,7 @@ export default FileSystemsHomePage;
 const ConnectedFileSystemsHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
 
-  const [store, dispatch] = useStore<State, Actions>();
+  const [store] = useStore<State, Actions>();
 
   const storageClusters = useWatchStorageCluster({ limit: 1 });
 
@@ -46,8 +46,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
-      alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
+      alerts={store.alerts}
       actions={
         (fileSystems.data ?? []).length > 0 ? (
           <FileSystemsCreateButton onClick={redirectToCreateFileSystems} />
