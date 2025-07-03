@@ -29,7 +29,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
   return (
     <Modal
       isOpen={vm.isOpen}
-      aria-describedby="delete-filesystem-confirmation-modal"
+      aria-describedby="filesystem-delete-confirmation-modal"
       aria-labelledby="delete-filesystem-title"
       variant="medium"
       onClose={vm.handleClose}
@@ -39,7 +39,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
         titleIconVariant="warning"
         labelId="delete-filesystem-title"
       />
-      <ModalBody tabIndex={0} id="delete-filesystem-confirmation-modal">
+      <ModalBody tabIndex={0} id="filesystem-delete-confirmation-modal">
         <Stack hasGutter>
           <StackItem isFilled>
             {!vm.errors.length ? (

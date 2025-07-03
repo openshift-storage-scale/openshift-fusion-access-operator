@@ -36,8 +36,7 @@ export const useLunsViewModel = () => {
         },
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageNodesLvdrs.error, t]);
+  }, [dispatch, storageNodesLvdrs.error, t]);
 
   // We're taking just the first LVDR from the storage nodes because
   // all of them MUST report the same disks as required during storage
@@ -104,7 +103,7 @@ export const useLunsViewModel = () => {
   const nodeName = storageNodesLvdr?.spec.nodeName;
   const loaded = storageNodesLvdrs.loaded && typeof nodeName === "string";
 
-  const vm = useMemo(
+  return useMemo(
     () =>
       ({
         data,
@@ -116,8 +115,6 @@ export const useLunsViewModel = () => {
       }) as const,
     [data, isSelected, loaded, nodeName, setAllSelected, setSelected]
   );
-
-  return vm;
 };
 
 export type LunsViewModel = ReturnType<typeof useLunsViewModel>;

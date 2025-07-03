@@ -36,6 +36,12 @@ export const useRoutes = (): NormalizedWatchK8sResult<Route[]> => {
       loaded: routes.loaded && storageClusters.loaded,
       error: routes.error || storageClusters.error,
     }),
-    [routes, storageClusters.error, storageClusters.loaded]
+    [
+      routes.data,
+      routes.error,
+      routes.loaded,
+      storageClusters.error,
+      storageClusters.loaded,
+    ]
   );
 };

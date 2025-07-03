@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef } from "react";
 import { useImmerReducer, type ImmerReducer } from "use-immer";
 
 /**
@@ -33,6 +33,8 @@ function useReducerWithThunk<State, Action>(
   initialState: State
 ): [State, React.Dispatch<Action>] {
   const [state, dispatch] = useImmerReducer(reducer, initialState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const customDispatch = useCallback<
     React.Dispatch<Thunk<Action, State> | Action>
@@ -40,12 +42,12 @@ function useReducerWithThunk<State, Action>(
     (param) => {
       if (typeof param === "function") {
         const thunk = param as Thunk<Action, State>;
-        void thunk(dispatch, state);
+        void thunk(dispatch, stateRef.current);
       } else {
         dispatch(param);
       }
     },
-    [dispatch, state]
+    [dispatch]
   );
 
   return useMemo(() => [state, customDispatch], [customDispatch, state]);

@@ -97,10 +97,9 @@ export const useFileSystemCreateFormViewModel = () => {
           luns.data.every((l) => !l.isSelected),
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.isValid, fileSystemName, luns.data]);
+  }, [form.isValid, fileSystemName, luns.data, dispatch]);
 
-  const vm = useMemo(
+  return useMemo(
     () =>
       ({
         columns,
@@ -123,8 +122,6 @@ export const useFileSystemCreateFormViewModel = () => {
       handleSubmitForm,
     ]
   );
-
-  return vm;
 };
 
 export type FileSystemCreateFormViewModel = ReturnType<
