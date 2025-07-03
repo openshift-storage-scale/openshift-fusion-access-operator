@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/kubernetes/1.30/types";
 import { STORAGE_ROLE_LABEL, WORKER_NODE_ROLE_LABEL } from "@/constants";
 import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
@@ -8,6 +8,8 @@ import { useWatchNode } from "@/shared/hooks/useWatchNode";
 import type { TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useValidateMinimumRequirements } from "./useValidateMinimumRequirements";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
 
 export interface NodesSelectionTableViewModel {
   columns: TableColumn<IoK8sApiCoreV1Node>[];
@@ -21,13 +23,39 @@ export interface NodesSelectionTableViewModel {
 
 export const useNodesSelectionTableViewModel =
   (): NodesSelectionTableViewModel => {
+    const [, dispatch] = useStore<State, Actions>();
+
     const { t } = useFusionAccessTranslations();
 
     const lvdrs = useWatchLocalVolumeDiscoveryResult();
+    useEffect(() => {
+      if (lvdrs.error) {
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: t("Failed to load LocalVolumeDiscoveryResults"),
+            description: lvdrs.error.message,
+            variant: "danger",
+          },
+        });
+      }
+    }, [dispatch, lvdrs.error, lvdrs.loaded, t]);
 
     const nodes = useWatchNode({
       withLabels: [WORKER_NODE_ROLE_LABEL],
     });
+    useEffect(() => {
+      if (nodes.error) {
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: t("Failed to load Nodes"),
+            description: nodes.error.message,
+            variant: "danger",
+          },
+        });
+      }
+    }, [dispatch, nodes.error, nodes.loaded, t]);
 
     const loaded = useMemo(
       () => nodes.loaded && lvdrs.loaded,

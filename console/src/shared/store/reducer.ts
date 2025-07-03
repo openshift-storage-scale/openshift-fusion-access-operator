@@ -11,11 +11,31 @@ export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
     case "global/updateDocTitle":
       draft.docTitle = action.payload;
       break;
-    case "global/showAlert":
-      draft.alert = action.payload;
+    case "global/addAlert":
+      if (action.payload.key === "minimum-shared-disks-and-nodes") {
+        // If the alert for minimum shared disks and nodes already exists,
+        // we don't add it again, but we update the existing one.
+        const existingAlertIndex = draft.alerts.findIndex(
+          (a) => a.key === "minimum-shared-disks-and-nodes"
+        );
+
+        if (existingAlertIndex === -1) {
+          // If the alert does not exist, we add it to the front.
+          draft.alerts.unshift(action.payload);
+        } else if (existingAlertIndex === 0) {
+          draft.alerts[existingAlertIndex] = action.payload;
+        } else if (existingAlertIndex > 0) {
+          // If the alert is not the first one, we move it to the front
+          // to ensure it is always visible.
+          draft.alerts.splice(existingAlertIndex, 1);
+          draft.alerts.unshift(action.payload);
+        }
+      } else {
+        draft.alerts.push(action.payload);
+      }
       break;
     case "global/dismissAlert":
-      draft.alert = null;
+      draft.alerts.shift();
       break;
     case "global/updateCta":
       draft.cta = {
@@ -32,7 +52,7 @@ export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
 
 export const initialState: State = {
   docTitle: t("Fusion Access for SAN"),
-  alert: null,
+  alerts: [],
   cta: {
     isDisabled: true,
     isLoading: false,

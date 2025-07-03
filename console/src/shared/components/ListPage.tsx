@@ -3,25 +3,17 @@ import {
   ListPageBody,
   ListPageHeader,
 } from "@openshift-console/dynamic-plugin-sdk";
-import {
-  AlertGroup,
-  Alert,
-  AlertActionCloseButton,
-  Stack,
-  StackItem,
-  List,
-  ListItem,
-} from "@patternfly/react-core";
+import { Stack, StackItem } from "@patternfly/react-core";
 import { useLayoutEffect } from "react";
 import type { State } from "../store/types";
+import { ListPageAlert } from "./ListPageAlert";
 
 interface ListPageProps {
   documentTitle: string;
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
-  alert?: State['alert'];
-  onDismissAlert?: (alert: State['alert']) => void;
+  alerts?: State["alerts"];
   listPageBodyStyle?: Partial<UseListPageBodyStyleHackOptions>;
   footer?: React.ReactNode;
 }
@@ -29,12 +21,11 @@ interface ListPageProps {
 export const ListPage: React.FC<ListPageProps> = (props) => {
   const {
     actions,
-    alert,
+    alerts = [],
     children,
     description = <br />,
     documentTitle,
     listPageBodyStyle = {},
-    onDismissAlert,
     title,
     footer,
   } = props;
@@ -55,38 +46,7 @@ export const ListPage: React.FC<ListPageProps> = (props) => {
         <Stack hasGutter>
           <StackItem>{children}</StackItem>
           <StackItem isFilled style={{ alignContent: "flex-end" }}>
-            {alert && (
-              <AlertGroup isLiveRegion>
-                <Alert
-                  isInline
-                  key={alert.key}
-                  variant={alert.variant}
-                  title={alert.title}
-                  actionClose={
-                    alert.isDismissable ? (
-                      <AlertActionCloseButton
-                        title={alert.title as string}
-                        variantLabel={alert.variant}
-                        onClose={() => {
-                          onDismissAlert?.(alert);
-                        }}
-                      />
-                    ) : null
-                  }
-                >
-                  {alert.description &&
-                  typeof alert.description !== "string" ? (
-                    <List>
-                      {alert.description.map((desc, idx) => (
-                        <ListItem key={idx}>{desc}</ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    alert.description
-                  )}
-                </Alert>
-              </AlertGroup>
-            )}
+            <ListPageAlert alert={alerts[0]} />
           </StackItem>
           <StackItem>{footer}</StackItem>
         </Stack>
