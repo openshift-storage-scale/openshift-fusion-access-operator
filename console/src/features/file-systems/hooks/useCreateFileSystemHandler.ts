@@ -50,11 +50,11 @@ export const useCreateFileSystemHandler = (
   return useCallback(async () => {
     if (!luns.nodeName) {
       dispatch({
-        type: "global/showAlert",
+        type: "global/addAlert",
         payload: {
           title: "Node name is required to create a file system.",
-          isDismissable: true,
           variant: "warning",
+          dismiss: () => dispatch({ type: "global/dismissAlert" }),
         },
       });
       return;
@@ -85,12 +85,11 @@ export const useCreateFileSystemHandler = (
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
-        type: "global/showAlert",
+        type: "global/addAlert",
         payload: {
-          variant: "danger",
           title: t("An error occurred while creating resources"),
           description,
-          isDismissable: true,
+          variant: "danger",
         },
       });
     } finally {

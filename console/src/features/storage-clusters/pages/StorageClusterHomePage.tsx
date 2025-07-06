@@ -31,7 +31,7 @@ export default StorageClusterHomePage;
 const ConnectedStorageClusterHomePage: React.FC = () => {
   const { t } = useFusionAccessTranslations();
 
-  const [store, dispatch] = useStore<State, Actions>();
+  const [store] = useStore<State, Actions>();
 
   const redirectToCreateStorageCluster = useRedirectHandler(
     "/fusion-access/storage-cluster/create"
@@ -43,8 +43,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Fusion Access for SAN")}
-      alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
+      alerts={store.alerts}
     >
       <Async
         loaded={storageClusters.loaded}

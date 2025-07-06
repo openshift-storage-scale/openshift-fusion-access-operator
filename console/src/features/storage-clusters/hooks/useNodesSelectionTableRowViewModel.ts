@@ -20,6 +20,9 @@ import {
   getMemory,
   toggleNodeStorageRoleLabel,
 } from "@/shared/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 
 export interface NodesSelectionTableRowViewModel {
   uid: string | undefined;
@@ -38,15 +41,19 @@ export interface NodesSelectionTableRowViewModel {
 export const useNodesSelectionTableRowViewModel = (
   node: IoK8sApiCoreV1Node
 ): NodesSelectionTableRowViewModel => {
+  const [, dispatch] = useStore<State, Actions>();
+
+  const { t } = useFusionAccessTranslations();
+
   const [status, setStatus] = useState<
     NodesSelectionTableRowViewModel["status"]
   >(hasLabel(node, STORAGE_ROLE_LABEL) ? "selected" : "unselected");
+
   const warnings = useMemo(() => new Set<"InsufficientMemory">(), []);
   const name = getName(node);
   const uid = getUid(node);
   const role = getRole(node);
   const cpu = getCpu(node);
-
   const value = getMemory(node);
   if (
     !(value instanceof Error) &&
@@ -87,13 +94,21 @@ export const useNodesSelectionTableRowViewModel = (
           resource: node,
         });
         setStatus(checked ? "selected" : "unselected");
-      } catch {
+      } catch (e) {
         setStatus(
           hasLabel(node, STORAGE_ROLE_LABEL) ? "selected" : "unselected"
         );
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: t("Failed to update node selection"),
+            description: e instanceof Error ? e.message : String(e),
+            variant: "danger",
+          },
+        });
       }
     },
-    [k8sNode, node, status]
+    [dispatch, k8sNode, node, status, t]
   );
 
   return useMemo(

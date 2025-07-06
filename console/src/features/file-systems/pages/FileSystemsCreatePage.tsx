@@ -24,7 +24,7 @@ FileSystemsCreate.displayName = "FileSystemsCreate";
 export default FileSystemsCreate;
 
 const ConnectedCreateFileSystems: React.FC = () => {
-  const [store, dispatch] = useStore<State, Actions>();
+  const [store] = useStore<State, Actions>();
 
   const { t } = useFusionAccessTranslations();
 
@@ -39,8 +39,7 @@ const ConnectedCreateFileSystems: React.FC = () => {
       description={t(
         "Create a file system to represent your required storage (based on the selected nodes’ storage)."
       )}
-      alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "global/dismissAlert" })}
+      alerts={store.alerts}
       footer={
         <Split hasGutter>
           <FileSystemsCreateButton
