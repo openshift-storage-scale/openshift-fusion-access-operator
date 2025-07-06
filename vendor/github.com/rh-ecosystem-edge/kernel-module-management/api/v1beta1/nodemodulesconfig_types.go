@@ -67,7 +67,7 @@ type NodeModuleStatus struct {
 	//+optional
 	Config ModuleConfig `json:"config,omitempty"`
 	//+optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	BootId string `json:"bootId,omitempty"`
 }
 
 // NodeModuleConfigStatus is the most recently observed status of the KMM modules on node.
