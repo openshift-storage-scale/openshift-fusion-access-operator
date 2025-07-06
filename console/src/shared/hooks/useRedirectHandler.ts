@@ -27,9 +27,7 @@ export const useRedirectHandler = (urlPath: UrlPathsValues) => {
   const history = useHistory();
 
   return useCallback(
-    (state?: unknown) => {
-      history.push(urlPath, state);
-    },
+    (state?: unknown) => history.push(urlPath, state),
     [history, urlPath]
   );
 };

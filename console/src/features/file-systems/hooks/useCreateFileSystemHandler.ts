@@ -112,7 +112,7 @@ export const useCreateFileSystemHandler = (
 
 function createFileSystem(
   fileSystemName: string,
-  localDisks: PromiseSettledResult<LocalDisk>[],
+  localDisks: LocalDisk[],
   fileSystemModel: K8sModel,
   namespace: string
 ): Promise<FileSystem> {
@@ -128,10 +128,7 @@ function createFileSystem(
             {
               disks: Array.from(
                 new Set(
-                  localDisks
-                    .filter((ld) => ld.status === "fulfilled")
-                    .map((ld) => ld.value.metadata?.name)
-                    .filter(Boolean)
+                  localDisks.map((ld) => ld.metadata?.name).filter(Boolean)
                 )
               ) as string[],
             },
@@ -168,7 +165,7 @@ function createLocalDisks(
     promises.push(promise);
   }
 
-  return Promise.allSettled(promises);
+  return Promise.all(promises);
 }
 
 const createStorageClass = (scModel: K8sModel, fileSystemName: string) => {
