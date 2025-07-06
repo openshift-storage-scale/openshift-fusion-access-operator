@@ -92,12 +92,12 @@ export const useCreateFileSystemHandler = (
           variant: "danger",
         },
       });
+    } finally {
+      dispatch({
+        type: "global/updateCta",
+        payload: { isLoading: false },
+      });
     }
-
-    dispatch({
-      type: "global/updateCta",
-      payload: { isLoading: false },
-    });
   }, [
     dispatch,
     fileSystemModel,
