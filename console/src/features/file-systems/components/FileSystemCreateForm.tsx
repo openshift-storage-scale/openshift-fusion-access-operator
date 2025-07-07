@@ -29,7 +29,7 @@ export const FileSystemCreateForm: React.FC = () => {
           id="file-system-create-form"
           onSubmit={vm.handleSubmitForm}
         >
-          <FormGroup isRequired label="Name" fieldId="name">
+          <FormGroup isRequired label="File system name" fieldId="name">
             <TextInput
               type="text"
               id="name"
@@ -90,7 +90,7 @@ export const FileSystemCreateForm: React.FC = () => {
                 </Thead>
                 <Tbody>
                   {vm.luns.data.map((lun, rowIndex) => (
-                    <Tr key={lun.id}>
+                    <Tr key={lun.path}>
                       <Td
                         select={{
                           rowIndex,
@@ -98,8 +98,8 @@ export const FileSystemCreateForm: React.FC = () => {
                           onSelect: vm.handleSelectLun(lun),
                         }}
                       />
-                      <Td dataLabel={vm.columns.ID}>{lun.id}</Td>
-                      <Td dataLabel={vm.columns.NAME}>{lun.name}</Td>
+                      <Td dataLabel={vm.columns.PATH}>{lun.path}</Td>
+                      <Td dataLabel={vm.columns.WWN}>{lun.wwn}</Td>
                       <Td dataLabel={vm.columns.CAPACITY}>{lun.capacity}</Td>
                     </Tr>
                   ))}

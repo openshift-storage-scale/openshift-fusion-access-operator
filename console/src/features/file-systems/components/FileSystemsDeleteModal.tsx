@@ -35,7 +35,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
       onClose={vm.handleClose}
     >
       <ModalHeader
-        title={t("Delete Filesystem")}
+        title={t("Delete File system")}
         titleIconVariant="warning"
         labelId="delete-filesystem-title"
       />
@@ -83,7 +83,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
             isLoading={vm.isDeleting}
             isDisabled={vm.isDeleting}
           >
-            {vm.isDeleting ? t("Deleting") : t("Confirm")}
+            {vm.isDeleting ? t("Deleting") : t("Delete")}
           </Button>
         ) : (
           <Button
@@ -94,7 +94,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
             isLoading={vm.isDeleting}
             isDisabled={vm.isDeleting}
           >
-            {t("OK")}
+            {t("Close")}
           </Button>
         )}
         {vm.isDeleting ? null : (

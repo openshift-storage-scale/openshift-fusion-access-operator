@@ -10,8 +10,8 @@ import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
 
 export interface Lun {
   isSelected: boolean;
-  id: string;
-  name: string;
+  path: string;
+  wwn: string;
   capacity: string;
 }
 
@@ -70,14 +70,14 @@ export const useLunsViewModel = () => {
   ]);
 
   const isSelected = useCallback(
-    (lun: Lun) => luns.find((l) => l.id === lun.id)?.isSelected ?? false,
+    (lun: Lun) => luns.find((l) => l.path === lun.path)?.isSelected ?? false,
     [luns]
   );
 
   const setSelected = useCallback((lun: Lun, isSelected: boolean) => {
     setLuns((current) => {
       const draft = window.structuredClone(current);
-      const subject = draft.find((l) => l.id === lun.id);
+      const subject = draft.find((l) => l.path === lun.path);
       if (subject) {
         subject.isSelected = isSelected;
         return draft;
@@ -130,8 +130,8 @@ const outDevicesUsedByLocalDisks =
 const toLun = (disk: DiscoveredDevice): Lun => {
   return {
     isSelected: false,
-    id: disk.path,
-    name: disk.WWN.slice("uuid.".length),
+    path: disk.path,
+    wwn: disk.WWN.slice("uuid.".length),
     // Note: Usage of 'GB' is intentional here
     capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
   };

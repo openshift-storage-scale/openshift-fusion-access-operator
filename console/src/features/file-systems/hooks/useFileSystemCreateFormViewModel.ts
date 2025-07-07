@@ -18,8 +18,8 @@ export const useFileSystemCreateFormViewModel = () => {
   const columns = useMemo(
     () =>
       ({
-        ID: t("ID"),
-        NAME: t("Name"),
+        PATH: t("Path"),
+        WWN: t("WWN"),
         CAPACITY: t("Capacity"),
       }) as const,
     [t]
