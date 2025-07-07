@@ -2,7 +2,6 @@ import {
   Button,
   EmptyState,
   EmptyStateActions,
-  EmptyStateBody,
   EmptyStateFooter,
 } from "@patternfly/react-core";
 import { ExternalLinkAltIcon, FolderIcon } from "@patternfly/react-icons";
@@ -23,9 +22,6 @@ export const FileSystemsTableEmptyState: React.FC = () => {
       headingLevel="h4"
       icon={FolderIcon}
     >
-      <EmptyStateBody>
-        {t("You can create one by pressing the button below.")}
-      </EmptyStateBody>
       <EmptyStateFooter>
         <EmptyStateActions>
           <FileSystemsCreateButton onClick={redirectToCreateFileSystem} />

@@ -96,10 +96,10 @@ export const useNodesSelectionTableViewModel =
         case n === 1:
           return t("{{n}} node selected", { n });
         case n >= 2 && s === 1:
-          return t("{{n}} nodes selected with {{s}} shared disk", { n, s });
+          return t("{{n}} nodes were selected, sharing {{s}} disk between them", { n, s });
         default:
           // n >= 2 && s >= 2
-          return t("{{n}} nodes selected with {{s}} shared disks", { n, s });
+          return t("{{n}} nodes were selected, sharing {{s}} disks between them", { n, s });
       }
     }, [selectedNodes.length, sharedDisksCount, t]);
 
