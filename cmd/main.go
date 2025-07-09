@@ -40,6 +40,7 @@ import (
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 
 	consolev1 "github.com/openshift/api/console/v1"
+	imageregistryv1 "github.com/openshift/api/imageregistry/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	lvdcontroller "github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
@@ -63,6 +64,8 @@ func init() {
 	utilruntime.Must(machineconfigv1.AddToScheme(scheme))
 
 	utilruntime.Must(consolev1.AddToScheme(scheme))
+
+	utilruntime.Must(imageregistryv1.AddToScheme(scheme))
 
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 

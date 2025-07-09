@@ -44,6 +44,7 @@ import (
 
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/console"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/imageregistry"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
@@ -84,6 +85,9 @@ func NewFusionAccessReconciler(
 
 // KMM support
 //+kubebuilder:rbac:groups=kmm.sigs.x-k8s.io,resources=modules,verbs=create;delete;get;list;patch;update;watch
+
+// Image repository (internal)
+//+kubebuilder:rbac:groups=imageregistry.operator.openshift.io,resources=configs,verbs=get;list;watch
 
 // Below rules are inserted via `make rbac-generate` automatically
 // IBM_RBAC_MARKER_START
@@ -367,6 +371,36 @@ func (r *FusionAccessReconciler) Reconcile(
 			return reconcile.Result{}, err
 		}
 		log.Log.Info("Entitlement secrets created")
+
+		// Check if we're using the internal image registry and validate its storage configuration
+		usingInternalRegistry, err := imageregistry.IsUsingInternalImageRegistry(ctx, r.Client, ns)
+		if err != nil {
+			log.Log.Error(err, "Failed to check if using internal image registry")
+			return ctrl.Result{}, err
+		}
+
+		if usingInternalRegistry {
+			log.Log.Info("Using internal image registry, validating storage configuration")
+			if err := imageregistry.CheckImageRegistryStorage(ctx, r.Client); err != nil {
+				fusionaccess.Status.Status = "Error"
+				meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+					v1.Condition{Type: "ImageRegistryStorage", Status: v1.ConditionFalse, Reason: "InvalidStorageBackend", Message: err.Error()})
+				serr := r.Status().Update(ctx, fusionaccess)
+				if serr != nil {
+					return ctrl.Result{}, errors.Join(serr, err)
+				}
+				return ctrl.Result{}, err
+			}
+			log.Log.Info("Image registry storage validation passed")
+			meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+				v1.Condition{Type: "ImageRegistryStorage", Status: v1.ConditionTrue, Reason: "ValidStorageBackend", Message: "Image registry is using a supported storage backend"})
+			serr := r.Status().Update(ctx, fusionaccess)
+			if serr != nil {
+				return ctrl.Result{}, serr
+			}
+		} else {
+			log.Log.Info("Using external image registry, skipping storage validation")
+		}
 
 		// Since the kernel module requires the pull secret, we only create that if the secret is found
 		log.Log.Info("Creating kernel module resources")
