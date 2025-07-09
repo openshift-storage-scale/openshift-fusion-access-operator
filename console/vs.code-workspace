@@ -4,14 +4,6 @@
       "name": "Openshift Fusion Access Plugin",
       "path": ".",
     },
-    {
-      "name": "Tekton pipeline",
-      "path": "../.tekton",
-    },
-    {
-      "name": "Github Actions",
-      "path": "../.github",
-    },
   ],
   "settings": {
     "window.title": "${folderName}",
