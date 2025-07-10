@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeu -o pipefail
 [[ -n "${DEBUGME+x}" ]] && set -x
 
 script_name="${BASH_SOURCE[0]:-$0}"
 script_path="$(realpath "$script_name")"
-script_dir_path="$(dirname "$script_path")"
-project_dir_path="$(dirname "$script_dir_path")"
+scripts_dir="$(dirname "$script_path")"
+console_dir="$(dirname "$scripts_dir")"
 
-PLUGIN_NAME="$(jq -r '.name' "$project_dir_path/package.json")"
+PLUGIN_NAME="$(jq -r '.name' "$console_dir/package.json")"
 
 CONSOLE_VERSION=${CONSOLE_VERSION:="latest"}
 CONSOLE_IMAGE=${CONSOLE_IMAGE:="quay.io/openshift/origin-console:$CONSOLE_VERSION"}
@@ -17,16 +17,24 @@ CONSOLE_IMAGE_PLATFORM=${CONSOLE_IMAGE_PLATFORM:="linux/amd64"}
 
 echo "Starting local OpenShift console v${CONSOLE_VERSION}..."
 
+# shellcheck disable=SC2034
 BRIDGE_I18N_NAMESPACES="plugin__${PLUGIN_NAME}"
+# shellcheck disable=SC2034
 BRIDGE_USER_AUTH="disabled"
+# shellcheck disable=SC2034
 BRIDGE_USER_SETTINGS_LOCATION="localstorage"
+# shellcheck disable=SC2034
 BRIDGE_K8S_MODE="off-cluster"
+# shellcheck disable=SC2034
 BRIDGE_K8S_AUTH_BEARER_TOKEN="${OC_DEV_TOKEN:-$(oc whoami --show-token 2>/dev/null)}"
 BRIDGE_K8S_MODE_OFF_CLUSTER_ENDPOINT=$(oc whoami --show-server)
+# shellcheck disable=SC2034
 BRIDGE_K8S_MODE_OFF_CLUSTER_SKIP_VERIFY_TLS=true
 # The monitoring operator is not always installed (e.g. for local OpenShift). Tolerate missing config maps.
 set +e
+# shellcheck disable=SC2034
 BRIDGE_K8S_MODE_OFF_CLUSTER_THANOS=$(oc -n openshift-config-managed get configmap monitoring-shared-config -o jsonpath='{.data.thanosPublicURL}' 2>/dev/null)
+# shellcheck disable=SC2034
 BRIDGE_K8S_MODE_OFF_CLUSTER_ALERTMANAGER=$(oc -n openshift-config-managed get configmap monitoring-shared-config -o jsonpath='{.data.alertmanagerPublicURL}' 2>/dev/null)
 set -e
 
@@ -35,6 +43,7 @@ set +e
 GITOPS_HOSTNAME=$(oc -n openshift-gitops get route cluster -o jsonpath='{.spec.host}' 2>/dev/null)
 set -e
 if [ -n "$GITOPS_HOSTNAME" ]; then
+    # shellcheck disable=SC2034
     BRIDGE_K8S_MODE_OFF_CLUSTER_GITOPS="https://$GITOPS_HOSTNAME"
 fi
 
@@ -52,8 +61,23 @@ pocker_args=(
     --rm
     --pull=always
     --platform="$CONSOLE_IMAGE_PLATFORM"
-    --name="console-$CONSOLE_VERSION"
+    --name="openshift-console-${CONSOLE_VERSION%.*}"
 )
+
+echo "Checking if the volume containing the console-app is already available..."
+if ! pocker volume inspect console-public-dir; then
+    OPENSHIFT_CONSOLE_DIR="${OPENSHIFT_CONSOLE_DIR:-$HOME/.openshift-console}"
+    "$scripts_dir/build-console-frontend.sh"
+
+    echo "Creating a container volume with the console-app built in dev-mode"
+    pocker volume create console-public-dir
+    pocker run -d --rm --name tmp -v console-public-dir:/data alpine sleep infinity
+    pocker cp "${OPENSHIFT_CONSOLE_DIR}/frontend/public/dist/." tmp:/data/
+    pocker stop tmp >/dev/null
+    rm -rf "$OPENSHIFT_CONSOLE_DIR"
+
+    pocker_args+=(-v="console-public-dir:/opt/bridge/static")    
+fi
 
 if [ -x "$(command -v podman)" ]; then
     if [ "$(uname -s)" = "Linux" ]; then
@@ -65,8 +89,9 @@ if [ -x "$(command -v podman)" ]; then
         pocker_args+=(-p="$CONSOLE_PORT:9000")
     fi
 else
+    # shellcheck disable=SC2034
     BRIDGE_PLUGINS="${PLUGIN_NAME}=http://host.docker.internal:9001"
     pocker_args+=(-p="$CONSOLE_PORT:9000")
 fi
 
-pocker run "${pocker_args[@]}" --env-file=<(set | grep BRIDGE) $CONSOLE_IMAGE
+pocker run "${pocker_args[@]}" --env-file=<(set | grep BRIDGE) "$CONSOLE_IMAGE"
