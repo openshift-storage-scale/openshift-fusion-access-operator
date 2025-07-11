@@ -1,21 +1,13 @@
 {
   "folders": [
     {
-      "name": "Openshift Fusion Access Plugin",
+      "name": "Fusion Access for SAN - Console Plugin",
       "path": ".",
-    },
-    {
-      "name": "Tekton pipeline",
-      "path": "../.tekton",
-    },
-    {
-      "name": "Github Actions",
-      "path": "../.github",
     },
   ],
   "settings": {
     "window.title": "${folderName}",
-    "typescript.tsdk": "Openshift Fusion Access Plugin/node_modules/typescript/lib",
+    "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
     "typescript.preferences.preferTypeOnlyAutoImports": true,
     "editor.formatOnSave": true,
     "eslint.options": {
