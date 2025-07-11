@@ -63,7 +63,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	KMMImageConfig, err := getKMMImageConfig(ctx, cl, ns)
+	KMMImageConfig, err := GetKMMImageConfig(ctx, cl, ns)
 	if err != nil {
 		return fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
@@ -220,7 +220,8 @@ type KMMImageConfig struct {
 	RegistrySecretName string
 }
 
-func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) (KMMImageConfig, error) {
+// Public function to get KMMImageConfig from ConfigMap held in var GetKMMImageConfig
+var GetKMMImageConfig = func(ctx context.Context, cl client.Client, namespace string) (KMMImageConfig, error) {
 	config := KMMImageConfig{
 		RegistryURL:        "image-registry.openshift-image-registry.svc:5000",
 		Repo:               fmt.Sprintf("%s/gpfs_compat_kmod", namespace),
@@ -234,7 +235,7 @@ func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) 
 			log.Log.Info(fmt.Sprintf("Configmap %s not found, using default values", KMMImageConfigMapName))
 			return config, nil
 		}
-		return config, fmt.Errorf("failed to get configmap %s in getKMMImageConfig: %w", KMMImageConfigMapName, err)
+		return config, fmt.Errorf("failed to get configmap %s in GetKMMImageConfig: %w", KMMImageConfigMapName, err)
 	}
 	data := cm.Data
 
@@ -274,7 +275,7 @@ func getMergedRegistrySecret(ctx context.Context, cl client.Client, namespace st
 			return nil, fmt.Errorf("failed to get secret %s in getMergedRegistrySecret: %w", kmmImageConfig.RegistrySecretName, err)
 		}
 	} else {
-		builderSecretName, err := getServiceAccountDockercfgSecretName(ctx, cl, namespace, "builder")
+		builderSecretName, err := GetServiceAccountDockercfgSecretName(ctx, cl, namespace, "builder")
 		if err != nil {
 			return nil, fmt.Errorf("error fetching dockercfg secret in getMergedRegistrySecret: %w", err)
 		}
@@ -365,8 +366,8 @@ COPY --from=builder /usr/lpp/mmfs/bin/lxtrace-${KERNEL_FULL_VERSION} /opt/lxtrac
 	}
 }
 
-// getServiceAccountDockercfgSecretName fetches the Docker config secret name for a given service account
-func getServiceAccountDockercfgSecretName(ctx context.Context, cl client.Client, namespace, serviceAccountName string) (string, error) {
+// GetServiceAccountDockercfgSecretName fetches the Docker config secret name for a given service account
+var GetServiceAccountDockercfgSecretName = func(ctx context.Context, cl client.Client, namespace, serviceAccountName string) (string, error) {
 	// Define the secret name pattern based on the service account name
 	secretPattern := fmt.Sprintf("^%s-dockercfg-.*$", serviceAccountName)
 
