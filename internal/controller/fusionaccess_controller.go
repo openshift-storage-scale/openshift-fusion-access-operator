@@ -443,6 +443,11 @@ func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.getPullSecretSelector),
 			isItOurPullSecret(),
 		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.getRegistrySecretSelector),
+			didTheRegistrySecretChange(r.Client),
+		).
 		Complete(r)
 }
 
@@ -573,3 +578,98 @@ func checkPullSecret(secret *corev1.Secret, ns string) bool {
 // 	reqLogger.Info("Successfully finalized FusionAccess")
 // 	return nil
 // }
+
+// returns true if the registry secret has changed
+func didTheRegistrySecretChange(c client.Client) builder.WatchesOption {
+	return builder.WithPredicates(predicate.Funcs{
+		// if the builder-docker-blah secret is recreated to builder-docker-boom in that case we want to trigger a reconcile.
+		CreateFunc: func(e event.CreateEvent) bool {
+			ns, err := utils.GetDeploymentNamespace()
+			if err != nil {
+				return false
+			}
+			ctx := context.Background()
+			expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
+			if err != nil {
+				return false
+			}
+			secret, ok := e.Object.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			return secret.Name == expectedName && secret.Namespace == ns
+		},
+		// if the builder-docker-blah secret content/data is updated in that case we want to trigger a reconcile.
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			ns, err := utils.GetDeploymentNamespace()
+			if err != nil {
+				return false
+			}
+			// Check if the secret is the one we are interested in
+			ctx := context.Background()
+			expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
+			if err != nil {
+				return false
+			}
+			newSecret, ok := e.ObjectNew.DeepCopyObject().(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			oldSecret, ok := e.ObjectOld.DeepCopyObject().(*corev1.Secret)
+			if !ok {
+				return true
+			}
+			if newSecret.Name != expectedName || newSecret.Namespace != ns {
+				return false
+			}
+			return !reflect.DeepEqual(oldSecret.Data, newSecret.Data)
+		},
+		// All other event types (Create, Delete, Generic) default to false
+	})
+}
+
+// Selector for registry secret
+func (r *FusionAccessReconciler) getRegistrySecretSelector(
+	ctx context.Context,
+	_ client.Object,
+) []reconcile.Request {
+	ns, err := utils.GetDeploymentNamespace()
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
+	if err := r.List(ctx, fusionAccessList, client.InNamespace(ns)); err != nil {
+		log.Log.Error(err, "Failed to list FusionAccess instances")
+		return nil
+	}
+	if len(fusionAccessList.Items) == 0 {
+		log.Log.Info("No FusionAccess instance found, skipping pull secret")
+		return nil
+	}
+
+	// We enforce a single fusionAccess instance via webhooks so we can take the first
+	req := reconcile.Request{
+		NamespacedName: client.ObjectKeyFromObject(&fusionAccessList.Items[0]),
+	}
+	log.Log.Info("Enqueueing request for", "request", req)
+	return []reconcile.Request{req}
+}
+
+// Helper func to determine the current registry secret name which is or will be used by the KMM operator
+// It first checks the KMMImageConfigMap for the registry secret name, and if not found, it falls back to the builder dockercfg secret.
+// This secret will be watched by the controller to trigger a reconcile when it changes.
+// This is useful for cases where the registry secret is updated or changed either by the user or by virtue of token expiration consequently roted.
+func getCurrentRegistrySecretName(ctx context.Context, c client.Client, ns string) (string, error) {
+	KMMImageConfig, err := kernelmodule.GetKMMImageConfig(ctx, c, ns)
+	if err != nil {
+		return "", fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
+	}
+
+	if KMMImageConfig.RegistrySecretName != "" {
+		return KMMImageConfig.RegistrySecretName, nil
+	} else {
+		// fallback to builder dockercfg secret
+		return kernelmodule.GetServiceAccountDockercfgSecretName(ctx, c, ns, "builder")
+	}
+}
