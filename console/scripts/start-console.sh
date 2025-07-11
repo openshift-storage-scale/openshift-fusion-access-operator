@@ -66,15 +66,15 @@ pocker_args=(
 
 echo "Checking if the volume containing the console-app is already available..."
 if ! pocker volume inspect console-public-dir; then
-    OPENSHIFT_CONSOLE_DIR="${OPENSHIFT_CONSOLE_DIR:-$HOME/.openshift-console}"
-    "$scripts_dir/build-console-frontend.sh"
+    OPENSHIFT_CONSOLE_TMP="${OPENSHIFT_CONSOLE_TMP:-$(mktemp -d)}"
+    "$scripts_dir/build-console-frontend.sh" "$OPENSHIFT_CONSOLE_TMP"
 
     echo "Creating a container volume with the console-app built in dev-mode"
     pocker volume create console-public-dir
     pocker run -d --rm --name tmp -v console-public-dir:/data alpine sleep infinity
-    pocker cp "${OPENSHIFT_CONSOLE_DIR}/frontend/public/dist/." tmp:/data/
+    pocker cp "${OPENSHIFT_CONSOLE_TMP}/frontend/public/dist/." tmp:/data/
     pocker stop tmp >/dev/null
-    rm -rf "$OPENSHIFT_CONSOLE_DIR"
+    rm -rf "$OPENSHIFT_CONSOLE_TMP"
 
     pocker_args+=(-v="console-public-dir:/opt/bridge/static")    
 fi

@@ -5,7 +5,7 @@ set -Eeu -o pipefail
 
 trap 'handle_error "$LINENO" "$BASH_COMMAND"' ERR
 
-CONSOLE_DIR="${CONSOLE_DIR:-$HOME/.openshift-console}"
+CONSOLE_DIR="${CONSOLE_DIR:-$1}"
 CONSOLE_REPO_URL="${CONSOLE_REPO_URL:-https://github.com/openshift/console.git}"
 CONSOLE_VERSION="${CONSOLE_VERSION:-4.19.0}"
 
@@ -66,6 +66,7 @@ function build_frontend {
 }
 
 function main {
+    echo "Starting the OpenShift Console build process..."
     fetch_openshift_console_repo
     build_frontend
 }
