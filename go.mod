@@ -4,7 +4,6 @@ go 1.23.6
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
-	github.com/TwiN/deepmerge v0.2.2
 	github.com/manifestival/controller-runtime-client v0.4.0
 	github.com/manifestival/manifestival v0.7.2
 	github.com/onsi/ginkgo/v2 v2.23.4
@@ -70,7 +69,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
