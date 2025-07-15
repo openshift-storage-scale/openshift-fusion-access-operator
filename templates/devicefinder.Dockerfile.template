@@ -19,6 +19,7 @@ USER 65532:65532
 ENTRYPOINT ["/usr/bin/devicefinder"]
 
 LABEL \
+    com.redhat.openshift.versions="${SUPPORTED_OCP_VERSIONS}" \
     com.redhat.component="Device Finder image for OpenShift Fusion Access Operator" \
     description="Device Finder image for OpenShift Fusion Access Operator" \
     io.k8s.display-name="Device Finder image for OpenShift Fusion Access Operator" \

@@ -5,6 +5,9 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 export VERSION ?= $(shell cat VERSION.txt)
 
+# This variable will trickle down to all the dockerfiles under templates/ and also in the bundle
+# annotations
+export SUPPORTED_OCP_VERSIONS ?= v4.19
 
 OPERATOR_DOCKERFILE ?= operator.Dockerfile
 DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
@@ -356,7 +359,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | envsubst | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	# Since https://www.github.com/operator-framework/operator-sdk/issues/6598 we copy the dependencies file on our own
 	cp -f ./config/olm-dependencies.yaml ./bundle/metadata/dependencies.yaml
-	./hack/add_openshift_version_annotation.sh
+	./hack/add_openshift_version_annotation.sh $(SUPPORTED_OCP_VERSIONS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
