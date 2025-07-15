@@ -447,6 +447,13 @@ func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.getRegistrySecretSelector),
 			didTheRegistrySecretChange(r.Client),
+			builder.OnlyMetadata,
+		).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.getKmmConfigMapSelector),
+			didTheKmmConfigMapChange(),
+			builder.OnlyMetadata,
 		).
 		Complete(r)
 }
@@ -581,68 +588,35 @@ func checkPullSecret(secret *corev1.Secret, ns string) bool {
 
 // returns true if the registry secret has changed
 func didTheRegistrySecretChange(c client.Client) builder.WatchesOption {
+	ns, _ := utils.GetDeploymentNamespace()
+
+	isOurSecret := func(ctx context.Context, obj client.Object) bool {
+		if obj.GetNamespace() != ns {
+			return false
+		}
+		var secret corev1.Secret
+		if err := c.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: ns}, &secret); err != nil {
+			return false
+		}
+		if secret.Type != corev1.SecretTypeDockerConfigJson && secret.Type != corev1.SecretTypeDockercfg {
+			return false
+		}
+		expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
+		if err != nil {
+			return false
+		}
+		return secret.Name == expectedName
+	}
+
 	return builder.WithPredicates(predicate.Funcs{
-		// if the builder-docker-blah secret is recreated to builder-docker-boom in that case we want to trigger a reconcile.
 		CreateFunc: func(e event.CreateEvent) bool {
-			ns, err := utils.GetDeploymentNamespace()
-			if err != nil {
-				return false
-			}
-			secret, ok := e.Object.(*corev1.Secret)
-			if !ok {
-				return false
-			}
-			// we are only interested in the docker config json secret in the namespace where the CR is running
-			if secret.Type != corev1.SecretTypeDockerConfigJson && secret.Type != corev1.SecretTypeDockercfg {
-				return false
-			}
-			if secret.Namespace != ns {
-				return false
-			}
-			ctx := context.Background()
-			expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
-			if err != nil {
-				return false
-			}
-			return secret.Name == expectedName
+			return isOurSecret(context.Background(), e.Object)
 		},
-		// if the builder-docker-blah secret content/data is updated in that case we want to trigger a reconcile.
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			ns, err := utils.GetDeploymentNamespace()
-			if err != nil {
-				return false
-			}
-			newSecret, ok := e.ObjectNew.DeepCopyObject().(*corev1.Secret)
-			if !ok {
-				return false
-			}
-			// we are only interested in the docker config json secret in the namespace where the CR is running
-			if newSecret.Type != corev1.SecretTypeDockerConfigJson {
-				return false
-			}
-			if newSecret.Namespace != ns {
-				return false
-			}
-			oldSecret, ok := e.ObjectOld.DeepCopyObject().(*corev1.Secret)
-			if !ok {
-				return true
-			}
-			ctx := context.Background()
-			expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
-			if err != nil {
-				return false
-			}
-			if newSecret.Name != expectedName {
-				return false
-			}
-			return !reflect.DeepEqual(oldSecret.Data, newSecret.Data)
+			return isOurSecret(context.Background(), e.ObjectNew)
 		},
-		DeleteFunc: func(_ event.DeleteEvent) bool {
-			return false
-		},
-		GenericFunc: func(_ event.GenericEvent) bool {
-			return false
-		},
+		DeleteFunc:  func(_ event.DeleteEvent) bool { return false },
+		GenericFunc: func(_ event.GenericEvent) bool { return false },
 	})
 }
 
@@ -690,4 +664,62 @@ func getCurrentRegistrySecretName(ctx context.Context, c client.Client, ns strin
 		// fallback to builder dockercfg secret
 		return kernelmodule.GetServiceAccountDockercfgSecretName(ctx, c, ns, "builder")
 	}
+}
+
+// Selector for KMM configmap
+func (r *FusionAccessReconciler) getKmmConfigMapSelector(
+	ctx context.Context,
+	_ client.Object,
+) []reconcile.Request {
+	ns, err := utils.GetDeploymentNamespace()
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
+	if err := r.List(ctx, fusionAccessList, client.InNamespace(ns)); err != nil {
+		log.Log.Error(err, "Failed to list FusionAccess instances")
+		return nil
+	}
+	if len(fusionAccessList.Items) == 0 {
+		log.Log.Info("No FusionAccess instance found, skipping KMM configmap")
+		return nil
+	}
+
+	// We enforce a single fusionAccess instance via webhooks so we can take the first
+	req := reconcile.Request{
+		NamespacedName: client.ObjectKeyFromObject(&fusionAccessList.Items[0]),
+	}
+	log.Log.Info("Enqueueing request for", "request", req)
+	return []reconcile.Request{req}
+}
+
+// didTheKmmConfigMapChange returns true if the KMM configmap has changed
+func didTheKmmConfigMapChange() builder.WatchesOption {
+
+	ns, _ := utils.GetDeploymentNamespace()
+
+	matches := func(obj client.Object) bool {
+		// when the controller runtime cannot find the deleted object in cache
+		if obj == nil {
+			return false
+		}
+		return obj.GetNamespace() == ns && obj.GetName() == kernelmodule.KMMImageConfigMapName
+	}
+
+	return builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return matches(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// any resourceVersion bump on the *same* CM is enough
+			return matches(e.ObjectNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// if the CM is deleted; we reconcile to update the kmm secret
+			// to point to the default docker registry secret
+			return matches(e.Object)
+		},
+		GenericFunc: func(_ event.GenericEvent) bool { return false },
+	})
 }
