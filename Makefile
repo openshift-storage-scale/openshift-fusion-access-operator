@@ -11,9 +11,7 @@ DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
 # Version of yaml file to generate rbacs from
-RBAC_VERSION ?= v5.2.3.0.1
-
-PULLFILE ?= internal/controller/pull.txt
+RBAC_VERSION ?= v5.2.3.1
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -143,7 +141,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: pull manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --fail-on-pending --keep-going -coverprofile cover.out
 	go tool cover -html="cover.out" -o coverage.html
 	# Test the scripts as well
@@ -173,12 +171,8 @@ GOARCH ?= amd64
 build-devicefinder: ## Build devicefinder binary.
 	env GOOS=$(GOOS) GOARCH=$(GOARCH) go build -mod=vendor -ldflags '-X main.version=$(REV)' -o $(TARGET_DIR)/devicefinder $(CURPATH)/cmd/devicefinder
 
-.PHONY: pull
-pull:
-	@touch internal/controller/pull.txt
-
 .PHONY: build
-build: pull manifests generate fmt vet ## Build manager binary.
+build: manifests generate fmt vet ## Build manager binary.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
 .PHONY: run
@@ -214,7 +208,7 @@ generate-dockerfile-console-plugin:
 TARGETARCH ?= amd64
 .PHONY: docker-build
 docker-build: generate-dockerfile-operator ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --secret id=pull,src=$(PULLFILE) --build-arg TARGETARCH=$(TARGETARCH) -t $(OPERATOR_IMG) -f $(CURPATH)/$(OPERATOR_DOCKERFILE) .
+	$(CONTAINER_TOOL) build --build-arg TARGETARCH=$(TARGETARCH) -t $(OPERATOR_IMG) -f $(CURPATH)/$(OPERATOR_DOCKERFILE) .
 	$(CONTAINER_TOOL) tag $(OPERATOR_IMG) $(IMAGE_TAG_BASE)-operator:latest
 
 .PHONY: docker-push

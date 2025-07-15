@@ -27,7 +27,7 @@ RUN mkdir licenses
 COPY LICENSE licenses/
 
 # Build
-RUN --mount=type=secret,id=pull export SECRET_NAME=${SECRET_NAME}; hack/build.sh
+RUN hack/build.sh
 
 # UBI is larger (158Mb vs. 56Mb) but approved by RH
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
