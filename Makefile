@@ -199,7 +199,7 @@ generate-dockerfile-devicefinder:
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
 .PHONY: generate-dockerfile-console-plugin
 generate-dockerfile-console-plugin:
-	envsubst '$${VERSION}' < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
+	envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
 
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
