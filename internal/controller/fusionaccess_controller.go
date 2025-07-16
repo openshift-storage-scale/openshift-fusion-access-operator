@@ -440,34 +440,30 @@ func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&fusionv1alpha1.FusionAccess{}).
 		Watches(
 			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.getPullSecretSelector),
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
 			isItOurPullSecret(),
 		).
 		Watches(
 			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.getRegistrySecretSelector),
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
 			didTheRegistrySecretChange(r.Client),
 			builder.OnlyMetadata,
 		).
 		Watches(
 			&corev1.ConfigMap{},
-			handler.EnqueueRequestsFromMapFunc(r.getKmmConfigMapSelector),
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
 			didTheKmmConfigMapChange(),
 			builder.OnlyMetadata,
 		).
 		Complete(r)
 }
 
-func (r *FusionAccessReconciler) getPullSecretSelector(
+func (r *FusionAccessReconciler) fusionAccessHandler(
 	ctx context.Context,
 	_ client.Object,
 ) []reconcile.Request {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
-		return []reconcile.Request{}
-	}
-	if _, err := getPullSecretContent(FUSIONPULLSECRETNAME, ns, ctx, r.fullClient); err != nil {
-		// The secret in the namespace is not there yet
 		return []reconcile.Request{}
 	}
 	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
@@ -620,34 +616,6 @@ func didTheRegistrySecretChange(c client.Client) builder.WatchesOption {
 	})
 }
 
-// Selector for registry secret
-func (r *FusionAccessReconciler) getRegistrySecretSelector(
-	ctx context.Context,
-	_ client.Object,
-) []reconcile.Request {
-	ns, err := utils.GetDeploymentNamespace()
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
-	if err := r.List(ctx, fusionAccessList, client.InNamespace(ns)); err != nil {
-		log.Log.Error(err, "Failed to list FusionAccess instances")
-		return nil
-	}
-	if len(fusionAccessList.Items) == 0 {
-		log.Log.Info("No FusionAccess instance found, skipping pull secret")
-		return nil
-	}
-
-	// We enforce a single fusionAccess instance via webhooks so we can take the first
-	req := reconcile.Request{
-		NamespacedName: client.ObjectKeyFromObject(&fusionAccessList.Items[0]),
-	}
-	log.Log.Info("Enqueueing request for", "request", req)
-	return []reconcile.Request{req}
-}
-
 // Helper func to determine the current registry secret name which is or will be used by the KMM operator
 // It first checks the KMMImageConfigMap for the registry secret name, and if not found, it falls back to the builder dockercfg secret.
 // This secret will be watched by the controller to trigger a reconcile when it changes.
@@ -666,37 +634,8 @@ func getCurrentRegistrySecretName(ctx context.Context, c client.Client, ns strin
 	}
 }
 
-// Selector for KMM configmap
-func (r *FusionAccessReconciler) getKmmConfigMapSelector(
-	ctx context.Context,
-	_ client.Object,
-) []reconcile.Request {
-	ns, err := utils.GetDeploymentNamespace()
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
-	if err := r.List(ctx, fusionAccessList, client.InNamespace(ns)); err != nil {
-		log.Log.Error(err, "Failed to list FusionAccess instances")
-		return nil
-	}
-	if len(fusionAccessList.Items) == 0 {
-		log.Log.Info("No FusionAccess instance found, skipping KMM configmap")
-		return nil
-	}
-
-	// We enforce a single fusionAccess instance via webhooks so we can take the first
-	req := reconcile.Request{
-		NamespacedName: client.ObjectKeyFromObject(&fusionAccessList.Items[0]),
-	}
-	log.Log.Info("Enqueueing request for", "request", req)
-	return []reconcile.Request{req}
-}
-
 // didTheKmmConfigMapChange returns true if the KMM configmap has changed
 func didTheKmmConfigMapChange() builder.WatchesOption {
-
 	ns, _ := utils.GetDeploymentNamespace()
 
 	matches := func(obj client.Object) bool {
