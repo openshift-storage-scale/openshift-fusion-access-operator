@@ -2,20 +2,17 @@ import { useCallback } from "react";
 import {
   k8sCreate,
   useK8sModel,
-  type K8sModel,
-  type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { SC_PROVISIONER } from "@/constants";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 import type { LunsViewModel } from "./useLunsViewModel";
 
 // TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
 const NAMESPACE = "ibm-spectrum-scale";
+const FUSION_NAMESPACE = "ibm-fusion-access";
+const FILESYSTEM_JOB_IMAGE = "quay.io/aeros/openshift-fusion-access-filesystem-job:latest";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
@@ -29,22 +26,10 @@ export const useCreateFileSystemHandler = (
     "/fusion-access/file-systems"
   );
 
-  const [localDiskModel] = useK8sModel({
-    group: "scale.spectrum.ibm.com",
-    version: "v1beta1",
-    kind: "LocalDisk",
-  });
-
-  const [fileSystemModel] = useK8sModel({
-    group: "scale.spectrum.ibm.com",
-    version: "v1beta1",
-    kind: "Filesystem",
-  });
-
-  const [storageClassModel] = useK8sModel({
-    group: "storage.k8s.io",
+  const [jobModel] = useK8sModel({
+    group: "batch",
     version: "v1",
-    kind: "StorageClass",
+    kind: "Job",
   });
 
   return useCallback(async () => {
@@ -66,28 +51,127 @@ export const useCreateFileSystemHandler = (
         payload: { isLoading: true },
       });
 
-      const localDisks = await createLocalDisks(
-        luns,
-        localDiskModel,
-        NAMESPACE
-      );
+      // Prepare LUN data - separate new and reused disks
+      const selectedLuns = (luns.data || []).filter(lun => lun?.isSelected && lun?.path && lun?.wwn);
+      
+      if (selectedLuns.length === 0) {
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: "No LUNs selected",
+            description: "Please select at least one LUN to create a filesystem.",
+            variant: "warning",
+            dismiss: () => dispatch({ type: "global/dismissAlert" }),
+          },
+        });
+        return;
+      }
+      
+      const newLuns = selectedLuns.filter(lun => !lun.isReused).map(lun => ({
+        path: lun.path,
+        wwn: lun.wwn,
+        node: luns.nodeName!,
+        isReused: false,
+      }));
+      
+      const reusedLuns = selectedLuns.filter(lun => lun.isReused && lun.localDiskName).map(lun => ({
+        path: lun.path,
+        wwn: lun.wwn,
+        node: luns.nodeName!,
+        isReused: true,
+        localDiskName: lun.localDiskName!,
+      }));
 
-      await createFileSystem(
-        fileSystemName,
-        localDisks,
-        fileSystemModel,
-        NAMESPACE
-      );
+      // Create the Job with configuration as environment variables - SINGLE API CALL
+      // Add timestamp to ensure unique job names even if filesystem names are reused
+      const timestamp = Date.now();
+      const jobName = `filesystem-job-${fileSystemName}-${timestamp}`;
+      
+      const jobData = {
+        apiVersion: "batch/v1",
+        kind: "Job",
+        metadata: { 
+          name: jobName, 
+          namespace: FUSION_NAMESPACE,
+          labels: {
+            "fusion.storage.openshift.io/filesystem-job": "true",
+            "fusion.storage.openshift.io/filesystem-name": fileSystemName,
+          },
+        },
+        spec: {
+          template: {
+            spec: {
+              restartPolicy: "Never",
+              serviceAccountName: "fusion-access-operator-controller-manager",
+              containers: [
+                {
+                  name: "filesystem-creator",
+                  image: FILESYSTEM_JOB_IMAGE,
+                  imagePullPolicy: "Always",  // Always pull latest image
+                  env: [
+                    {
+                      name: "OPERATION",
+                      value: "create-filesystem",
+                    },
+                    {
+                      name: "FILESYSTEM_NAME",
+                      value: fileSystemName,
+                    },
+                    {
+                      name: "NAMESPACE",
+                      value: NAMESPACE,
+                    },
+                    {
+                      name: "NEW_LUNS_JSON", 
+                      value: JSON.stringify(newLuns),
+                    },
+                    {
+                      name: "REUSED_LUNS_JSON",
+                      value: JSON.stringify(reusedLuns),
+                    },
+                    {
+                      name: "JOB_NAME",
+                      value: jobName,
+                    },
+                    {
+                      name: "FUSION_NAMESPACE",
+                      value: FUSION_NAMESPACE,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          backoffLimit: 0,  // Never retry - preserve original failure reason
+          activeDeadlineSeconds: 600, // 10 minutes timeout
+          // No ttlSecondsAfterFinished - preserve failed jobs for debugging
+        },
+      };
+      
+      await k8sCreate({
+        model: jobModel,
+        data: jobData,
+      });
 
-      await createStorageClass(storageClassModel, fileSystemName);
-
+      // Redirect immediately - user can check status on the filesystems page
       redirectToFileSystemsHome();
+      
+      dispatch({
+        type: "global/addAlert",
+        payload: {
+          title: t("Filesystem creation job started"),
+          description: `Job ${jobName} has been created. You can monitor its progress on the file systems page.`,
+          variant: "info",
+          dismiss: () => dispatch({ type: "global/dismissAlert" }),
+        },
+      });
+
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
         type: "global/addAlert",
         payload: {
-          title: t("An error occurred while creating resources"),
+          title: t("An error occurred while creating the filesystem job"),
           description,
           variant: "danger",
         },
@@ -98,90 +182,5 @@ export const useCreateFileSystemHandler = (
         payload: { isLoading: false },
       });
     }
-  }, [
-    dispatch,
-    fileSystemModel,
-    fileSystemName,
-    localDiskModel,
-    luns,
-    redirectToFileSystemsHome,
-    storageClassModel,
-    t,
-  ]);
-};
-
-function createFileSystem(
-  fileSystemName: string,
-  localDisks: LocalDisk[],
-  fileSystemModel: K8sModel,
-  namespace: string
-): Promise<FileSystem> {
-  return k8sCreate<FileSystem>({
-    model: fileSystemModel,
-    data: {
-      apiVersion: "scale.spectrum.ibm.com/v1beta1",
-      kind: "FileSystem",
-      metadata: { name: fileSystemName, namespace },
-      spec: {
-        local: {
-          pools: [
-            {
-              disks: Array.from(
-                new Set(
-                  localDisks.map((ld) => ld.metadata?.name).filter(Boolean)
-                )
-              ) as string[],
-            },
-          ],
-          replication: "1-way",
-          type: "shared",
-        },
-      },
-    },
-  });
-}
-
-function createLocalDisks(
-  luns: LunsViewModel,
-  localDiskModel: K8sModel,
-  namespace: string
-) {
-  const promises: Promise<LocalDisk>[] = [];
-  for (const lun of luns.data) {
-    const localDiskName =
-      `${lun.path.slice("/dev/".length)}-${lun.wwn}`.replaceAll(".", "-");
-    const promise = k8sCreate<LocalDisk>({
-      model: localDiskModel,
-      data: {
-        apiVersion: "scale.spectrum.ibm.com/v1beta1",
-        kind: "LocalDisk",
-        metadata: { name: localDiskName, namespace },
-        spec: {
-          device: lun.path,
-          node: luns.nodeName!,
-        },
-      },
-    });
-    promises.push(promise);
-  }
-
-  return Promise.all(promises);
-}
-
-const createStorageClass = (scModel: K8sModel, fileSystemName: string) => {
-  return k8sCreate<StorageClass>({
-    model: scModel,
-    data: {
-      apiVersion: `${scModel.apiGroup}/${scModel.apiVersion}`,
-      kind: scModel.kind,
-      metadata: { name: fileSystemName },
-      provisioner: SC_PROVISIONER,
-      parameters: {
-        volBackendFs: fileSystemName,
-      },
-      reclaimPolicy: "Delete",
-      allowVolumeExpansion: true,
-      volumeBindingMode: "Immediate",
-    },
-  });
+  }, [fileSystemName, luns, dispatch, redirectToFileSystemsHome, jobModel, t]);
 };

@@ -1,6 +1,6 @@
 import { VirtualizedTable } from "@openshift-console/dynamic-plugin-sdk";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { FileSystemsDeleteModal } from "./FileSystemsDeleteModal";
+import type { UnifiedFilesystemEntry } from "../hooks/useFileSystemsTableViewModel";
+import { CleanupModal } from "./CleanupModal";
 import { FileSystemsTableEmptyState } from "./FileSystemsTableEmptyState";
 import { FileSystemsTabTableRow, type RowData } from "./FileSystemsTableRow";
 import { useFileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
@@ -8,13 +8,13 @@ import { useFileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewMo
 export const FileSystemsTable: React.FC = () => {
   const vm = useFileSystemsTableViewModel();
 
-  const { columns, deleteModal, routes } = vm;
+  const { columns, cleanupModal, routes } = vm;
 
-  const { handleDelete } = deleteModal;
+  const { handleCleanup } = cleanupModal;
 
   return (
     <>
-      <VirtualizedTable<FileSystem, RowData>
+      <VirtualizedTable<UnifiedFilesystemEntry, RowData>
         columns={vm.columns}
         data={vm.fileSystems.data ?? []}
         unfilteredData={vm.fileSystems.data ?? []}
@@ -22,9 +22,17 @@ export const FileSystemsTable: React.FC = () => {
         loadError={vm.fileSystems.error}
         EmptyMsg={FileSystemsTableEmptyState}
         Row={FileSystemsTabTableRow}
-        rowData={{ columns, handleDelete, routes }}
+        rowData={{ columns, handleCleanup, routes }}
       />
-      <FileSystemsDeleteModal vm={vm.deleteModal} />
+      <CleanupModal
+        target={cleanupModal.target}
+        isOpen={cleanupModal.isOpen}
+        isProcessing={cleanupModal.isProcessing}
+        errors={cleanupModal.errors}
+        onClose={cleanupModal.handleClose}
+        onSetProcessing={cleanupModal.setIsProcessing}
+        onSetErrors={cleanupModal.setErrors}
+      />
     </>
   );
 };

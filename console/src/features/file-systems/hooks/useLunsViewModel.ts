@@ -1,19 +1,67 @@
-import convert from "convert";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import convert from "convert";
+
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
 import { useWatchLocalDisk } from "@/shared/hooks/useWatchLocalDisk";
-import type { DiscoveredDevice } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
+import { useWatchUnusedLocalDisks, type UnusedLocalDisk } from "@/shared/hooks/useWatchUnusedLocalDisks";
 
 export interface Lun {
-  isSelected: boolean;
   path: string;
   wwn: string;
   capacity: string;
+  isSelected: boolean;
+  isReused?: boolean; // Mark if this is from unused LocalDisk
+  localDiskName?: string; // For reused disks, store the LocalDisk name
 }
+
+export interface LunsViewModel {
+  data: Lun[];
+  loaded: boolean;
+  nodeName?: string;
+  isSelected: (lun: Lun) => boolean;
+  setSelected: (lun: Lun, isSelected: boolean) => void;
+  setAllSelected: (isSelected: boolean) => void;
+}
+
+// Utility function to format bytes to human readable format
+const formatBytes = (bytes: number | string | undefined): string => {
+  if (!bytes) return "Unknown";
+  
+  const numBytes = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
+  if (isNaN(numBytes)) return "Unknown";
+  
+  try {
+    return convert(numBytes, "B").to("best", "imperial").toString(2);
+  } catch (error) {
+    // Fallback to simple GB conversion if convert fails
+    const gb = numBytes / (1024 ** 3);
+    return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(numBytes / (1024 ** 2)).toFixed(1)} MB`;
+  }
+};
+
+const toLun = (device: any): Lun => ({
+  path: device.path,
+  wwn: device.wwn || device.WWN, // Handle both lowercase and uppercase WWN
+  capacity: formatBytes(device.capacity || device.size),
+  isSelected: false,
+  isReused: false,
+});
+
+const unusedLocalDiskToLun = (unusedDisk: UnusedLocalDisk): Lun => ({
+  path: unusedDisk.device,
+  wwn: unusedDisk.wwn || "Unknown",
+  capacity: formatBytes(unusedDisk.capacity), 
+  isSelected: false,
+  isReused: true,
+  localDiskName: unusedDisk.name,
+});
+
+const outDevicesUsedByLocalDisks = (localDisks: any[]) => (device: any) => {
+  return !localDisks.some((ld) => ld.spec.device === device.path);
+};
 
 export const useLunsViewModel = () => {
   const { t } = useFusionAccessTranslations();
@@ -46,27 +94,60 @@ export const useLunsViewModel = () => {
   );
 
   const localDisks = useWatchLocalDisk();
+  const unusedLocalDisks = useWatchUnusedLocalDisks();
 
   const [luns, setLuns] = useState<Lun[]>([]);
 
   useEffect(() => {
     const discoveredDevices = storageNodesLvdr?.status?.discoveredDevices ?? [];
-    if (
-      storageNodesLvdrs.loaded &&
-      localDisks.loaded &&
-      discoveredDevices.length
-    ) {
-      setLuns(
-        discoveredDevices
-          .filter(outDevicesUsedByLocalDisks(localDisks.data ?? []))
-          .map(toLun)
-      );
+    const loaded = storageNodesLvdrs.loaded && localDisks.loaded && unusedLocalDisks.loaded;
+    
+    if (loaded) {
+      const allLuns: Lun[] = [];
+      
+      try {
+        // Add new devices from LVDR (not yet used by LocalDisks)
+        if (discoveredDevices.length > 0) {
+          const newDeviceLuns = discoveredDevices
+            .filter(outDevicesUsedByLocalDisks(localDisks.data ?? []))
+            .map(toLun)
+            .filter(lun => lun.path && lun.wwn); // Only include valid LUNs
+          allLuns.push(...newDeviceLuns);
+        }
+        
+        // Add unused LocalDisks (previously created but not used by filesystems)
+        if (unusedLocalDisks.data && unusedLocalDisks.data.length > 0) {
+          const reusedLuns = unusedLocalDisks.data
+            .map(unusedLocalDiskToLun)
+            .filter(lun => lun.path && lun.localDiskName); // Only include valid reused LUNs
+          allLuns.push(...reusedLuns);
+        }
+        
+        // Use setTimeout to avoid state updates during render
+        setTimeout(() => {
+          setLuns(currentLuns => {
+            // Preserve existing selection state
+            const updatedLuns = allLuns.map(newLun => {
+              const existingLun = currentLuns.find(existing => existing.path === newLun.path);
+              return existingLun ? { ...newLun, isSelected: existingLun.isSelected } : newLun;
+            });
+            return updatedLuns;
+          });
+        }, 0);
+      } catch (error) {
+        console.error('LunsViewModel: Error processing LUNs:', error);
+        setTimeout(() => {
+          setLuns([]);
+        }, 0);
+      }
     }
   }, [
     localDisks.data,
     localDisks.loaded,
     storageNodesLvdr?.status?.discoveredDevices,
     storageNodesLvdrs.loaded,
+    unusedLocalDisks.data,
+    unusedLocalDisks.loaded,
   ]);
 
   const isSelected = useCallback(
@@ -87,52 +168,22 @@ export const useLunsViewModel = () => {
     });
   }, []);
 
-  const setAllSelected = useCallback((isSelecting: boolean) => {
+  const setAllSelected = useCallback((isSelected: boolean) => {
     setLuns((current) => {
       const draft = window.structuredClone(current);
       draft.forEach((lun) => {
-        lun.isSelected = isSelecting;
+        lun.isSelected = isSelected;
       });
-
       return draft;
     });
   }, []);
 
-  const data = luns;
-  const nodeName = storageNodesLvdr?.spec.nodeName;
-  const loaded = storageNodesLvdrs.loaded && typeof nodeName === "string";
-
-  return useMemo(
-    () =>
-      ({
-        data,
-        loaded,
-        nodeName,
-        isSelected,
-        setSelected,
-        setAllSelected,
-      }) as const,
-    [data, isSelected, loaded, nodeName, setAllSelected, setSelected]
-  );
-};
-
-export type LunsViewModel = ReturnType<typeof useLunsViewModel>;
-
-const outDevicesUsedByLocalDisks =
-  (localDisks: LocalDisk[]) => (disk: DiscoveredDevice) =>
-    localDisks.length
-      ? localDisks.find(
-          (localDisk) =>
-            !localDisk.metadata?.name?.endsWith(disk.WWN.slice("uuid.".length))
-        )
-      : true;
-
-const toLun = (disk: DiscoveredDevice): Lun => {
   return {
-    isSelected: false,
-    path: disk.path,
-    wwn: disk.WWN.slice("uuid.".length),
-    // Note: Usage of 'GB' is intentional here
-    capacity: convert(disk.size, "B").to("GiB").toFixed(2) + " GB",
+    data: luns,
+    loaded: storageNodesLvdrs.loaded && localDisks.loaded && unusedLocalDisks.loaded,
+    nodeName: storageNodesLvdr?.spec?.nodeName,
+    isSelected,
+    setSelected,
+    setAllSelected,
   };
 };

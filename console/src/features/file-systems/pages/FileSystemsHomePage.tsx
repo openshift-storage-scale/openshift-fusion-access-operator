@@ -9,6 +9,7 @@ import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
 import { Async } from "@/shared/components/Async";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
+import { useWatchFilesystemJobs } from "@/shared/hooks/useWatchFilesystemJobs";
 import {
   UrlPaths,
   useRedirectHandler,
@@ -37,10 +38,15 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
   const storageClusters = useWatchStorageCluster({ limit: 1 });
 
   const fileSystems = useWatchFileSystem();
+  const { jobs: filesystemJobs } = useWatchFilesystemJobs();
 
   const redirectToCreateFileSystems = useRedirectHandler(
     "/fusion-access/file-systems/create"
   );
+
+  // Show create button if we have any filesystems OR any jobs (active or completed)
+  // This ensures the button is always available unless it's truly an empty state
+  const hasFilesystemActivity = (fileSystems.data ?? []).length > 0 || filesystemJobs.length > 0;
 
   return (
     <ListPage
@@ -48,7 +54,7 @@ const ConnectedFileSystemsHomePage: React.FC = () => {
       title={t("Fusion Access for SAN")}
       alerts={store.alerts}
       actions={
-        (fileSystems.data ?? []).length > 0 ? (
+        hasFilesystemActivity ? (
           <FileSystemsCreateButton onClick={redirectToCreateFileSystems} />
         ) : null
       }
