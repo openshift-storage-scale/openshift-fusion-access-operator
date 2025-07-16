@@ -115,7 +115,6 @@ func doSigningSecretsExist(ctx context.Context, cl client.Client, namespace stri
 }
 
 func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
-
 	logger := log.Log.WithName("mutateKMMModule")
 	logger.V(1).Info("Mutating KMM module", "moduleName", existing.Name)
 
