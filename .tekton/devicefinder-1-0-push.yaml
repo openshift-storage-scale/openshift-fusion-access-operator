@@ -15,7 +15,7 @@ metadata:
       "internal/diskutils/***".pathChanged()  ||
       "templates/devicefinder.Dockerfile.template".pathChanged() ||
       ".tekton/devicefinder-common.yaml".pathChanged() ||
-      ".tekton/devicefinder-0-1-on-push.yaml".pathChanged())
+      ".tekton/devicefinder-0-1-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: operator-1-0

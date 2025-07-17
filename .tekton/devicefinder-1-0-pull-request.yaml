@@ -16,7 +16,7 @@ metadata:
       "internal/diskutils/***".pathChanged()  ||
       "templates/devicefinder.Dockerfile.template".pathChanged() ||
       ".tekton/devicefinder-common.yaml".pathChanged() ||
-      ".tekton/devicefinder-1-0-on-pull-request.yaml".pathChanged()
+      ".tekton/devicefinder-1-0-pull-request.yaml".pathChanged()
       )
   creationTimestamp: null
   labels:
