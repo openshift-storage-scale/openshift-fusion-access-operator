@@ -34,6 +34,10 @@ spec:
     value: 5d
   - name: dockerfile
     value: console-plugin.Dockerfile
+  - name: prefetch-input
+    value: [{"type": "npm", "path": "console/"},]
+    # TODO switch to yarn at some point
+    # {"type": "yarn", "path": "console/"},]
   pipelineRef:
     name: console-plugin-common
   taskRunTemplate:

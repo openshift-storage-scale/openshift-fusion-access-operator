@@ -31,6 +31,10 @@ spec:
     value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/console-plugin-rhel9:{{revision}}
   - name: dockerfile
     value: console-plugin.Dockerfile
+  - name: prefetch-input
+    value: [{"type": "npm", "path": "console/"},]
+    # TODO switch to yarn at some point
+    # {"type": "yarn", "path": "console/"},]
   pipelineRef:
     name: console-plugin-common
   taskRunTemplate:
