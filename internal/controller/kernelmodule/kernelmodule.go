@@ -19,6 +19,7 @@ package kernelmodule
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -114,7 +115,14 @@ func doSigningSecretsExist(ctx context.Context, cl client.Client, namespace stri
 }
 
 func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
-	existing.Spec = desired.Spec
+	logger := log.Log.WithName("mutateKMMModule")
+	logger.V(1).Info("Mutating KMM module", "moduleName", existing.Name)
+
+	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+		logger.Info("Updating Module spec")
+		existing.Spec = desired.Spec
+	}
+
 	return nil
 }
 
@@ -177,8 +185,11 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 						// This is used to copy the lxtrace binary from /opt/lxtrace/${KERNEL_FULL_VERSION}/*
 						// to kmm-operator-manager-config` at `worker.setFirmwareClassPath`
 						FirmwarePath: "/opt/lxtrace/",
+						// Set DirName to match KMM's default
+						DirName: "/opt",
 					},
 					RegistryTLS: kmmv1beta1.TLSOptions{
+						// Explicitly set defaults to match what KMM applies
 						Insecure:              kmmImageConfig.TLSInsecure,
 						InsecureSkipTLSVerify: kmmImageConfig.TLSSkipVerify,
 					},
