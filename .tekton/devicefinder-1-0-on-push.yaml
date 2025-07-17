@@ -7,19 +7,21 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "v1" &&
-      ("templates/bundle.Dockerfile.template".pathChanged() ||
-      ".tekton/operator-bundle-1-0-push.yaml".pathChanged() ||
-      ".tekton/operator-bundle-common.yaml".pathChanged() ||
-      "bundle/***".pathChanged() ||
-      "nudges/***".pathChanged() ||
-      "scripts/generate-bundle-for-konflux.sh".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "v1" && (
+      "go.mod".pathChanged() ||
+      "VERSION.txt".pathChanged() ||
+      "cmd/devicefinder/***".pathChanged() ||
+      "internal/devicefinder/***".pathChanged()  ||
+      "internal/diskutils/***".pathChanged()  ||
+      "templates/devicefinder.Dockerfile.template".pathChanged() ||
+      ".tekton/devicefinder-common.yaml".pathChanged() ||
+      ".tekton/devicefinder-1-0-on-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: operator-1-0
-    appstudio.openshift.io/component: operator-bundle-1-0
+    appstudio.openshift.io/component: devicefinder-1-0
     pipelines.appstudio.openshift.io/type: build
-  name: operator-bundle-1-0-on-push
+  name: devicefinder-1-0-on-push
   namespace: storage-scale-releng-tenant
 spec:
   params:
@@ -28,13 +30,15 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/operator-bundle:{{revision}}
+    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/devicefinder-rhel9:{{revision}}
   - name: dockerfile
-    value: bundle.Dockerfile
+    value: devicefinder.Dockerfile
+  - name: prefetch-input
+    value: [{"type": "rpm", "path": "hack/"},]
   pipelineRef:
-    name: operator-bundle-common
+    name: devicefinder-common
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-bundle-1-0
+    serviceAccountName: build-pipeline-devicefinder-1-0
   workspaces:
   - name: git-auth
     secret:
