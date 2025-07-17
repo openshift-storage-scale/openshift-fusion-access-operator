@@ -283,11 +283,22 @@ func getMergedRegistrySecret(ctx context.Context, cl client.Client, namespace st
 			return nil, fmt.Errorf("failed to get secret (for internal registry) %s in getMergedRegistrySecret: %w", builderSecretName, err)
 		}
 	}
-	KMMRegistryPushPullSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      KMMRegistryPushPullSecretName,
-			Namespace: namespace,
-		},
+
+	// If the KMMRegistryPushPullSecretName secret already exist we reuse it and just overwrite existing keys
+	// This way we solve the problem of a user changing registry and losing access to the previous kmm images
+	// which are needed by KMM to do an rmmod
+	KMMRegistryPushPullSecret := &corev1.Secret{}
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KMMRegistryPushPullSecretName}, KMMRegistryPushPullSecret); err != nil {
+		if errors.IsNotFound(err) {
+			KMMRegistryPushPullSecret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      KMMRegistryPushPullSecretName,
+					Namespace: namespace,
+				},
+			}
+		} else {
+			return nil, fmt.Errorf("error while retrieving the %s secret: %v", KMMRegistryPushPullSecretName, err)
+		}
 	}
 	KMMRegistryPushPullSecret, err := utils.MergeDockerSecrets(KMMRegistryPushPullSecret, ibmPullSecret)
 	if err != nil {
