@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift-storage-scale/openshift-fusion-access-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "v1" &&
+      ("templates/bundle.Dockerfile.template".pathChanged() ||
+      ".tekton/operator-bundle-1-0-push.yaml".pathChanged() ||
+      ".tekton/operator-bundle-common.yaml".pathChanged() ||
+      "bundle/***".pathChanged() ||
+      "nudges/***".pathChanged() ||
+      "scripts/generate-bundle-for-konflux.sh".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: operator-1-0
+    appstudio.openshift.io/component: operator-bundle-1-0
+    pipelines.appstudio.openshift.io/type: build
+  name: operator-bundle-1-0-on-push
+  namespace: storage-scale-releng-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/operator-bundle:{{revision}}
+  - name: dockerfile
+    value: bundle.Dockerfile
+  pipelineRef:
+    name: operator-bundle-common
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-operator-bundle-1-0
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
