@@ -8,19 +8,19 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "v1" &&
-      ("templates/bundle.Dockerfile.template".pathChanged() ||
-      ".tekton/operator-bundle-1-0-pull-request.yaml".pathChanged() ||
-      ".tekton/operator-bundle-common.yaml".pathChanged() ||
-      "bundle/***".pathChanged() ||
-      "nudges/***".pathChanged() ||
-      "scripts/generate-bundle-for-konflux.sh".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "v1" && (
+      "console/***".pathChanged() ||
+      "VERSION.txt".pathChanged() ||
+      ".tekton/console-plugin-1-0-on-pull-request.yaml".pathChanged() ||
+      ".tekton/console-plugin-common.yaml".pathChanged() ||
+      "templates/console-plugin.Dockerfile.template".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: operator-1-0
-    appstudio.openshift.io/component: operator-bundle-1-0
+    appstudio.openshift.io/component: console-plugin-1-0
     pipelines.appstudio.openshift.io/type: build
-  name: operator-bundle-1-0-on-pull-request
+  name: console-plugin-1-0-on-pull-request
   namespace: storage-scale-releng-tenant
 spec:
   params:
@@ -29,15 +29,19 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/operator-bundle:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/console-plugin-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: bundle.Dockerfile
+    value: console-plugin.Dockerfile
+  - name: prefetch-input
+    value: [{"type": "npm", "path": "console/"},]
+    # TODO switch to yarn at some point
+    # {"type": "yarn", "path": "console/"},]
   pipelineRef:
-    name: operator-bundle-common
+    name: console-plugin-common
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-bundle-1-0
+    serviceAccountName: build-pipeline-console-plugin-1-0
   workspaces:
   - name: git-auth
     secret:
