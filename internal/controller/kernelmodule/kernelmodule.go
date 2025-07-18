@@ -172,7 +172,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 			Namespace: namespace,
 		},
 		Spec: kmmv1beta1.ModuleSpec{
-			ModuleLoader: kmmv1beta1.ModuleLoaderSpec{
+			ModuleLoader: &kmmv1beta1.ModuleLoaderSpec{
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					ImagePullPolicy: corev1.PullAlways,
 					Modprobe: kmmv1beta1.ModprobeSpec{
