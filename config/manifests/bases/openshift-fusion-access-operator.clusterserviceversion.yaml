@@ -96,7 +96,7 @@ spec:
   - email: aeros@redhat.com
     name: darkdoc
   maturity: alpha
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.32.0
   provider:
     name: Fusion Access for SAN Team
   version: 0.0.0
