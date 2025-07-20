@@ -13,7 +13,7 @@ require (
 	github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
-	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250710091453-478659262549
+	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250716080751-315689322647
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
