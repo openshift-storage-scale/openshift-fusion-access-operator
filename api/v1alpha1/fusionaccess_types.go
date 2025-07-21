@@ -30,7 +30,7 @@ type FusionAccessSpec struct {
 	// NOTE(bandini): If you change anything in the following three lines you need to update
 	// ./scripts/update-cnsa-versions-metadata.sh
 
-	// Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
+	// Version of IBM Fusion installation manifest
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="IBM Storage Scale Version",order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.1"}
 	StorageScaleVersion StorageScaleVersions `json:"storageScaleVersion,omitempty"`
 
