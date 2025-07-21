@@ -372,6 +372,8 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: IMAGE_DIGEST
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+    - name: ARGS
+      value: "--project-name=hybrid-platforms-fusion-access-for-san-project --report --org=021b2536-651b-4eb7-b144-0fe83dddfc30"
     runAfter:
     - build-image-index
     taskRef:
