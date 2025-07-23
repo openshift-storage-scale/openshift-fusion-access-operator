@@ -12,6 +12,7 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import { getFileSystemStorageClasses } from "../utils/FileSystems";
 import type { FileSystemsTableViewModel } from "./useFileSystemsTableViewModel";
 import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
+import { waitForLocalDiskUsedConditionFalse } from "@/shared/utils/console/LocalDiskWaiter";
 
 type DeleteFileSystemsHandler = () => Promise<void>;
 
@@ -102,29 +103,30 @@ export const useDeleteFileSystemsHandler = (
       );
 
       const disks = Array.from(
-        vm.fileSystem.spec?.local?.pools.reduce((disks, pool) => {
-          pool.disks.forEach((d) => disks.add(d));
+        vm.fileSystem.spec?.local?.pools.reduce((disks: Set<string>, pool: any) => {
+          pool.disks.forEach((d: string) => disks.add(d));
           return disks;
         }, new Set<string>()) ?? []
       );
 
       if (disks.length > 0) {
-        // This is a temporary workaround. We need to clean-up the LocalDisk-s too
-        // There is a webhook that disallows deleting LocalDisks if FileSystem still exists
-        // We periodically check if the FileSystem still exists. Once it is gone, we delete the LocalDisk-s
-        let exists = true;
-        while (exists) {
-          await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        // Wait for each LocalDisk to have "Used" condition become "False" before deletion
+        // This ensures the LocalDisk is no longer in use by the FileSystem
+        const waitPromises = (disks as string[]).map(async (diskName: string) => {
           try {
-            await k8sGet({
-              model: fileSystemModel,
-              ns: fsNamespace,
-              name: fsName,
+            await waitForLocalDiskUsedConditionFalse({
+              name: diskName,
+              namespace: fsNamespace,
+              model: localDiskModel,
             });
-          } catch {
-            exists = false;
+          } catch (error) {
+            console.warn(`Failed to wait for LocalDisk ${diskName} "Used" condition:`, error);
+            // Continue with deletion even if wait fails - might be already unused
           }
-        }
+        });
+
+        // Wait for all disks to be ready for deletion (or timeout)
+        await Promise.allSettled(waitPromises);
 
         const diskDeletions = await Promise.allSettled(
           disks.map((d) =>
