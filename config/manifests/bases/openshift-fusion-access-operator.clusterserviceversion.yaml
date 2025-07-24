@@ -43,7 +43,7 @@ spec:
       kind: FusionAccess
       name: fusionaccesses.fusion.storage.openshift.io
       specDescriptors:
-      - description: Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
+      - description: Version of IBM Fusion installation manifest
         displayName: IBM Storage Scale Version
         path: storageScaleVersion
         x-descriptors:
