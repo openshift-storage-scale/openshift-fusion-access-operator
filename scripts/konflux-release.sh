@@ -37,7 +37,7 @@ if ! oc project "${PROJ}" &> /dev/null; then
   exit 1
 fi
 
-applicationName=operator-0-1
+applicationName=${KONFLUX_APPLICATION:-"operator-1-0"}
 releaseVersion=$(echo $applicationName | sed 's/operator//g')
 operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}' | grep bundle)
 
