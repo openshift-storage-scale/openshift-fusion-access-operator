@@ -13,7 +13,6 @@ import {
 } from "@/shared/hooks/useRedirectHandler";
 import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
 import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
-import { LEARN_MORE_LINK } from "@/constants";
 
 const StorageClusterHomePage: React.FC = () => {
   return (
@@ -54,7 +53,6 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
         {(storageClusters.data ?? []).length === 0 ? (
           <StorageClusterEmptyState
             onCreateStorageCluster={redirectToCreateStorageCluster}
-            learnMoreHref={LEARN_MORE_LINK}
           />
         ) : (
           <Redirect to={UrlPaths.FileSystemsHome} />
