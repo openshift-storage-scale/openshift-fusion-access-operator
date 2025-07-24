@@ -18,8 +18,8 @@ export const useNormalizedK8sWatchResource: UseNormalizedK8sWatchResource = <
 >(
   options: WatchK8sResource
 ) => {
-  const state = useK8sWatchResource<R | R[]>(options);
-  return normalizeReturnValue<R>(state);
+  const result = useK8sWatchResource<R | R[]>(options);
+  return normalizeResult<R>(result);
 };
 
 interface WatchK8sResourceList extends WatchK8sResource {
@@ -35,12 +35,6 @@ interface UseNormalizedK8sWatchResource {
   ): NormalizedWatchK8sResult<R>;
 }
 
-type WatchResultPending = [null, false, null];
-type WatchResultLoadedWithError = [null, true, Error];
-type WatchResultLoadedWithData<
-  R extends K8sResourceCommon | K8sResourceCommon[],
-> = [R, true, null];
-
 /**
  * Represents the normalized return value of the `useK8sWatchResource` hook.
  * It provides a consistent structure for handling loading, data, and error states.
@@ -53,38 +47,51 @@ type WatchResultLoadedWithData<
  * [R[], true, null]
  * ```
  */
-export type NormalizedWatchK8sResult<
+export interface NormalizedWatchK8sResult<
   R extends K8sResourceCommon | K8sResourceCommon[],
-> =
-  | WatchResultPending
-  | WatchResultLoadedWithError
-  | WatchResultLoadedWithData<R>;
+> {
+  data: R | null;
+  loaded: boolean;
+  error: Error | null;
+}
 
-const normalizeReturnValue = <R extends K8sResourceCommon>(
+const normalizeResult = <R extends K8sResourceCommon>(
   state: WatchK8sResult<R | R[]>
-): NormalizedWatchK8sResult<R> => {
+): NormalizedWatchK8sResult<R | R[]> => {
   const [data, loaded, error] = state;
 
   if (!loaded) {
-    return [null, false, null] as WatchResultPending;
+    return {
+      data: null,
+      loaded: false,
+      error: null,
+    };
   }
 
   if (!data && !error) {
-    return [null, true, new Error("The requested resource is not available")];
+    return {
+      data: null,
+      loaded: true,
+      error: new Error("The requested resource is not available"),
+    };
   }
 
   if (error instanceof Error) {
-    return [null, true, error];
+    return { data: null, loaded: true, error };
   }
 
   if (typeof error === "string" && error.length > 0) {
-    return [null, true, new Error(error)];
+    return { data: null, loaded: true, error: new Error(error) };
   }
 
   if (typeof error === "object") {
     const cause = JSON.stringify(error);
-    return [null, true, new Error("Unknown error type", { cause })];
+    return {
+      data: null,
+      loaded: true,
+      error: new Error("Unknown error type", { cause }),
+    };
   }
 
-  return [data, true, null] as WatchResultLoadedWithData<R>;
+  return { data, loaded: true, error: null };
 };

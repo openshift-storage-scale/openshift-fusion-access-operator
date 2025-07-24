@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-OPENSHIFT_VERSIONS="\"v4.19\""
+OPENSHIFT_VERSIONS="\"${1}\""
 
 {
   echo ""

@@ -44,6 +44,7 @@ import (
 
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/console"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/imageregistry"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
@@ -84,6 +85,9 @@ func NewFusionAccessReconciler(
 
 // KMM support
 //+kubebuilder:rbac:groups=kmm.sigs.x-k8s.io,resources=modules,verbs=create;delete;get;list;patch;update;watch
+
+// Image repository (internal)
+//+kubebuilder:rbac:groups=imageregistry.operator.openshift.io,resources=configs,verbs=get;list;watch
 
 // Below rules are inserted via `make rbac-generate` automatically
 // IBM_RBAC_MARKER_START
@@ -368,6 +372,36 @@ func (r *FusionAccessReconciler) Reconcile(
 		}
 		log.Log.Info("Entitlement secrets created")
 
+		// Check if we're using the internal image registry and validate its storage configuration
+		usingInternalRegistry, err := imageregistry.IsUsingInternalImageRegistry(ctx, r.Client, ns)
+		if err != nil {
+			log.Log.Error(err, "Failed to check if using internal image registry")
+			return ctrl.Result{}, err
+		}
+
+		if usingInternalRegistry {
+			log.Log.Info("Using internal image registry, validating storage configuration")
+			if err := imageregistry.CheckImageRegistryStorage(ctx, r.Client); err != nil {
+				fusionaccess.Status.Status = "Error"
+				meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+					v1.Condition{Type: "ImageRegistryStorage", Status: v1.ConditionFalse, Reason: "InvalidStorageBackend", Message: err.Error()})
+				serr := r.Status().Update(ctx, fusionaccess)
+				if serr != nil {
+					return ctrl.Result{}, errors.Join(serr, err)
+				}
+				return ctrl.Result{}, err
+			}
+			log.Log.Info("Image registry storage validation passed")
+			meta.SetStatusCondition(&fusionaccess.Status.Conditions,
+				v1.Condition{Type: "ImageRegistryStorage", Status: v1.ConditionTrue, Reason: "ValidStorageBackend", Message: "Image registry is using a supported storage backend"})
+			serr := r.Status().Update(ctx, fusionaccess)
+			if serr != nil {
+				return ctrl.Result{}, serr
+			}
+		} else {
+			log.Log.Info("Using external image registry, skipping storage validation")
+		}
+
 		// Since the kernel module requires the pull secret, we only create that if the secret is found
 		log.Log.Info("Creating kernel module resources")
 		if err := kernelmodule.CreateOrUpdateKMMResources(ctx, r.Client); err != nil {
@@ -440,22 +474,30 @@ func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&fusionv1alpha1.FusionAccess{}).
 		Watches(
 			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.getPullSecretSelector),
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
 			isItOurPullSecret(),
+		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
+			didTheRegistrySecretChange(r.Client),
+			builder.OnlyMetadata,
+		).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
+			didTheKmmConfigMapChange(),
+			builder.OnlyMetadata,
 		).
 		Complete(r)
 }
 
-func (r *FusionAccessReconciler) getPullSecretSelector(
+func (r *FusionAccessReconciler) fusionAccessHandler(
 	ctx context.Context,
 	_ client.Object,
 ) []reconcile.Request {
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
-		return []reconcile.Request{}
-	}
-	if _, err := getPullSecretContent(FUSIONPULLSECRETNAME, ns, ctx, r.fullClient); err != nil {
-		// The secret in the namespace is not there yet
 		return []reconcile.Request{}
 	}
 	fusionAccessList := &fusionv1alpha1.FusionAccessList{}
@@ -573,3 +615,84 @@ func checkPullSecret(secret *corev1.Secret, ns string) bool {
 // 	reqLogger.Info("Successfully finalized FusionAccess")
 // 	return nil
 // }
+
+// returns true if the registry secret has changed
+func didTheRegistrySecretChange(c client.Client) builder.WatchesOption {
+	ns, _ := utils.GetDeploymentNamespace()
+
+	isOurSecret := func(ctx context.Context, obj client.Object) bool {
+		if obj.GetNamespace() != ns {
+			return false
+		}
+		var secret corev1.Secret
+		if err := c.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: ns}, &secret); err != nil {
+			return false
+		}
+		if secret.Type != corev1.SecretTypeDockerConfigJson && secret.Type != corev1.SecretTypeDockercfg {
+			return false
+		}
+		expectedName, err := getCurrentRegistrySecretName(ctx, c, ns)
+		if err != nil {
+			return false
+		}
+		return secret.Name == expectedName
+	}
+
+	return builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isOurSecret(context.Background(), e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isOurSecret(context.Background(), e.ObjectNew)
+		},
+		DeleteFunc:  func(_ event.DeleteEvent) bool { return false },
+		GenericFunc: func(_ event.GenericEvent) bool { return false },
+	})
+}
+
+// Helper func to determine the current registry secret name which is or will be used by the KMM operator
+// It first checks the KMMImageConfigMap for the registry secret name, and if not found, it falls back to the builder dockercfg secret.
+// This secret will be watched by the controller to trigger a reconcile when it changes.
+// This is useful for cases where the registry secret is updated or changed either by the user or by virtue of token expiration consequently roted.
+func getCurrentRegistrySecretName(ctx context.Context, c client.Client, ns string) (string, error) {
+	KMMImageConfig, err := kernelmodule.GetKMMImageConfig(ctx, c, ns)
+	if err != nil {
+		return "", fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
+	}
+
+	if KMMImageConfig.RegistrySecretName != "" {
+		return KMMImageConfig.RegistrySecretName, nil
+	} else {
+		// fallback to builder dockercfg secret
+		return kernelmodule.GetServiceAccountDockercfgSecretName(ctx, c, ns, "builder")
+	}
+}
+
+// didTheKmmConfigMapChange returns true if the KMM configmap has changed
+func didTheKmmConfigMapChange() builder.WatchesOption {
+	ns, _ := utils.GetDeploymentNamespace()
+
+	matches := func(obj client.Object) bool {
+		// when the controller runtime cannot find the deleted object in cache
+		if obj == nil {
+			return false
+		}
+		return obj.GetNamespace() == ns && obj.GetName() == kernelmodule.KMMImageConfigMapName
+	}
+
+	return builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return matches(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// any resourceVersion bump on the *same* CM is enough
+			return matches(e.ObjectNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// if the CM is deleted; we reconcile to update the kmm secret
+			// to point to the default docker registry secret
+			return matches(e.Object)
+		},
+		GenericFunc: func(_ event.GenericEvent) bool { return false },
+	})
+}

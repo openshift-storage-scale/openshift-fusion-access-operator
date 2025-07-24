@@ -1,178 +1,160 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import type {
-  IoK8sApiCoreV1Node,
-  IoK8sApimachineryPkgApiResourceQuantity,
-} from "@/shared/types/kubernetes/1.30/types";
+import { useEffect, useMemo } from "react";
+import type { IoK8sApiCoreV1Node } from "@/shared/types/kubernetes/1.30/types";
+import { STORAGE_ROLE_LABEL, WORKER_NODE_ROLE_LABEL } from "@/constants";
+import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocalVolumeDiscoveryResult";
+import { useWatchNode } from "@/shared/hooks/useWatchNode";
+import type { TableColumn } from "@openshift-console/dynamic-plugin-sdk";
+import { useValidateMinimumRequirements } from "./useValidateMinimumRequirements";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
-import {
-  MINIMUM_AMOUNT_OF_MEMORY_GIB,
-  VALUE_NOT_AVAILABLE,
-  STORAGE_ROLE_LABEL,
-} from "@/constants";
-import {
-  getName,
-  getUid,
-  hasLabel,
-} from "@/shared/utils/console/K8sResourceCommon";
-import {
-  getMemory,
-  getRole,
-  getCpu,
-} from "@/shared/utils/kubernetes/1.30/IoK8sApiCoreV1Node";
-import { t } from "@/shared/hooks/useFusionAccessTranslations";
+import { useStore } from "@/shared/store/provider";
+import type { State, Actions } from "@/shared/store/types";
 
 export interface NodesSelectionTableViewModel {
-  isLoaded: boolean;
-  loadError: string | null;
-  selectedNodes: NodesSelectionTableRowViewModel[];
+  columns: TableColumn<IoK8sApiCoreV1Node>[];
+  loaded: boolean;
+  error: Error | null;
+  nodes: NormalizedWatchK8sResult<IoK8sApiCoreV1Node[]>;
+  selectedNodes: IoK8sApiCoreV1Node[];
   sharedDisksCount: number;
-  sharedDisksCounterMessage: string;
-  tableRows: NodesSelectionTableRowViewModel[];
-  setNodeStatus: (
-    node: NodesSelectionTableRowViewModel,
-    status: NodesSelectionTableRowViewModel["status"]
-  ) => void;
+  sharedDisksCountMessage: string;
 }
 
-export const useNodesSelectionTableViewModel = (
-  [nodes, nodesLoaded, nodesLoadError]: NormalizedWatchK8sResult<
-    IoK8sApiCoreV1Node[]
-  >,
-  [lvdrs, lvdrsLoaded, lvdrsLoadError]: NormalizedWatchK8sResult<
-    LocalVolumeDiscoveryResult[]
-  >
-): NodesSelectionTableViewModel => {
-  const [tableRows, setTableRows] = useState<NodesSelectionTableRowViewModel[]>(
-    []
-  );
+export const useNodesSelectionTableViewModel =
+  (): NodesSelectionTableViewModel => {
+    const [, dispatch] = useStore<State, Actions>();
 
-  const isLoaded = useMemo(
-    () => nodesLoaded && lvdrsLoaded,
-    [lvdrsLoaded, nodesLoaded]
-  );
+    const { t } = useFusionAccessTranslations();
 
-  const loadError = useMemo(
-    () =>
-      (nodesLoadError instanceof Error
-        ? nodesLoadError.message
-        : nodesLoadError) ||
-      (lvdrsLoadError instanceof Error
-        ? lvdrsLoadError.message
-        : lvdrsLoadError),
-    [lvdrsLoadError, nodesLoadError]
-  );
-
-  const selectedNodes = useMemo(
-    () => tableRows.filter((n) => n.status === "selected"),
-    [tableRows]
-  );
-
-  const sharedDisksCount = useMemo(() => {
-    const wwnSetsList = (lvdrs ?? [])
-      .filter((lvdr) =>
-        selectedNodes.find((n) => n.name === lvdr.spec.nodeName)
-      )
-      .map((lvdr) => lvdr?.status?.discoveredDevices ?? [])
-      .map((dd) => new Set(dd.map((d) => d.WWN)));
-
-    return wwnSetsList.length >= 2
-      ? wwnSetsList.reduce((previous, current) =>
-          previous.intersection(current)
-        ).size
-      : new Set<string>().size;
-  }, [lvdrs, selectedNodes]);
-
-  const sharedDisksCounterMessage = useMemo(() => {
-    const n = selectedNodes.length;
-    const s = sharedDisksCount;
-    switch (true) {
-      case n === 0:
-        return t("No nodes selected");
-      case n === 1:
-        return t("{{n}} node selected", { n });
-      case n >= 2 && s === 1:
-        return t("{{n}} nodes selected with {{s}} shared disk", { n, s });
-      default:
-        // n >= 2 && s >= 2
-        return t("{{n}} nodes selected with {{s}} shared disks", { n, s });
-    }
-  }, [selectedNodes.length, sharedDisksCount]);
-
-  const setNodeStatus = useCallback((node, status) => {
-    setTableRows((currentState) => {
-      const subjectIndex = currentState.findIndex((n) => n.uid === node.uid);
-      if (subjectIndex === -1) {
-        return currentState;
+    const lvdrs = useWatchLocalVolumeDiscoveryResult();
+    useEffect(() => {
+      if (lvdrs.error) {
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: t("Failed to load LocalVolumeDiscoveryResults"),
+            description: lvdrs.error.message,
+            variant: "danger",
+          },
+        });
       }
-      const draftState = window.structuredClone(currentState);
-      draftState[subjectIndex].status = status;
-      return draftState;
+    }, [dispatch, lvdrs.error, lvdrs.loaded, t]);
+
+    const nodes = useWatchNode({
+      withLabels: [WORKER_NODE_ROLE_LABEL],
     });
-  }, []);
+    useEffect(() => {
+      if (nodes.error) {
+        dispatch({
+          type: "global/addAlert",
+          payload: {
+            title: t("Failed to load Nodes"),
+            description: nodes.error.message,
+            variant: "danger",
+          },
+        });
+      }
+    }, [dispatch, nodes.error, nodes.loaded, t]);
 
-  useEffect(() => {
-    setTableRows(
-      (nodes ?? []).map((node) => createNodesSelectionTableRowViewModel(node))
+    const loaded = useMemo(
+      () => nodes.loaded && lvdrs.loaded,
+      [lvdrs.loaded, nodes.loaded]
     );
-  }, [nodes]);
 
-  return useMemo(
-    () => ({
-      isLoaded,
-      loadError,
-      selectedNodes,
-      setNodeStatus,
-      sharedDisksCount,
-      sharedDisksCounterMessage,
-      tableRows,
-    }),
-    [
-      isLoaded,
-      loadError,
-      selectedNodes,
-      setNodeStatus,
-      sharedDisksCount,
-      sharedDisksCounterMessage,
-      tableRows,
-    ]
-  );
-};
+    const error = useMemo(
+      () => nodes.error || lvdrs.error,
+      [lvdrs.error, nodes.error]
+    );
 
-export interface NodesSelectionTableRowViewModel {
-  uid: string | undefined;
-  name: string | undefined;
-  role: string | undefined;
-  cpu: IoK8sApimachineryPkgApiResourceQuantity | undefined;
-  memory: string;
-  status: "selected" | "selection-pending" | "unselected";
-  warnings: Set<"InsufficientMemory">;
-}
+    const selectedNodes = useMemo(
+      () => (nodes.data ?? []).filter((n) => hasLabel(n, STORAGE_ROLE_LABEL)),
+      [nodes]
+    );
 
-export const createNodesSelectionTableRowViewModel = (
-  node: IoK8sApiCoreV1Node
-): NodesSelectionTableRowViewModel => {
-  const name = getName(node);
-  const memory = getMemory(node);
-  const warnings = new Set<"InsufficientMemory">();
+    const sharedDisksCount = useMemo(() => {
+      const wwnSetsList = (lvdrs.data ?? [])
+        .filter((lvdr) =>
+          selectedNodes.find((n) => n.metadata?.name === lvdr.spec.nodeName)
+        )
+        .map((lvdr) => lvdr?.status?.discoveredDevices ?? [])
+        .map((dd) => new Set(dd.map((d) => d.WWN)));
 
-  if (
-    !(memory instanceof Error) &&
-    memory.to("GiB") < MINIMUM_AMOUNT_OF_MEMORY_GIB
-  ) {
-    warnings.add("InsufficientMemory");
-  }
+      return wwnSetsList.length >= 2
+        ? wwnSetsList.reduce((previous, current) =>
+            previous.intersection(current)
+          ).size
+        : new Set<string>().size;
+    }, [lvdrs, selectedNodes]);
 
-  return {
-    uid: getUid(node),
-    name,
-    role: getRole(node),
-    cpu: getCpu(node),
-    memory:
-      memory instanceof Error
-        ? VALUE_NOT_AVAILABLE
-        : memory.to("best", "imperial").toString(2),
-    status: hasLabel(node, STORAGE_ROLE_LABEL) ? "selected" : "unselected",
-    warnings,
+    const sharedDisksCountMessage = useMemo(() => {
+      const n = selectedNodes.length;
+      const s = sharedDisksCount;
+      switch (true) {
+        case n === 0:
+          return t("No nodes selected");
+        case n === 1:
+          return t("{{n}} node selected", { n });
+        case n >= 2 && s === 1:
+          return t("{{n}} nodes were selected, sharing {{s}} disk between them", { n, s });
+        default:
+          // n >= 2 && s >= 2
+          return t("{{n}} nodes were selected, sharing {{s}} disks between them", { n, s });
+      }
+    }, [selectedNodes.length, sharedDisksCount, t]);
+
+    const columns: TableColumn<IoK8sApiCoreV1Node>[] = useMemo(
+      () => [
+        {
+          id: "checkbox",
+          title: "",
+          props: { className: "pf-v6-c-table__check" },
+        },
+        {
+          id: "name",
+          title: t("Name"),
+        },
+        {
+          id: "role",
+          title: t("Role"),
+          props: { className: "pf-v6-u-text-align-center" },
+        },
+        {
+          id: "cpu",
+          title: t("CPU"),
+          props: { className: "pf-v6-u-text-align-center" },
+        },
+        {
+          id: "memory",
+          title: t("Memory"),
+          props: { className: "pf-v6-u-text-align-center" },
+        },
+      ],
+      [t]
+    );
+
+    const vm = useMemo(
+      () => ({
+        columns,
+        loaded,
+        error,
+        nodes,
+        selectedNodes,
+        sharedDisksCount,
+        sharedDisksCountMessage,
+      }),
+      [
+        columns,
+        loaded,
+        error,
+        nodes,
+        selectedNodes,
+        sharedDisksCount,
+        sharedDisksCountMessage,
+      ]
+    );
+
+    useValidateMinimumRequirements(vm);
+
+    return vm;
   };
-};

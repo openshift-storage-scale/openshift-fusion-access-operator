@@ -1,32 +1,24 @@
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { Button, Skeleton } from "@patternfly/react-core";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import { Button } from "@patternfly/react-core";
 import { ExternalLinkAltIcon } from "@patternfly/react-icons";
+import { VALUE_NOT_AVAILABLE } from "@/constants";
+import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
 import type { Route } from "../types/Route";
 
 type FileSystemsDashboardLinkProps = {
   fileSystem: FileSystem;
-  routes: Route[];
-  loaded: boolean;
-  isDisabled?: boolean;
+  routes: Route[] | null;
+  isNotAvailable?: boolean;
 };
 
 export const FileSystemsDashboardLink: React.FC<
   FileSystemsDashboardLinkProps
-> = ({ fileSystem, routes, loaded, isDisabled = false }) => {
-  const { t } = useFusionAccessTranslations();
-
-  if (!loaded) {
-    return (
-      <Skeleton screenreaderText={t("Loading file system dashboard link")} />
-    );
+> = ({ fileSystem, routes, isNotAvailable = false }) => {
+  if (!routes || !routes.length || isNotAvailable) {
+    return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
-  if (!routes.length) {
-    return <span className="text-secondary">{t("Not available")}</span>;
-  }
-
-  const href = `https://${routes[0].spec.host}/gui#files-filesystems-/${fileSystem.metadata?.name || ""}`;
+  const fileSystemName = fileSystem.metadata?.name ?? "";
+  const { host } = routes[0].spec;
 
   return (
     <Button
@@ -34,13 +26,12 @@ export const FileSystemsDashboardLink: React.FC<
       variant="link"
       target="_blank"
       rel="noopener noreferrer"
-      href={href}
+      href={`https://${host}/gui#files-filesystems-/${fileSystemName}`}
       icon={<ExternalLinkAltIcon />}
       iconPosition="end"
       isInline
-      isDisabled={isDisabled}
     >
-      {fileSystem.metadata?.name || ""}
+      {fileSystemName}
     </Button>
   );
 };

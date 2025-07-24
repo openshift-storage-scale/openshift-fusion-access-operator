@@ -27,7 +27,7 @@ RUN mkdir licenses
 COPY LICENSE licenses/
 
 # Build
-RUN --mount=type=secret,id=pull export SECRET_NAME=${SECRET_NAME}; hack/build.sh
+RUN hack/build.sh
 
 # UBI is larger (158Mb vs. 56Mb) but approved by RH
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -39,11 +39,10 @@ USER 65532:65532
 
 ARG VERSION=1.0
 
-
-
 ENTRYPOINT ["/manager"]
 
 LABEL \
+    com.redhat.openshift.versions="${SUPPORTED_OCP_VERSIONS}" \
     com.redhat.component="OpenShift Fusion Access Operator" \
     description="OpenShift Fusion Access Operator" \
     io.k8s.display-name="OpenShift Fusion Access Operator" \

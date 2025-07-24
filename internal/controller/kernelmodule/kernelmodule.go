@@ -19,6 +19,7 @@ package kernelmodule
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -63,7 +64,7 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 		return fmt.Errorf("failed to get namespace in CreateOrUpdateKMMResources: %w", err)
 	}
 
-	KMMImageConfig, err := getKMMImageConfig(ctx, cl, ns)
+	KMMImageConfig, err := GetKMMImageConfig(ctx, cl, ns)
 	if err != nil {
 		return fmt.Errorf("failed to get KMMImageConfigmap in CreateOrUpdateKMMResources: %w", err)
 	}
@@ -114,7 +115,14 @@ func doSigningSecretsExist(ctx context.Context, cl client.Client, namespace stri
 }
 
 func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
-	existing.Spec = desired.Spec
+	logger := log.Log.WithName("mutateKMMModule")
+	logger.V(1).Info("Mutating KMM module", "moduleName", existing.Name)
+
+	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+		logger.Info("Updating Module spec")
+		existing.Spec = desired.Spec
+	}
+
 	return nil
 }
 
@@ -164,7 +172,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 			Namespace: namespace,
 		},
 		Spec: kmmv1beta1.ModuleSpec{
-			ModuleLoader: kmmv1beta1.ModuleLoaderSpec{
+			ModuleLoader: &kmmv1beta1.ModuleLoaderSpec{
 				Container: kmmv1beta1.ModuleLoaderContainerSpec{
 					ImagePullPolicy: corev1.PullAlways,
 					Modprobe: kmmv1beta1.ModprobeSpec{
@@ -177,8 +185,11 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 						// This is used to copy the lxtrace binary from /opt/lxtrace/${KERNEL_FULL_VERSION}/*
 						// to kmm-operator-manager-config` at `worker.setFirmwareClassPath`
 						FirmwarePath: "/opt/lxtrace/",
+						// Set DirName to match KMM's default
+						DirName: "/opt",
 					},
 					RegistryTLS: kmmv1beta1.TLSOptions{
+						// Explicitly set defaults to match what KMM applies
 						Insecure:              kmmImageConfig.TLSInsecure,
 						InsecureSkipTLSVerify: kmmImageConfig.TLSSkipVerify,
 					},
@@ -220,7 +231,8 @@ type KMMImageConfig struct {
 	RegistrySecretName string
 }
 
-func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) (KMMImageConfig, error) {
+// Public function to get KMMImageConfig from ConfigMap held in var GetKMMImageConfig
+var GetKMMImageConfig = func(ctx context.Context, cl client.Client, namespace string) (KMMImageConfig, error) {
 	config := KMMImageConfig{
 		RegistryURL:        "image-registry.openshift-image-registry.svc:5000",
 		Repo:               fmt.Sprintf("%s/gpfs_compat_kmod", namespace),
@@ -234,7 +246,7 @@ func getKMMImageConfig(ctx context.Context, cl client.Client, namespace string) 
 			log.Log.Info(fmt.Sprintf("Configmap %s not found, using default values", KMMImageConfigMapName))
 			return config, nil
 		}
-		return config, fmt.Errorf("failed to get configmap %s in getKMMImageConfig: %w", KMMImageConfigMapName, err)
+		return config, fmt.Errorf("failed to get configmap %s in GetKMMImageConfig: %w", KMMImageConfigMapName, err)
 	}
 	data := cm.Data
 
@@ -274,7 +286,7 @@ func getMergedRegistrySecret(ctx context.Context, cl client.Client, namespace st
 			return nil, fmt.Errorf("failed to get secret %s in getMergedRegistrySecret: %w", kmmImageConfig.RegistrySecretName, err)
 		}
 	} else {
-		builderSecretName, err := getServiceAccountDockercfgSecretName(ctx, cl, namespace, "builder")
+		builderSecretName, err := GetServiceAccountDockercfgSecretName(ctx, cl, namespace, "builder")
 		if err != nil {
 			return nil, fmt.Errorf("error fetching dockercfg secret in getMergedRegistrySecret: %w", err)
 		}
@@ -282,11 +294,22 @@ func getMergedRegistrySecret(ctx context.Context, cl client.Client, namespace st
 			return nil, fmt.Errorf("failed to get secret (for internal registry) %s in getMergedRegistrySecret: %w", builderSecretName, err)
 		}
 	}
-	KMMRegistryPushPullSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      KMMRegistryPushPullSecretName,
-			Namespace: namespace,
-		},
+
+	// If the KMMRegistryPushPullSecretName secret already exist we reuse it and just overwrite existing keys
+	// This way we solve the problem of a user changing registry and losing access to the previous kmm images
+	// which are needed by KMM to do an rmmod
+	KMMRegistryPushPullSecret := &corev1.Secret{}
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KMMRegistryPushPullSecretName}, KMMRegistryPushPullSecret); err != nil {
+		if errors.IsNotFound(err) {
+			KMMRegistryPushPullSecret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      KMMRegistryPushPullSecretName,
+					Namespace: namespace,
+				},
+			}
+		} else {
+			return nil, fmt.Errorf("error while retrieving the %s secret: %v", KMMRegistryPushPullSecretName, err)
+		}
 	}
 	KMMRegistryPushPullSecret, err := utils.MergeDockerSecrets(KMMRegistryPushPullSecret, ibmPullSecret)
 	if err != nil {
@@ -365,8 +388,8 @@ COPY --from=builder /usr/lpp/mmfs/bin/lxtrace-${KERNEL_FULL_VERSION} /opt/lxtrac
 	}
 }
 
-// getServiceAccountDockercfgSecretName fetches the Docker config secret name for a given service account
-func getServiceAccountDockercfgSecretName(ctx context.Context, cl client.Client, namespace, serviceAccountName string) (string, error) {
+// GetServiceAccountDockercfgSecretName fetches the Docker config secret name for a given service account
+var GetServiceAccountDockercfgSecretName = func(ctx context.Context, cl client.Client, namespace, serviceAccountName string) (string, error) {
 	// Define the secret name pattern based on the service account name
 	secretPattern := fmt.Sprintf("^%s-dockercfg-.*$", serviceAccountName)
 

@@ -1,28 +1,42 @@
-import type { FilesystemStatus } from "@/features/file-systems/utils/filesystem";
-import { Button, Popover } from "@patternfly/react-core";
+import { Button, List, ListItem, Popover } from "@patternfly/react-core";
 
 type FileSystemStatusProps = {
-  status: FilesystemStatus;
+  title: string;
+  description?: Partial<Record<"Success" | "Healthy", string>>;
+  icon: React.ReactNode;
 };
 
-const FileSystemStatus: React.FC<FileSystemStatusProps> = ({ status }) => {
-  if (status.description) {
+export const FileSystemsStatus: React.FC<FileSystemStatusProps> = (props) => {
+  const { title, description, icon } = props;
+
+  if (description) {
     return (
       <Popover
         aria-label="Status popover"
-        bodyContent={<div>{status.description}</div>}
+        bodyContent={
+          <List aria-label="Status data list">
+            {Object.entries(description).map(([statusType, message]) => (
+              <ListItem
+                aria-labelledby={`${statusType}-message`}
+                key={statusType}
+              >
+                <span id={`${statusType}-message`}>{message}</span>
+              </ListItem>
+            ))}
+          </List>
+        }
       >
-        <Button variant="link" isInline icon={status.icon}>
-          {status.title}
+        <Button variant="link" isInline icon={icon}>
+          {title}
         </Button>
       </Popover>
     );
   }
+
   return (
     <>
-      {status.icon} {status.title}
+      {icon} {title}
     </>
   );
 };
-
-export default FileSystemStatus;
+FileSystemsStatus.displayName = "FileSystemsStatus";
