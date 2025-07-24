@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Trans } from "react-i18next";
 import {
   Alert,
@@ -11,43 +10,53 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystemsTabViewModel } from "../hooks/useFileSystemsTabViewModel";
+import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useDeleteFileSystemsHandler } from "../hooks/useDeleteFileSystemHandler";
 
 interface FileSystemsDeleteModalProps {
-  vm: FileSystemsTabViewModel["deleteModal"];
+  vm: FileSystemsTableViewModel["deleteModal"];
 }
 
 export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
   props
 ) => {
   const { vm } = props;
+
   const { t } = useFusionAccessTranslations();
+
   const handleDeleteFileSystem = useDeleteFileSystemsHandler(vm);
 
   return (
     <Modal
-      isOpen={vm.state.isOpen}
-      aria-describedby="modal-delete-filesystem"
+      isOpen={vm.isOpen}
+      aria-describedby="filesystem-delete-confirmation-modal"
+      aria-labelledby="delete-filesystem-title"
       variant="medium"
+      onClose={vm.handleClose}
     >
-      <ModalHeader title={t("Delete Filesystem?")} titleIconVariant="warning" />
-      <ModalBody>
+      <ModalHeader
+        title={t("Delete File system")}
+        titleIconVariant="warning"
+        labelId="delete-filesystem-title"
+      />
+      <ModalBody tabIndex={0} id="filesystem-delete-confirmation-modal">
         <Stack hasGutter>
           <StackItem isFilled>
-            <Trans t={t} ns="public">
-              Are you sure you want to delete{" "}
-              <strong>
-                {{ resourceName: vm.state.fileSystem?.metadata?.name }}
-              </strong>{" "}
-              in namespace{" "}
-              <strong>
-                {{ namespace: vm.state.fileSystem?.metadata?.namespace }}
-              </strong>
-              ?
-            </Trans>
+            {!vm.errors.length ? (
+              <Trans t={t} ns="public">
+                Are you sure you want to delete{" "}
+                <strong>
+                  {{ resourceName: vm.fileSystem?.metadata?.name }}
+                </strong>{" "}
+                in namespace{" "}
+                <strong>
+                  {{ namespace: vm.fileSystem?.metadata?.namespace }}
+                </strong>
+                ?
+              </Trans>
+            ) : null}
           </StackItem>
-          {(vm.state.errors ?? []).length > 0 && (
+          {(vm.errors ?? []).length > 0 && (
             <StackItem>
               <Alert
                 isInline
@@ -55,7 +64,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
                 title={t("An error occurred while deleting resources.")}
               >
                 <Stack>
-                  {vm.state.errors.map((e, index) => (
+                  {vm.errors.map((e, index) => (
                     <StackItem key={index}>{e}</StackItem>
                   ))}
                 </Stack>
@@ -65,23 +74,35 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
         </Stack>
       </ModalBody>
       <ModalFooter>
-        <Button
-          key="confirm"
-          variant="danger"
-          onClick={async () => {
-            await handleDeleteFileSystem();
-          }}
-          isLoading={vm.state.isDeleting}
-          isDisabled={vm.state.isDeleting}
-        >
-          {vm.state.isDeleting ? t("Deleting") : t("Delete")}
-        </Button>
-        {!vm.state.isDeleting && (
+        {!vm.errors.length ? (
           <Button
+            id="modal-cta-button"
+            key="confirm"
+            variant="danger"
+            onClick={handleDeleteFileSystem}
+            isLoading={vm.isDeleting}
+            isDisabled={vm.isDeleting}
+          >
+            {vm.isDeleting ? t("Deleting") : t("Delete")}
+          </Button>
+        ) : (
+          <Button
+            id="modal-cta-button"
+            key="ok"
+            variant="primary"
+            onClick={vm.handleClose}
+            isLoading={vm.isDeleting}
+            isDisabled={vm.isDeleting}
+          >
+            {t("Close")}
+          </Button>
+        )}
+        {vm.isDeleting ? null : (
+          <Button
+            id="modal-cancel-button"
             key="cancel"
             variant="link"
-            onClick={() => vm.actions.setIsOpen(false)}
-            isDisabled={vm.state.isDeleting}
+            onClick={vm.handleClose}
           >
             {t("Cancel")}
           </Button>

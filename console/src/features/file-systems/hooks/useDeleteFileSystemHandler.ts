@@ -9,14 +9,14 @@ import {
 } from "@openshift-console/dynamic-plugin-sdk";
 import { FS_ALLOW_DELETE_LABEL } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { getFileSystemScs as getFileSystemStorageClasses } from "../utils/filesystem";
-import type { FileSystemsTabViewModel } from "./useFileSystemsTabViewModel";
+import { getFileSystemStorageClasses } from "../utils/FileSystems";
+import type { FileSystemsTableViewModel } from "./useFileSystemsTableViewModel";
 import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
 
 type DeleteFileSystemsHandler = () => Promise<void>;
 
 export const useDeleteFileSystemsHandler = (
-  vm: FileSystemsTabViewModel["deleteModal"]
+  vm: FileSystemsTableViewModel["deleteModal"]
 ): DeleteFileSystemsHandler => {
   const { t } = useFusionAccessTranslations();
 
@@ -49,28 +49,28 @@ export const useDeleteFileSystemsHandler = (
   });
 
   const deleteFileSystemsHandler = useCallback(async () => {
-    if (!vm.state.fileSystem) {
+    if (!vm.fileSystem) {
       return;
     }
 
     const [fsName, fsNamespace] = [
-      vm.state.fileSystem.metadata?.name,
-      vm.state.fileSystem.metadata?.namespace,
+      vm.fileSystem.metadata?.name,
+      vm.fileSystem.metadata?.namespace,
     ];
 
     if (!fsName || !fsNamespace) {
       return;
     }
 
-    vm.actions.setIsDeleting(true);
-    vm.actions.setErrors([]);
+    vm.setErrors([]);
+    vm.setIsDeleting(true);
 
     try {
-      if (!hasLabel(vm.state.fileSystem, FS_ALLOW_DELETE_LABEL)) {
+      if (!hasLabel(vm.fileSystem, FS_ALLOW_DELETE_LABEL)) {
         await k8sPatch({
           model: fileSystemModel,
           ns: fsNamespace,
-          resource: vm.state.fileSystem,
+          resource: vm.fileSystem,
           data: [
             {
               op: "add",
@@ -84,11 +84,11 @@ export const useDeleteFileSystemsHandler = (
       await k8sDelete({
         model: fileSystemModel,
         ns: fsNamespace,
-        resource: vm.state.fileSystem,
+        resource: vm.fileSystem,
       });
 
       const fileSystemStorageClasses = getFileSystemStorageClasses(
-        vm.state.fileSystem,
+        vm.fileSystem,
         storageClasses
       );
 
@@ -102,7 +102,7 @@ export const useDeleteFileSystemsHandler = (
       );
 
       const disks = Array.from(
-        vm.state.fileSystem.spec?.local?.pools.reduce((disks, pool) => {
+        vm.fileSystem.spec?.local?.pools.reduce((disks, pool) => {
           pool.disks.forEach((d) => disks.add(d));
           return disks;
         }, new Set<string>()) ?? []
@@ -146,8 +146,7 @@ export const useDeleteFileSystemsHandler = (
         );
 
         if (failedDiskRemovals) {
-          vm.actions.setIsDeleting(false);
-          vm.actions.setErrors([
+          vm.setErrors([
             t("Failed to delete the following local disks:"),
             ...diskDeletions.reduce((acc, curr, idx) => {
               if (curr.status === "rejected") {
@@ -160,23 +159,25 @@ export const useDeleteFileSystemsHandler = (
               return acc;
             }, [] as string[]),
           ]);
+          vm.setIsDeleting(false);
           return;
         }
       }
-      vm.actions.setIsOpen(false);
+
+      vm.setIsOpen(false);
     } catch (e) {
-      vm.actions.setIsDeleting(false);
       const description = e instanceof Error ? e.message : (e as string);
-      vm.actions.setErrors([description]);
+      vm.setErrors([description]);
     }
+
+    vm.setIsDeleting(false);
   }, [
+    vm,
     fileSystemModel,
     storageClasses,
     storageClassModel,
     localDiskModel,
     t,
-    vm.actions,
-    vm.state.fileSystem,
   ]);
 
   return deleteFileSystemsHandler;

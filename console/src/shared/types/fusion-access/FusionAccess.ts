@@ -24,7 +24,7 @@ interface FusionAccessSpec {
   /**
    * Version of IBMs installation manifests found at https://github.com/IBM/ibm-spectrum-scale-container-native
    */
-  storageScaleVersion?: "v5.2.3.0.1";
+  storageScaleVersion?: "v5.2.3.1";
 }
 
 /**

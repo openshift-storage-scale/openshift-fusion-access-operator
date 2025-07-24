@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -31,11 +32,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kubeclient "k8s.io/client-go/kubernetes/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	fusionv1alpha "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 )
 
 const (
@@ -287,5 +290,75 @@ var _ = Describe("getIbmManifest", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("no Storage Scale manifest version"))
 		})
+	})
+})
+
+var _ = Describe("getCurrentRegistrySecretName", func() {
+	var (
+		origGetKMMImageConfig                func(context.Context, client.Client, string) (kernelmodule.KMMImageConfig, error)
+		origGetServiceAccountDockercfgSecret func(context.Context, client.Client, string, string) (string, error)
+		fakeClient                           client.Client
+		ctx                                  = context.Background()
+		ns                                   = "test-ns"
+	)
+
+	BeforeEach(func() {
+		origGetKMMImageConfig = kernelmodule.GetKMMImageConfig
+		origGetServiceAccountDockercfgSecret = kernelmodule.GetServiceAccountDockercfgSecretName
+		fakeClient = fake.NewClientBuilder().Build()
+	})
+
+	AfterEach(func() {
+		kernelmodule.GetKMMImageConfig = origGetKMMImageConfig
+		kernelmodule.GetServiceAccountDockercfgSecretName = origGetServiceAccountDockercfgSecret
+	})
+
+	It("returns RegistrySecretName from KMMImageConfig if set", func() {
+		kernelmodule.GetKMMImageConfig = func(_ context.Context, _ client.Client, _ string) (kernelmodule.KMMImageConfig, error) {
+			return kernelmodule.KMMImageConfig{RegistrySecretName: "my-registry-secret"}, nil
+		}
+		kernelmodule.GetServiceAccountDockercfgSecretName = func(_ context.Context, _ client.Client, _, _ string) (string, error) {
+			return "should-not-be-called", nil
+		}
+		name, err := getCurrentRegistrySecretName(ctx, fakeClient, ns)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal("my-registry-secret"))
+	})
+
+	It("falls back to GetServiceAccountDockercfgSecretName if RegistrySecretName is empty", func() {
+		kernelmodule.GetKMMImageConfig = func(_ context.Context, _ client.Client, _ string) (kernelmodule.KMMImageConfig, error) {
+			return kernelmodule.KMMImageConfig{RegistrySecretName: ""}, nil
+		}
+		kernelmodule.GetServiceAccountDockercfgSecretName = func(_ context.Context, _ client.Client, namespace, sa string) (string, error) {
+			Expect(namespace).To(Equal(ns))
+			Expect(sa).To(Equal("builder"))
+			return "builder-dockercfg-secret", nil
+		}
+		name, err := getCurrentRegistrySecretName(ctx, fakeClient, ns)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal("builder-dockercfg-secret"))
+	})
+
+	It("returns error if GetKMMImageConfig fails", func() {
+		kernelmodule.GetKMMImageConfig = func(_ context.Context, _ client.Client, _ string) (kernelmodule.KMMImageConfig, error) {
+			return kernelmodule.KMMImageConfig{}, fmt.Errorf("configmap not found")
+		}
+		name, err := getCurrentRegistrySecretName(ctx, fakeClient, ns)
+		Expect(err).To(HaveOccurred())
+		Expect(name).To(BeEmpty())
+		Expect(err.Error()).To(ContainSubstring("failed to get KMMImageConfigmap"))
+	})
+
+	It("returns error if GetServiceAccountDockercfgSecretName fails", func() {
+		kernelmodule.GetKMMImageConfig = func(_ context.Context, _ client.Client, _ string) (kernelmodule.KMMImageConfig, error) {
+			return kernelmodule.KMMImageConfig{RegistrySecretName: ""}, nil
+		}
+		kernelmodule.GetServiceAccountDockercfgSecretName = func(_ context.Context, _ client.Client, _, _ string) (string, error) {
+			return "", fmt.Errorf("dockercfg secret not found")
+		}
+		name, err := getCurrentRegistrySecretName(ctx, fakeClient, ns)
+		Expect(err).To(HaveOccurred())
+		Expect(name).To(BeEmpty())
+		Expect(err.Error()).To(ContainSubstring("dockercfg secret not found"))
 	})
 })

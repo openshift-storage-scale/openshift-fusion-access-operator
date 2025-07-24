@@ -274,6 +274,14 @@ rules:
   - patch
   - update
 - apiGroups:
+  - imageregistry.operator.openshift.io
+  resources:
+  - configs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - kmm.sigs.x-k8s.io
   resources:
   - modules

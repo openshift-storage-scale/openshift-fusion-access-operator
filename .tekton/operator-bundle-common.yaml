@@ -84,10 +84,6 @@ spec:
     description: Whether to enable privileged mode, should be used only with remote VMs
     name: privileged-nested
     type: string
-  - description: Script base image
-    name: script-base-image
-    default: "quay.io/konflux-ci/operator-sdk-builder:latest@sha256:df11e9d5193d267f9c92061ef132b4c2f80e70642ae4fb5f40ade46405970559"
-    type: string
   results:
   - description: ''
     name: IMAGE_URL
@@ -161,7 +157,7 @@ spec:
     - name: SOURCE_ARTIFACT
       value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
     - name: SCRIPT_RUNNER_IMAGE
-      value: $(params.script-base-image)
+      value: quay.io/konflux-ci/operator-sdk-builder:latest
     runAfter:
     - clone-repository
     taskRef:
@@ -228,7 +224,7 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: ADDITIONAL_BASE_IMAGES
       value:
-      - $(params.script-base-image)
+      - $(tasks.generate-bundle.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - prefetch-dependencies
     taskRef:
@@ -386,6 +382,8 @@ spec:
       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: IMAGE_DIGEST
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+    - name: ARGS
+      value: "--project-name=hybrid-platforms-fusion-access-for-san-project --report --org=021b2536-651b-4eb7-b144-0fe83dddfc30"
     runAfter:
     - build-image-index
     taskRef:

@@ -1,33 +1,28 @@
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
-import { getFileSystemScs } from "@/features/file-systems/utils/filesystem";
 import {
   ResourceLink,
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { Skeleton, Stack, StackItem } from "@patternfly/react-core";
+import { Stack, StackItem } from "@patternfly/react-core";
+import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import { getFileSystemStorageClasses } from "@/features/file-systems/utils/FileSystems";
+import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 type FileSystemStorageClassesProps = {
   fileSystem: FileSystem;
-  storageClasses: StorageClass[];
-  loaded: boolean;
-  isDisabled?: boolean;
+  storageClasses: StorageClass[] | null;
+  isNotAvailable?: boolean;
 };
 
-const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
-  fileSystem,
-  loaded,
-  storageClasses,
-  isDisabled = false,
-}) => {
-  const { t } = useFusionAccessTranslations();
-  if (!loaded) {
-    return <Skeleton screenreaderText={t("Loading storage classes")} />;
+export const FileSystemStorageClasses: React.FC<
+  FileSystemStorageClassesProps
+> = ({ fileSystem, storageClasses, isNotAvailable = false }) => {
+  if (!storageClasses || !storageClasses.length || isNotAvailable) {
+    return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
-  const scs = getFileSystemScs(fileSystem, storageClasses);
-  if (!scs.length) {
-    return <span className="text-secondary">-</span>;
+  const scs = getFileSystemStorageClasses(fileSystem, storageClasses);
+  if (!storageClasses.length || isNotAvailable) {
+    return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
   return (
@@ -35,7 +30,6 @@ const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
       {scs.map((sc) => (
         <StackItem key={sc.metadata?.uid}>
           <ResourceLink
-            {...(isDisabled && { onClick: () => {} })}
             groupVersionKind={{
               group: "storage.k8s.io",
               version: "v1",
@@ -48,5 +42,4 @@ const FileSystemStorageClasses: React.FC<FileSystemStorageClassesProps> = ({
     </Stack>
   );
 };
-
-export default FileSystemStorageClasses;
+FileSystemStorageClasses.displayName = "FileSystemStorageClasses";

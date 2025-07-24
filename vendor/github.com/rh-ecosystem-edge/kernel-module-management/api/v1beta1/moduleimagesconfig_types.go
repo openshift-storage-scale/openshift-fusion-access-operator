@@ -50,6 +50,10 @@ type ModuleImageSpec struct {
 	// +optional
 	Sign *Sign `json:"sign,omitempty"`
 
+	// SkipWaitMissingImage signals to MIC to stop waiting for image to be present
+	// in case Build andSign not define, and report the image as DoesNotExist
+	SkipWaitMissingImage bool `json:"skipWaitMissingImage,omitempty"`
+
 	// +optional
 	// RegistryTLS set the TLS configs for accessing the registry of the image.
 	RegistryTLS *TLSOptions `json:"registryTLS,omitempty"`
@@ -63,6 +67,16 @@ type ModuleImagesConfigSpec struct {
 	// ImageRepoSecret contains pull secret for the image's repo, if needed
 	// +optional
 	ImageRepoSecret *v1.LocalObjectReference `json:"imageRepoSecret,omitempty"`
+
+	// +kubebuilder:default=IfNotPresent
+	// ImagePullPolicy defines the pull policy used for verifying the presence of the image
+	//+optional
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy"`
+
+	// Boolean flag that determines whether images built must also
+	// be pushed to a defined repository
+	// +optional
+	PushBuiltImage bool `json:"pushBuiltImage"`
 }
 
 type ModuleImageState struct {

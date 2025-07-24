@@ -1,4 +1,4 @@
-import { Redirect, useHistory } from "react-router";
+import { Redirect } from "react-router";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
 import { reducer, initialState } from "@/shared/store/reducer";
@@ -6,14 +6,17 @@ import { NodesSelectionTable } from "@/features/storage-clusters/components/Node
 import { ListPage } from "@/shared/components/ListPage";
 import { StorageClustersCreateButton } from "@/features/storage-clusters/components/StorageClustersCreateButton";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchSpectrumScaleCluster } from "@/shared/hooks/useWatchSpectrumScaleCluster";
-import { Split } from "@patternfly/react-core";
+import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
+import { Button, Split } from "@patternfly/react-core";
 import { useCreateStorageClusterHandler } from "@/features/storage-clusters/hooks/useCreateStorageClusterHandler";
-import { CancelButton } from "@/shared/components/CancelButton";
+import {
+  UrlPaths,
+  useRedirectHandler,
+} from "@/shared/hooks/useRedirectHandler";
 
 const StorageClusterCreate: React.FC = () => {
-  const [cluster] = useWatchSpectrumScaleCluster({ limit: 1 });
-  return (cluster ?? []).length === 0 ? (
+  const storageCluster = useWatchStorageCluster({ limit: 1 });
+  return (storageCluster.data ?? []).length === 0 ? (
     <StoreProvider<State, Actions>
       reducer={reducer}
       initialState={initialState}
@@ -21,7 +24,7 @@ const StorageClusterCreate: React.FC = () => {
       <ConnectedStorageClusterCreate />
     </StoreProvider>
   ) : (
-    <Redirect to={"/fusion-access/file-systems"} />
+    <Redirect to={UrlPaths.FileSystemsHome} />
   );
 };
 StorageClusterCreate.displayName = "StorageClusterCreate";
@@ -30,25 +33,26 @@ export default StorageClusterCreate;
 
 const ConnectedStorageClusterCreate: React.FC = () => {
   const { t } = useFusionAccessTranslations();
-  const [store, dispatch] = useStore<State, Actions>();
+  const [store] = useStore<State, Actions>();
   const handleCreateStorageCluster = useCreateStorageClusterHandler();
-  const history = useHistory();
+  const redirectoStorageClusterHome = useRedirectHandler(
+    "/fusion-access/storage-cluster"
+  );
 
   return (
     <ListPage
       documentTitle={t("Fusion Access for SAN")}
       title={t("Create storage cluster")}
-      alert={store.alert}
-      onDismissAlert={() => dispatch({ type: "dismissAlert" })}
+      alerts={store.alerts}
       footer={
         <Split hasGutter>
           <StorageClustersCreateButton
-            key="create-button"
-            isDisabled={store.ctas.createStorageCluster.isDisabled}
-            isLoading={store.ctas.createStorageCluster.isLoading}
-            onCreateStorageCluster={handleCreateStorageCluster}
+            {...store.cta}
+            onClick={handleCreateStorageCluster}
           />
-          <CancelButton key="cancel-button" onCancel={history.goBack} />
+          <Button variant="link" onClick={redirectoStorageClusterHome}>
+            {t("Cancel")}
+          </Button>
         </Split>
       }
     >
