@@ -1,6 +1,8 @@
 module github.com/openshift-storage-scale/openshift-fusion-access-operator
 
-go 1.23.6
+go 1.24.0
+
+toolchain go1.24.4
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -8,7 +10,7 @@ require (
 	github.com/manifestival/manifestival v0.7.2
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
-	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
+	github.com/openshift/api v0.0.0-20250725072657-92b1455121e1
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
 	github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95
 	github.com/pkg/errors v0.9.1
@@ -17,8 +19,8 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.3
-	k8s.io/apimachinery v0.32.3
+	k8s.io/api v0.33.2
+	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v0.32.3
 	k8s.io/component-helpers v0.32.3
 	k8s.io/klog/v2 v2.130.1
@@ -45,7 +47,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250630185457-6e76a2b096b5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -60,7 +61,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
