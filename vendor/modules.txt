@@ -264,7 +264,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250710091453-478659262549
+# github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250716080751-315689322647
 ## explicit; go 1.23.3
 github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1
 github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta2
