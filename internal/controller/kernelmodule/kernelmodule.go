@@ -27,7 +27,7 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 
-	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/yaml"
 
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"

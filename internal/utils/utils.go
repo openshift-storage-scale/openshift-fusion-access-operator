@@ -27,10 +27,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	configv1 "github.com/openshift/api/config/v1"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -164,28 +164,29 @@ type ControllerManagerConfig struct {
 
 // ParseYAMLAndExtractCoreInit takes multi-doc YAML and returns coreInit value
 func ParseYAMLAndExtractTestImage(yamlContent string) (string, error) {
-	decoder := yaml.NewDecoder(strings.NewReader(yamlContent))
-	for {
-		var node yaml.Node
-		if err := decoder.Decode(&node); err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return "", fmt.Errorf("failed to decode YAML: %w", err)
+	// Split multi-document YAML by "---" separator
+	documents := strings.Split(yamlContent, "---")
+
+	for _, doc := range documents {
+		doc = strings.TrimSpace(doc)
+		if doc == "" {
+			continue
 		}
+
 		var kindNode struct {
 			Kind     string `yaml:"kind"`
 			Metadata struct {
 				Name string `yaml:"name"`
 			} `yaml:"metadata"`
 		}
-		if err := node.Decode(&kindNode); err != nil {
+		if err := yaml.Unmarshal([]byte(doc), &kindNode); err != nil {
 			continue // not a valid K8s resource, skip
 		}
+
 		if kindNode.Kind == "ConfigMap" &&
 			kindNode.Metadata.Name == "ibm-spectrum-scale-manager-config" {
 			var cm ConfigMap
-			if err := node.Decode(&cm); err != nil {
+			if err := yaml.Unmarshal([]byte(doc), &cm); err != nil {
 				return "", fmt.Errorf("failed to decode ConfigMap: %w", err)
 			}
 
