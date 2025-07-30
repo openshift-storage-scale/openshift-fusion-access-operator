@@ -2,8 +2,7 @@ package localvolumediscovery
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	fusionv1alpha "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,15 +23,15 @@ func CreateOrUpdateLocalVolumeDiscovery(ctx context.Context, devicefinder *fusio
 	oldCP := &fusionv1alpha.LocalVolumeDiscovery{}
 	if err := cl.Get(ctx, client.ObjectKeyFromObject(devicefinder), oldCP); apierrors.IsNotFound(err) {
 		if err := cl.Create(ctx, devicefinder); err != nil {
-			return errors.Wrap(err, "could not create device finder")
+			return fmt.Errorf("could not create device finder: %w", err)
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing device finder")
+		return fmt.Errorf("could not check for existing device finder: %w", err)
 	} else {
 		oldCP.OwnerReferences = devicefinder.OwnerReferences
 		oldCP.Spec = devicefinder.Spec
 		if err := cl.Update(ctx, oldCP); err != nil {
-			return errors.Wrap(err, "could not update device finder")
+			return fmt.Errorf("could not update device finder: %w", err)
 		}
 	}
 	return nil
