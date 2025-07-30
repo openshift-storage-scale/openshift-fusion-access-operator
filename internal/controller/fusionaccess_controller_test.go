@@ -163,7 +163,6 @@ var _ = Describe("FusionAccessReconciler Setup", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(reconciler.config).ToNot(BeNil())
-		Expect(reconciler.dynamicClient).ToNot(BeNil())
 		Expect(reconciler.fullClient).ToNot(BeNil())
 
 	})

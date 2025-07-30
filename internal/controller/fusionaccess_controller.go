@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,10 +56,9 @@ type CanPullImageFunc func(ctx context.Context, client kubernetes.Interface, ns,
 // FusionAccessReconciler reconciles a FusionAccess object
 type FusionAccessReconciler struct {
 	client.Client
-	Scheme        *runtime.Scheme
-	config        *rest.Config
-	dynamicClient dynamic.Interface
-	fullClient    kubernetes.Interface
+	Scheme     *runtime.Scheme
+	config     *rest.Config
+	fullClient kubernetes.Interface
 	// Need this for mocking when needed
 	CanPullImage CanPullImageFunc
 }
@@ -472,9 +470,6 @@ func (r *FusionAccessReconciler) Reconcile(
 func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
-	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
-		return err
-	}
 	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
 		return err
 	}
