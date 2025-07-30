@@ -83,6 +83,10 @@ func NewFusionAccessReconciler(
 
 //+kubebuilder:rbac:groups="",namespace=ibm-fusion-access,resources=secrets,verbs=get;list;watch
 
+// Filesystem Job RBACs - needed for job containers to update their own status
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;patch;create;delete
+//+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
+
 // KMM support
 //+kubebuilder:rbac:groups=kmm.sigs.x-k8s.io,resources=modules,verbs=create;delete;get;list;patch;update;watch
 

@@ -12,6 +12,7 @@ export SUPPORTED_OCP_VERSIONS ?= v4.19
 OPERATOR_DOCKERFILE ?= operator.Dockerfile
 DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
+FILESYSTEMJOB_DOCKERFILE ?= filesystemjob.Dockerfile
 
 # Version of yaml file to generate rbacs from
 RBAC_VERSION ?= v5.2.3.1
@@ -59,6 +60,7 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 
 export DEVICEFINDER_IMAGE ?= $(IMAGE_TAG_BASE)-devicefinder:$(VERSION)
+export FILESYSTEMJOB_IMAGE ?= $(IMAGE_TAG_BASE)-filesystem-job:$(VERSION)
 
 REV=$(shell git describe --long --tags --match='v*' --dirty 2>/dev/null || git rev-list -n1 HEAD)
 CURPATH=$(PWD)
@@ -204,6 +206,11 @@ generate-dockerfile-devicefinder:
 generate-dockerfile-console-plugin:
 	envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
 
+# Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
+.PHONY: generate-dockerfile-filesystemjob
+generate-dockerfile-filesystemjob:
+	envsubst < templates/filesystemjob.Dockerfile.template > $(FILESYSTEMJOB_DOCKERFILE)
+
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -233,6 +240,14 @@ devicefinder-docker-build: generate-dockerfile-devicefinder ## Build docker imag
 .PHONY: devicefinder-docker-push
 devicefinder-docker-push: ## Push docker image of the devicefinder
 	$(CONTAINER_TOOL) push $(DEVICEFINDER_IMAGE)
+
+.PHONY: filesystemjob-docker-build
+filesystemjob-docker-build: generate-dockerfile-filesystemjob ## Build docker image of the filesystem job
+	$(CONTAINER_TOOL) build -t $(FILESYSTEMJOB_IMAGE) -f $(CURPATH)/${FILESYSTEMJOB_DOCKERFILE} .
+
+.PHONY: filesystemjob-docker-push
+filesystemjob-docker-push: ## Push docker image of the filesystem job
+	$(CONTAINER_TOOL) push $(FILESYSTEMJOB_IMAGE)
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
