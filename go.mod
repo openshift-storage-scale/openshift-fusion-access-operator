@@ -11,7 +11,6 @@ require (
 	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
 	github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250716080751-315689322647
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
