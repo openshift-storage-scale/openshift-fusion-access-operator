@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	SC_PROVISIONER = "spectrumscale.csi.ibm.com"
-
+	SC_PROVISIONER           = "spectrumscale.csi.ibm.com"
+	MAX_RESOURCE_NAME_LENGTH = 63
 	// Labels
 	FS_ALLOW_DELETE_LABEL = "scale.spectrum.ibm.com/allowDelete"
 
@@ -169,10 +169,10 @@ func handleCreateFilesystem(ctx context.Context, clientset kubernetes.Interface,
 	}
 
 	// Create filesystem with phase tracking
-	return createFilesystemWithPhases(ctx, clientset, dynamicClient, fileSystemName, namespace, newLuns, reusedLuns, jobName, jobNamespace)
+	return createResources(ctx, clientset, dynamicClient, fileSystemName, namespace, newLuns, reusedLuns, jobName, jobNamespace)
 }
 
-func createFilesystemWithPhases(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface, fileSystemName, namespace string, newLuns, reusedLuns []LUNSpec, jobName, jobNamespace string) error {
+func createResources(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface, fileSystemName, namespace string, newLuns, reusedLuns []LUNSpec, jobName, jobNamespace string) error {
 	createdResources := &CreatedResources{}
 
 	// Update job phase to starting
@@ -273,14 +273,13 @@ func createFilesystemWithPhases(ctx context.Context, clientset kubernetes.Interf
 // ============================================================================
 
 func handleCleanupFailedJob(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface) error {
-	targetName := os.Getenv("TARGET_NAME")
 	targetNamespace := os.Getenv("TARGET_NAMESPACE")
 	failedJobName := os.Getenv("FAILED_JOB_NAME")
 	failedJobNamespace := os.Getenv("FAILED_JOB_NAMESPACE")
 	createdResourcesJSON := os.Getenv("CREATED_RESOURCES")
 
-	if targetName == "" || targetNamespace == "" {
-		return fmt.Errorf("TARGET_NAME and TARGET_NAMESPACE are required")
+	if targetNamespace == "" {
+		return fmt.Errorf("TARGET_NAMESPACE is required")
 	}
 
 	log.Printf("Cleaning up failed job: %s in namespace %s", failedJobName, failedJobNamespace)
@@ -293,7 +292,7 @@ func handleCleanupFailedJob(ctx context.Context, clientset kubernetes.Interface,
 		}
 	}
 
-	return cleanupFailedJob(ctx, clientset, dynamicClient, targetName, targetNamespace, failedJobName, failedJobNamespace, &createdResources)
+	return cleanupFailedJob(ctx, clientset, dynamicClient, targetNamespace, failedJobName, failedJobNamespace, &createdResources)
 }
 
 func handleCleanupFilesystem(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface) error {
@@ -346,8 +345,8 @@ func updateJobPhase(ctx context.Context, clientset kubernetes.Interface, namespa
 	resourcesJSON, _ := json.Marshal(resources)
 
 	// Patch the job with updated annotations
-	patchData := map[string]interface{}{
-		"metadata": map[string]interface{}{
+	patchData := map[string]any{
+		"metadata": map[string]any{
 			"annotations": map[string]string{
 				PhaseAnnotation:            phase,
 				PhaseDetailsAnnotation:     string(detailsJSON),
@@ -384,18 +383,18 @@ func createLocalDisks(ctx context.Context, client dynamic.Interface, fileSystemN
 			lun.WWN))
 
 		localDisk := &unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": "scale.spectrum.ibm.com/v1beta1",
 				"kind":       "LocalDisk",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      localDiskName,
 					"namespace": namespace,
-					"labels": map[string]interface{}{
+					"labels": map[string]any{
 						"fusion.storage.openshift.io/filesystem-job":  "true",
 						"fusion.storage.openshift.io/filesystem-name": fileSystemName,
 					},
 				},
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"device": lun.Path,
 					"node":   lun.Node,
 				},
@@ -423,17 +422,17 @@ func createFileSystem(ctx context.Context, client dynamic.Interface, fileSystemN
 	}
 
 	filesystem := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "scale.spectrum.ibm.com/v1beta1",
 			"kind":       "Filesystem",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      fileSystemName,
 				"namespace": namespace,
 			},
-			"spec": map[string]interface{}{
-				"local": map[string]interface{}{
-					"pools": []interface{}{
-						map[string]interface{}{
+			"spec": map[string]any{
+				"local": map[string]any{
+					"pools": []any{
+						map[string]any{
 							"disks": localDiskNames,
 						},
 					},
@@ -471,7 +470,7 @@ func createStorageClass(ctx context.Context, clientset kubernetes.Interface, fil
 	return nil
 }
 
-func cleanupFailedJob(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface, targetName, targetNamespace, failedJobName, failedJobNamespace string, createdResources *CreatedResources) error {
+func cleanupFailedJob(ctx context.Context, clientset kubernetes.Interface, dynamicClient dynamic.Interface, targetNamespace, failedJobName, failedJobNamespace string, createdResources *CreatedResources) error {
 	// Clean up resources in reverse order (StorageClass -> FileSystem -> Job)
 	// Don't clean up LocalDisks - they can be reused
 
@@ -580,8 +579,8 @@ func sanitizeName(name string) string {
 	name = strings.ToLower(name)
 
 	// Ensure it starts and ends with alphanumeric characters
-	if len(name) > 63 {
-		name = name[:63]
+	if len(name) > MAX_RESOURCE_NAME_LENGTH {
+		name = name[:MAX_RESOURCE_NAME_LENGTH]
 	}
 
 	return name
