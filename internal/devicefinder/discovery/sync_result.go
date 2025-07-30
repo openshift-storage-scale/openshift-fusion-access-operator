@@ -11,7 +11,6 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/common"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/devicefinder"
 
-	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiTypes "k8s.io/apimachinery/pkg/types"
@@ -53,7 +52,7 @@ func (discovery *DeviceDiscovery) ensureDiscoveryResultCR() error {
 	parentObjUID := os.Getenv("DISCOVERY_OBJECT_UID")
 	parentObjName := os.Getenv("DISCOVERY_OBJECT_NAME")
 	if nodeName == "" || namespace == "" || parentObjUID == "" || parentObjName == "" {
-		return errors.New("failed to create LocalVolumeDiscoveryResult resource. missing required env variables")
+		return fmt.Errorf("failed to create LocalVolumeDiscoveryResult resource. missing required env variables")
 	}
 	newCR := newDiscoveryResultInstance(nodeName, namespace, parentObjName, parentObjUID)
 	_, err := discovery.apiClient.GetDiscoveryResult(newCR.Name, newCR.Namespace)
@@ -61,7 +60,7 @@ func (discovery *DeviceDiscovery) ensureDiscoveryResultCR() error {
 	if kerrors.IsNotFound(err) {
 		err = discovery.apiClient.CreateDiscoveryResult(newCR)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create LocalVolumeDiscoveryResult resource")
+			return fmt.Errorf("failed to create LocalVolumeDiscoveryResult resource: %w", err)
 		}
 		message := "successfully created LocalVolumeDiscoveryResult resource"
 		e := devicefinder.NewSuccessEvent(devicefinder.CreatedDiscoveryResultObject, message, "")
@@ -82,7 +81,7 @@ func (discovery *DeviceDiscovery) updateStatus() error {
 			klog.Warning("result resource not found. Ignoring since object must be deleted.")
 			return nil
 		}
-		return errors.Wrapf(err, "failed to retrieve LocalVolumeDiscoveryResult resource to update status")
+		return fmt.Errorf("failed to retrieve LocalVolumeDiscoveryResult resource to update status: %w", err)
 	}
 
 	// Update discovered devce list and discovery time
@@ -91,7 +90,7 @@ func (discovery *DeviceDiscovery) updateStatus() error {
 
 	err = discovery.apiClient.UpdateDiscoveryResultStatus(resultCR)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update the device status in the LocalVolumeDiscoveryResult resource")
+		return fmt.Errorf("failed to update the device status in the LocalVolumeDiscoveryResult resource: %w", err)
 	}
 
 	return nil

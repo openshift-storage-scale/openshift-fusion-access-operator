@@ -22,7 +22,6 @@ import (
 	"slices"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
-	"github.com/pkg/errors"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,15 +65,15 @@ func createOrUpdateConsolePlugin(ctx context.Context, namespace string, cl clien
 	oldCP := &consolev1.ConsolePlugin{}
 	if err := cl.Get(ctx, client.ObjectKeyFromObject(cp), oldCP); apierrors.IsNotFound(err) {
 		if err := cl.Create(ctx, cp); err != nil {
-			return errors.Wrap(err, "could not create console plugin")
+			return fmt.Errorf("could not create console plugin: %w", err)
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "could not check for existing console plugin")
+		return fmt.Errorf("could not check for existing console plugin: %w", err)
 	} else {
 		oldCP.OwnerReferences = cp.OwnerReferences
 		oldCP.Spec = cp.Spec
 		if err := cl.Update(ctx, oldCP); err != nil {
-			return errors.Wrap(err, "could not update console plugin")
+			return fmt.Errorf("could not update console plugin: %w", err)
 		}
 	}
 	return nil
@@ -106,16 +105,16 @@ func EnablePlugin(ctx context.Context, cl client.Client) error {
 	consoleKey := client.ObjectKey{Namespace: "", Name: "cluster"}
 	consoleObj := &operatorv1.Console{}
 	if err := cl.Get(ctx, consoleKey, consoleObj); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Could not find resource - APIVersion: %s, Kind: %s, Name: %s",
-			consoleObj.APIVersion, consoleObj.Kind, consoleObj.Name))
+		return fmt.Errorf("could not find resource - APIVersion: %s, Kind: %s, Name: %s: %w",
+			consoleObj.APIVersion, consoleObj.Kind, consoleObj.Name, err)
 	}
 
 	if !slices.Contains(consoleObj.Spec.Plugins, PluginName) {
 		consoleObj.Spec.Plugins = append(consoleObj.Spec.Plugins, PluginName)
 		err := cl.Update(ctx, consoleObj)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Could not update resource - APIVersion: %s, Kind: %s, Name: %s",
-				consoleObj.APIVersion, consoleObj.Kind, consoleObj.Name))
+			return fmt.Errorf("could not update resource - APIVersion: %s, Kind: %s, Name: %s: %w",
+				consoleObj.APIVersion, consoleObj.Kind, consoleObj.Name, err)
 		}
 	}
 	return nil

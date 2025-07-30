@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/devicefinder/discovery"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 )
@@ -14,12 +14,12 @@ func startDeviceDiscovery(_ *cobra.Command, _ []string) error {
 
 	discoveryObj, err := discovery.NewDeviceDiscovery()
 	if err != nil {
-		return errors.Wrap(err, "failed to discover devices")
+		return fmt.Errorf("failed to discover devices: %w", err)
 	}
 
 	err = discoveryObj.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to discover devices")
+		return fmt.Errorf("failed to discover devices: %w", err)
 	}
 
 	return nil
