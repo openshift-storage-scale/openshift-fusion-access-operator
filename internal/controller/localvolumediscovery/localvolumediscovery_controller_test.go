@@ -2,10 +2,11 @@ package localvolumediscovery
 
 import (
 	"context"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	localv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
-	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,15 +114,15 @@ var localVolumeDiscoveryResultList = localv1alpha1.LocalVolumeDiscoveryResultLis
 	},
 }
 
-func newFakeLocalVolumeDiscoveryReconciler(t *testing.T, objs ...runtime.Object) *LocalVolumeDiscoveryReconciler {
+func newFakeLocalVolumeDiscoveryReconciler(objs ...runtime.Object) *LocalVolumeDiscoveryReconciler {
 	scheme, err := localv1alpha1.SchemeBuilder.Build()
-	assert.NoErrorf(t, err, "creating scheme")
+	Expect(err).ToNot(HaveOccurred(), "creating scheme")
 
 	err = corev1.AddToScheme(scheme)
-	assert.NoErrorf(t, err, "adding corev1 to scheme")
+	Expect(err).ToNot(HaveOccurred(), "adding corev1 to scheme")
 
 	err = appsv1.AddToScheme(scheme)
-	assert.NoErrorf(t, err, "adding appsv1 to scheme")
+	Expect(err).ToNot(HaveOccurred(), "adding appsv1 to scheme")
 
 	crsWithStatus := []client.Object{
 		&localv1alpha1.LocalVolumeDiscovery{},
@@ -135,151 +136,115 @@ func newFakeLocalVolumeDiscoveryReconciler(t *testing.T, objs ...runtime.Object)
 	}
 }
 
-func TestDiscoveryReconciler(t *testing.T) {
-	testcases := []struct {
-		label                        string
-		discoveryDaemonCreated       bool
-		discoveryDesiredDaemonsCount int32
-		discoveryReadyDaemonsCount   int32
-		expectedPhase                localv1alpha1.DiscoveryPhase
-		conditionType                string
-		conditionStatus              metav1.ConditionStatus
-	}{
-		{
-			label:                        "case 1", // all the desired discovery daemonset pods are running
-			discoveryDaemonCreated:       true,
-			discoveryDesiredDaemonsCount: 1,
-			discoveryReadyDaemonsCount:   1,
-			expectedPhase:                localv1alpha1.Discovering,
-			conditionType:                "Available",
-			conditionStatus:              metav1.ConditionTrue,
-		},
-		{
-			label:                        "case 2", // all the desired discovery daemonset pods are running
-			discoveryDaemonCreated:       true,
-			discoveryDesiredDaemonsCount: 100,
-			discoveryReadyDaemonsCount:   100,
-			expectedPhase:                localv1alpha1.Discovering,
-			conditionType:                "Available",
-			conditionStatus:              metav1.ConditionTrue,
-		},
-		{
-			label:                        "case 3", // ready discovery daemonset pods are less than the desired count
-			discoveryDaemonCreated:       true,
-			discoveryDesiredDaemonsCount: 100,
-			discoveryReadyDaemonsCount:   80,
-			expectedPhase:                localv1alpha1.Discovering,
-			conditionType:                "Progressing",
-			conditionStatus:              metav1.ConditionFalse,
-		},
-		{
-			label:                        "case 4", // no discovery daemonset pods are running
-			discoveryDaemonCreated:       true,
-			discoveryDesiredDaemonsCount: 0,
-			discoveryReadyDaemonsCount:   0,
-			expectedPhase:                localv1alpha1.DiscoveryFailed,
-			conditionType:                "Degraded",
-			conditionStatus:              metav1.ConditionFalse,
-		},
+var _ = Describe("LocalVolumeDiscoveryReconciler", func() {
+	Context("Reconcile", func() {
+		DescribeTable("should set correct phase and conditions based on daemon set status",
+			func(discoveryDaemonCreated bool, discoveryDesiredDaemonsCount, discoveryReadyDaemonsCount int32, expectedPhase localv1alpha1.DiscoveryPhase, conditionType string, conditionStatus metav1.ConditionStatus) {
+				discoveryDS := &appsv1.DaemonSet{}
+				discoveryDaemonSet.DeepCopyInto(discoveryDS)
+				discoveryDS.Status.NumberReady = discoveryReadyDaemonsCount
+				discoveryDS.Status.DesiredNumberScheduled = discoveryDesiredDaemonsCount
 
-		{
-			label:                        "case 5", // discovery daemonset not created
-			discoveryDaemonCreated:       false,
-			discoveryDesiredDaemonsCount: 0,
-			discoveryReadyDaemonsCount:   0,
-			expectedPhase:                localv1alpha1.DiscoveryFailed,
-			conditionType:                "Degraded",
-			conditionStatus:              metav1.ConditionFalse,
-		},
-	}
+				discoveryObj := &localv1alpha1.LocalVolumeDiscovery{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+					},
+					TypeMeta: metav1.TypeMeta{
+						Kind: "LocalVolumeDiscovery",
+					},
+				}
+				objects := []runtime.Object{
+					discoveryObj,
+				}
 
-	for _, tc := range testcases {
-		discoveryDS := &appsv1.DaemonSet{}
-		discoveryDaemonSet.DeepCopyInto(discoveryDS)
-		discoveryDS.Status.NumberReady = tc.discoveryReadyDaemonsCount
-		discoveryDS.Status.DesiredNumberScheduled = tc.discoveryDesiredDaemonsCount
+				if discoveryDaemonCreated {
+					objects = append(objects, discoveryDS)
+				}
 
-		discoveryObj := &localv1alpha1.LocalVolumeDiscovery{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
+				req := ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      discoveryObj.Name,
+						Namespace: discoveryObj.Namespace,
+					},
+				}
+				fakeReconciler := newFakeLocalVolumeDiscoveryReconciler(objects...)
+				_, err := fakeReconciler.Reconcile(context.TODO(), req)
+				Expect(err).ToNot(HaveOccurred())
+				err = fakeReconciler.Client.Get(context.TODO(), types.NamespacedName{Name: discoveryObj.Name, Namespace: discoveryObj.Namespace}, discoveryObj)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(discoveryObj.Status.Phase).To(Equal(expectedPhase))
+				Expect(discoveryObj.Status.Conditions[0].Type).To(Equal(conditionType))
+				Expect(discoveryObj.Status.Conditions[0].Status).To(Equal(conditionStatus))
 			},
-			TypeMeta: metav1.TypeMeta{
-				Kind: "LocalVolumeDiscovery",
-			},
-		}
-		objects := []runtime.Object{
-			discoveryObj,
-		}
+			Entry("all the desired discovery daemonset pods are running - case 1",
+				true, int32(1), int32(1), localv1alpha1.Discovering, "Available", metav1.ConditionTrue,
+			),
+			Entry("all the desired discovery daemonset pods are running - case 2",
+				true, int32(100), int32(100), localv1alpha1.Discovering, "Available", metav1.ConditionTrue,
+			),
+			Entry("ready discovery daemonset pods are less than the desired count",
+				true, int32(100), int32(80), localv1alpha1.Discovering, "Progressing", metav1.ConditionFalse,
+			),
+			Entry("no discovery daemonset pods are running",
+				true, int32(0), int32(0), localv1alpha1.DiscoveryFailed, "Degraded", metav1.ConditionFalse,
+			),
+			Entry("discovery daemonset not created",
+				false, int32(0), int32(0), localv1alpha1.DiscoveryFailed, "Degraded", metav1.ConditionFalse,
+			),
+		)
+	})
 
-		if tc.discoveryDaemonCreated {
-			objects = append(objects, discoveryDS)
-		}
+	Context("deleteOrphanDiscoveryResults", func() {
+		It("should delete orphan discovery results when NodeSelector is updated", func() {
+			nodeList := &corev1.NodeList{}
+			mockNodeList.DeepCopyInto(nodeList)
+			discoveryDS := &appsv1.DaemonSet{}
+			discoveryDaemonSet.DeepCopyInto(discoveryDS)
 
-		req := ctrl.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      discoveryObj.Name,
-				Namespace: discoveryObj.Namespace,
-			},
-		}
-		fakeReconciler := newFakeLocalVolumeDiscoveryReconciler(t, objects...)
-		_, err := fakeReconciler.Reconcile(context.TODO(), req)
-		assert.NoError(t, err, tc.label)
-		err = fakeReconciler.Client.Get(context.TODO(), types.NamespacedName{Name: discoveryObj.Name, Namespace: discoveryObj.Namespace}, discoveryObj)
-		assert.NoError(t, err)
-		assert.Equalf(t, tc.expectedPhase, discoveryObj.Status.Phase, "[%s] invalid phase", tc.label)
-		assert.Equalf(t, tc.conditionType, discoveryObj.Status.Conditions[0].Type, "[%s] invalid condition type", tc.label)
-		assert.Equalf(t, tc.conditionStatus, discoveryObj.Status.Conditions[0].Status, "[%s] invalid condition status", tc.label)
-	}
-}
+			discoveryObj := &localv1alpha1.LocalVolumeDiscovery{}
+			localVolumeDiscoveryCR.DeepCopyInto(discoveryObj)
 
-func TestDeleteOrphanDiscoveryResults(t *testing.T) {
-	nodeList := &corev1.NodeList{}
-	mockNodeList.DeepCopyInto(nodeList)
-	discoveryDS := &appsv1.DaemonSet{}
-	discoveryDaemonSet.DeepCopyInto(discoveryDS)
+			discoveryResults := &localv1alpha1.LocalVolumeDiscoveryResultList{}
+			localVolumeDiscoveryResultList.DeepCopyInto(discoveryResults)
 
-	discoveryObj := &localv1alpha1.LocalVolumeDiscovery{}
-	localVolumeDiscoveryCR.DeepCopyInto(discoveryObj)
+			objects := []runtime.Object{
+				nodeList, discoveryObj, discoveryDS, discoveryResults,
+			}
 
-	discoveryResults := &localv1alpha1.LocalVolumeDiscoveryResultList{}
-	localVolumeDiscoveryResultList.DeepCopyInto(discoveryResults)
+			fakeReconciler := newFakeLocalVolumeDiscoveryReconciler(objects...)
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      discoveryObj.Name,
+					Namespace: discoveryObj.Namespace,
+				},
+			}
 
-	objects := []runtime.Object{
-		nodeList, discoveryObj, discoveryDS, discoveryResults,
-	}
+			_, err := fakeReconciler.Reconcile(context.TODO(), req)
+			Expect(err).ToNot(HaveOccurred())
+			results := &localv1alpha1.LocalVolumeDiscoveryResultList{}
+			err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(results.Items)).To(Equal(2))
 
-	fakeReconciler := newFakeLocalVolumeDiscoveryReconciler(t, objects...)
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      discoveryObj.Name,
-			Namespace: discoveryObj.Namespace,
-		},
-	}
+			// update discovery CR to remove "Node2"
+			discoveryObj.Spec.NodeSelector.NodeSelectorTerms[0].MatchExpressions[0].Values = []string{"Node1"}
+			fakeReconciler = newFakeLocalVolumeDiscoveryReconciler(objects...)
+			err = fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
+			Expect(err).ToNot(HaveOccurred())
+			// assert that discovery result object on "Node2" is deleted
+			results = &localv1alpha1.LocalVolumeDiscoveryResultList{}
+			err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(results.Items)).To(Equal(1))
+			Expect(results.Items[0].Spec.NodeName).To(Equal("Node1"))
 
-	_, err := fakeReconciler.Reconcile(context.TODO(), req)
-	assert.NoError(t, err)
-	results := &localv1alpha1.LocalVolumeDiscoveryResultList{}
-	err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(results.Items))
-
-	// update discovery CR to remove "Node2"
-	discoveryObj.Spec.NodeSelector.NodeSelectorTerms[0].MatchExpressions[0].Values = []string{"Node1"}
-	fakeReconciler = newFakeLocalVolumeDiscoveryReconciler(t, objects...)
-	err = fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
-	assert.NoError(t, err)
-	// assert that discovery result object on "Node2" is deleted
-	results = &localv1alpha1.LocalVolumeDiscoveryResultList{}
-	err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(results.Items))
-	assert.Equal(t, "Node1", results.Items[0].Spec.NodeName)
-
-	// skip deletion of orphan results when no NodeSelector is provided
-	discoveryObj.Spec = localv1alpha1.LocalVolumeDiscoverySpec{}
-	err = fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(results.Items))
-	assert.Equal(t, "Node1", results.Items[0].Spec.NodeName)
-}
+			// skip deletion of orphan results when no NodeSelector is provided
+			discoveryObj.Spec = localv1alpha1.LocalVolumeDiscoverySpec{}
+			err = fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(results.Items)).To(Equal(1))
+			Expect(results.Items[0].Spec.NodeName).To(Equal("Node1"))
+		})
+	})
+})
