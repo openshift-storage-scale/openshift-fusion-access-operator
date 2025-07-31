@@ -138,16 +138,10 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 		ibmImageHash = ibmImageHash[:maxHashLength]
 	}
 
-	ibmImageHashLabel := getIBMCoreImageHashForLabel(ibmScaleImage)
-	if ibmImageHashLabel != "" {
-		selector = map[string]string{
-			"kubernetes.io/arch":                  "amd64",
-			"scale.spectrum.ibm.com/image-digest": ibmImageHashLabel,
-		}
-	} else {
-		selector = map[string]string{
-			"kubernetes.io/arch": "amd64",
-		}
+	// TODO: Fetch the selector from the cluster CR
+	selector = map[string]string{
+		"kubernetes.io/arch":                     "amd64",
+		"scale.spectrum.ibm.com/daemon-selector": "",
 	}
 
 	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/
