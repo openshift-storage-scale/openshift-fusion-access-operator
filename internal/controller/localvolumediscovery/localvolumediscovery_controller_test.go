@@ -246,5 +246,28 @@ var _ = Describe("LocalVolumeDiscoveryReconciler", func() {
 			Expect(results.Items).To(HaveLen(1))
 			Expect(results.Items[0].Spec.NodeName).To(Equal("Node1"))
 		})
+
+		It("should handle empty discovery results list gracefully", func() {
+			nodeList := &corev1.NodeList{}
+			mockNodeList.DeepCopyInto(nodeList)
+			discoveryDS := &appsv1.DaemonSet{}
+			discoveryDaemonSet.DeepCopyInto(discoveryDS)
+
+			discoveryObj := &localv1alpha1.LocalVolumeDiscovery{}
+			localVolumeDiscoveryCR.DeepCopyInto(discoveryObj)
+
+			objects := []runtime.Object{
+				nodeList, discoveryObj, discoveryDS,
+			}
+
+			fakeReconciler := newFakeLocalVolumeDiscoveryReconciler(objects...)
+			err := fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			results := &localv1alpha1.LocalVolumeDiscoveryResultList{}
+			err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(results.Items).To(BeEmpty())
+		})
 	})
 })
