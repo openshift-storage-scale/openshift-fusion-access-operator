@@ -5,11 +5,10 @@ import (
 	"runtime"
 
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/devicefinder/discovery"
-	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 )
 
-func startDeviceDiscovery(_ *cobra.Command, _ []string) error {
+func startDeviceDiscovery() error {
 	printVersion()
 
 	discoveryObj, err := discovery.NewDeviceDiscovery()
