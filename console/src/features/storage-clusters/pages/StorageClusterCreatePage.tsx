@@ -35,7 +35,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
   const { t } = useFusionAccessTranslations();
   const [store] = useStore<State, Actions>();
   const handleCreateStorageCluster = useCreateStorageClusterHandler();
-  const redirectoStorageClusterHome = useRedirectHandler(
+  const redirectToStorageClusterHome = useRedirectHandler(
     "/fusion-access/storage-cluster"
   );
 
@@ -50,7 +50,7 @@ const ConnectedStorageClusterCreate: React.FC = () => {
             {...store.cta}
             onClick={handleCreateStorageCluster}
           />
-          <Button variant="link" onClick={redirectoStorageClusterHome}>
+          <Button variant="link" onClick={redirectToStorageClusterHome}>
             {t("Cancel")}
           </Button>
         </Split>
