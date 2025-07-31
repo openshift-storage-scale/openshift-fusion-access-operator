@@ -225,7 +225,7 @@ var _ = Describe("LocalVolumeDiscoveryReconciler", func() {
 			results := &localv1alpha1.LocalVolumeDiscoveryResultList{}
 			err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(results.Items)).To(Equal(2))
+			Expect(results.Items).To(HaveLen(2))
 
 			// update discovery CR to remove "Node2"
 			discoveryObj.Spec.NodeSelector.NodeSelectorTerms[0].MatchExpressions[0].Values = []string{"Node1"}
@@ -236,14 +236,14 @@ var _ = Describe("LocalVolumeDiscoveryReconciler", func() {
 			results = &localv1alpha1.LocalVolumeDiscoveryResultList{}
 			err = fakeReconciler.Client.List(context.TODO(), results, client.InNamespace(namespace))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(results.Items)).To(Equal(1))
+			Expect(results.Items).To(HaveLen(1))
 			Expect(results.Items[0].Spec.NodeName).To(Equal("Node1"))
 
 			// skip deletion of orphan results when no NodeSelector is provided
 			discoveryObj.Spec = localv1alpha1.LocalVolumeDiscoverySpec{}
 			err = fakeReconciler.deleteOrphanDiscoveryResults(context.TODO(), discoveryObj)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(results.Items)).To(Equal(1))
+			Expect(results.Items).To(HaveLen(1))
 			Expect(results.Items[0].Spec.NodeName).To(Equal("Node1"))
 		})
 	})
