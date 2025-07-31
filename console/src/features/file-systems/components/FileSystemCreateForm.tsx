@@ -9,6 +9,7 @@ import {
   HelperTextItem,
   EmptyState,
   Spinner,
+  Label,
 } from "@patternfly/react-core";
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
@@ -61,7 +62,7 @@ export const FileSystemCreateForm: React.FC = () => {
             labelHelp={
               <HelpLabelIcon
                 popoverContent={t(
-                  "Select LUNs to designate the storage devices used in the file system."
+                  "Select LUNs to designate the storage devices used in the file system. New disks are discovered from storage nodes, while reused disks are LocalDisk resources from previous creations."
                 )}
               />
             }
@@ -86,6 +87,7 @@ export const FileSystemCreateForm: React.FC = () => {
                     {Object.entries(vm.columns).map(([name, value]) => (
                       <Th key={name}>{value}</Th>
                     ))}
+                    <Th>Type</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -101,6 +103,17 @@ export const FileSystemCreateForm: React.FC = () => {
                       <Td dataLabel={vm.columns.PATH}>{lun.path}</Td>
                       <Td dataLabel={vm.columns.WWN}>{lun.wwn}</Td>
                       <Td dataLabel={vm.columns.CAPACITY}>{lun.capacity}</Td>
+                      <Td>
+                        {lun.isReused ? (
+                          <Label color="blue" isCompact>
+                            {lun.localDiskName ? `Reused (${lun.localDiskName})` : 'Reused'}
+                          </Label>
+                        ) : (
+                          <Label color="green" isCompact>
+                            New
+                          </Label>
+                        )}
+                      </Td>
                     </Tr>
                   ))}
                 </Tbody>

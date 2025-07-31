@@ -1,0 +1,26 @@
+FROM --platform=linux/$TARGETARCH brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.23 AS builder
+ARG BUILDFLAGS=""
+WORKDIR /tmp/build
+
+# Cache dependencies
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Build unified filesystem job binary
+RUN CGO_ENABLED=0 GOOS=linux go build $BUILDFLAGS -o filesystem-job ./cmd/filesystemjob/
+
+# Use final image for runtime
+FROM registry.redhat.io/ubi10/ubi-minimal:latest
+WORKDIR /
+
+# Copy the unified filesystem job binary
+COPY --from=builder /tmp/build/filesystem-job .
+
+# Run as non-root user for security
+USER 65532:65532
+
+ENTRYPOINT ["/filesystem-job"] 
