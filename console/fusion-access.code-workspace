@@ -22,4 +22,17 @@
       "redhat.vscode-yaml",
     ],
   },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "chrome",
+        "request": "launch",
+        "name": "with Google Chrome",
+        "url": "http://localhost:9000/fusion-access",
+        "webRoot": "${workspaceFolder}/src",
+      }
+    ],
+    "compounds": []
+  }
 }
