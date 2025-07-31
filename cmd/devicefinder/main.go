@@ -3,26 +3,23 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "devicefinder",
-	Short: "Used to start the devicefinder daemon for the fusion-access-operator",
-}
-
-var discoveryDaemonCmd = &cobra.Command{
-	Use:   "discover",
-	Short: "Used to start device discovery to generate the FusionAccessDiscoveryResult CR",
-	RunE:  startDeviceDiscovery,
-}
-
 func main() {
-	rootCmd.AddCommand(discoveryDaemonCmd)
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage: devicefinder discover")
+		os.Exit(1)
+	}
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+	switch os.Args[1] {
+	case "discover":
+		if err := startDeviceDiscovery(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", os.Args[1])
+		fmt.Fprintln(os.Stderr, "Usage: devicefinder discover")
 		os.Exit(1)
 	}
 }
