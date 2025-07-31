@@ -38,5 +38,27 @@ var _ = Describe("UdevEvent", func() {
 				false,
 			),
 		)
+
+		Context("with invalid regex patterns", func() {
+			It("should return error for invalid match regex pattern", func() {
+				text := "KERNEL[1008.734088] add      /devices/pci0000:00/0000:00:07.0/virtio5/block/vdc (block)"
+				matches := []string{"[invalid"}
+				exclusions := []string{"(?i)dm-[0-9]+"}
+
+				_, err := matchUdevEvent(text, matches, exclusions)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to search string"))
+			})
+
+			It("should return error for invalid exclusion regex pattern", func() {
+				text := "KERNEL[1008.734088] add      /devices/pci0000:00/0000:00:07.0/virtio5/block/vdc (block)"
+				matches := []string{"(?i)add"}
+				exclusions := []string{"[invalid"}
+
+				_, err := matchUdevEvent(text, matches, exclusions)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to search string"))
+			})
+		})
 	})
 })
