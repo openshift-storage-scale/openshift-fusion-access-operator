@@ -36,11 +36,12 @@ export const useFileSystemsTableViewModel = () => {
         title: t("Link to file system dashboard"),
         props: { className: "pf-v6-u-w-10" },
       },
-      {
-        id: "actions",
-        title: "",
-        props: { className: "pf-v6-c-table__action" },
-      },
+      // TODO: Add actions column when we have actions to show (see conversation in https://issues.redhat.com/browse/OCPNAS-217)
+      // {
+      //   id: "actions",
+      //   title: "",
+      //   props: { className: "pf-v6-c-table__action" },
+      // },
     ],
     [t]
   );

@@ -29,17 +29,18 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
 
   const { t } = useFusionAccessTranslations();
 
-  const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
-    () => [
-      {
-        key: "delete",
-        onClick: handleDelete(fileSystem),
-        description: vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null,
-        children: t("Delete"),
-      },
-    ],
-    [fileSystem, handleDelete, t, vm.isInUse]
-  );
+  // TODO: Add actions column when we have actions to show (see conversation in https://issues.redhat.com/browse/OCPNAS-217)
+  // const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
+  //   () => [
+  //     {
+  //       key: "delete",
+  //       onClick: handleDelete(fileSystem),
+  //       description: vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null,
+  //       children: t("Delete"),
+  //     },
+  //   ],
+  //   [fileSystem, handleDelete, t, vm.isInUse]
+  // );
 
   return (
     <>
@@ -95,7 +96,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         />
       </TableData>
 
-      <TableData
+      {/* <TableData
         activeColumnIDs={activeColumnIDs}
         id={columns[5].id}
         className={columns[5].props.className}
@@ -108,7 +109,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
             items={kebabMenuActions}
           />
         )}
-      </TableData>
+      </TableData> */}
     </>
   );
 };
