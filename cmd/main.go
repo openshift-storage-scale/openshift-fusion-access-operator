@@ -35,8 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
-
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 
 	consolev1 "github.com/openshift/api/console/v1"
@@ -60,8 +58,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(fusionv1alpha.AddToScheme(scheme))
-
-	utilruntime.Must(machineconfigv1.AddToScheme(scheme))
 
 	utilruntime.Must(consolev1.AddToScheme(scheme))
 

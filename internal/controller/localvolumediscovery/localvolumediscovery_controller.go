@@ -25,12 +25,12 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/assets"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/common"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -87,7 +87,7 @@ func (r *LocalVolumeDiscoveryReconciler) Reconcile(ctx context.Context, request 
 	diskMakerDSMutateFn := getDeviceFinderDiscoveryDSMutateFn(request, instance.Spec.Tolerations,
 		getEnvVars(instance.Name, string(instance.UID)),
 		getOwnerRefs(instance),
-		instance.Spec.NodeSelector)
+		instance.Spec.NodeSelector, r.Scheme)
 	ds, opResult, err := CreateOrUpdateDaemonset(ctx, r.Client, diskMakerDSMutateFn)
 	if err != nil {
 		message := fmt.Sprintf("failed to create discovery daemonset. Error %+v", err)
@@ -146,7 +146,8 @@ func getDeviceFinderDiscoveryDSMutateFn(request reconcile.Request,
 	tolerations []corev1.Toleration,
 	envVars []corev1.EnvVar,
 	ownerRefs []metav1.OwnerReference,
-	nodeSelector *corev1.NodeSelector) func(*appsv1.DaemonSet) error {
+	nodeSelector *corev1.NodeSelector,
+	scheme *runtime.Scheme) func(*appsv1.DaemonSet) error {
 	return func(ds *appsv1.DaemonSet) error {
 		// read template for default values
 		dsBytes, err := assets.ReadFileAndReplace(
@@ -159,7 +160,11 @@ func getDeviceFinderDiscoveryDSMutateFn(request reconcile.Request,
 		if err != nil {
 			return err
 		}
-		dsTemplate := resourceread.ReadDaemonSetV1OrDie(dsBytes)
+
+		dsTemplate, err := decodeDaemonSet(dsBytes, scheme)
+		if err != nil {
+			return err
+		}
 
 		MutateAggregatedSpec(
 			ds,
@@ -288,4 +293,15 @@ func (r *LocalVolumeDiscoveryReconciler) SetupWithManager(mgr ctrl.Manager) erro
 		For(&localv1alpha1.LocalVolumeDiscovery{}).
 		Watches(&appsv1.DaemonSet{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &localv1alpha1.LocalVolumeDiscovery{})).
 		Complete(r)
+}
+
+// decodeDaemonSet decodes YAML/JSON bytes into a DaemonSet object using the provided scheme
+func decodeDaemonSet(objBytes []byte, scheme *runtime.Scheme) (*appsv1.DaemonSet, error) {
+	codecs := serializer.NewCodecFactory(scheme)
+
+	requiredObj, err := runtime.Decode(codecs.UniversalDecoder(appsv1.SchemeGroupVersion), objBytes)
+	if err != nil {
+		return nil, err
+	}
+	return requiredObj.(*appsv1.DaemonSet), nil
 }
