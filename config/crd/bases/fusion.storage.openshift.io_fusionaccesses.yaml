@@ -12,6 +12,8 @@ spec:
     listKind: FusionAccessList
     plural: fusionaccesses
     singular: fusionaccess
+    shortNames:
+    - fa
   scope: Namespaced
   versions:
   - name: v1alpha1
