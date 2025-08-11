@@ -100,6 +100,7 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, cl client.
 		log.Log.Info(
 			"No extra pull secret found",
 		)
+		extraPullSecret = nil
 	}
 
 	for _, destNamespace := range IbmEntitlementSecrets(ns) {
@@ -107,11 +108,14 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, cl client.
 			destSecretName,
 			destNamespace,
 			secretData,
-			"kubernetes.io/dockerconfigjson",
+			corev1.SecretTypeDockerConfigJson,
 			nil,
 		)
-		mergedSecret, err := utils.MergeDockerSecrets(ibmPullSecret, extraPullSecret)
-		if err == nil {
+		if extraPullSecret != nil {
+			mergedSecret, err := utils.MergeDockerSecrets(ibmPullSecret, extraPullSecret)
+			if err != nil {
+				return fmt.Errorf("failed to merge secret in updateEntitlementPullSecrets: %w", err)
+			}
 			ibmPullSecret = mergedSecret
 		}
 
@@ -123,26 +127,6 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, cl client.
 			return fmt.Errorf("failed to update secret in updateEntitlementPullSecrets: %w", err)
 		}
 		continue
-		// // err = client.Get(ctx, types.NamespacedName{Namespace: ns, Name: EXTRAFUSIONPULLSECRETNAME}, _)
-		// _, err = client.CoreV1().Secrets(destNamespace).Get(ctx, destSecretName, metav1.GetOptions{})
-		// if err != nil {
-		// 	if kerrors.IsNotFound(err) {
-		// 		// Resource does not exist, create it
-		// 		_, err := client.CoreV1().Secrets(destNamespace).Create(context.TODO(), ibmPullSecret, metav1.CreateOptions{})
-		// 		if err != nil {
-		// 			return err
-		// 		}
-		// 		log.Log.Info(fmt.Sprintf("Created Secret %s in ns %s", destSecretName, destNamespace))
-		// 		continue
-		// 	}
-		// 	return err
-		// }
-		// // The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
-		// _, err = client.CoreV1().Secrets(destNamespace).Update(context.TODO(), ibmPullSecret, metav1.UpdateOptions{})
-		// if err == nil {
-		// 	log.Log.Info(fmt.Sprintf("Updated Secret %s in ns %s", destSecretName, destNamespace))
-		// 	continue
-		// }
 	}
 	return nil
 }

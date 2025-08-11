@@ -141,22 +141,16 @@ var _ = Describe("Image Pull Checker", func() {
 	var (
 		cl                client.Client
 		fakeClientBuilder *fake.ClientBuilder
-
-		// scheme = createFakeScheme()
-
-		// client      *fake.Clientset
-		namespace   string
-		image       string
-		testTimeout time.Duration
+		namespace         string
+		image             string
+		testTimeout       time.Duration
 	)
 
 	BeforeEach(func() {
-		// cl = fake.NewClientBuilder().Build()
 		namespace = "default"
 		image = "test.registry.io/valid/image:latest"
 		testTimeout = 3 * time.Second
 		fakeClientBuilder = fake.NewClientBuilder()
-		// WithScheme(scheme)
 	})
 
 	Describe("PollPodPullStatus", func() {
@@ -301,12 +295,6 @@ var _ = Describe("CanPullImage", func() {
 					Namespace: ns,
 				},
 			}
-
-			// k8sClient = fakeClientBuilder.WithRuntimeObjects(pod).Build()
-
-			// Expect(k8sClient).NotTo(BeNil())
-			// _, err := cl.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-			// Expect(err).NotTo(HaveOccurred())
 			return pod.Name, nil
 		}
 

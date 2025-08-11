@@ -128,10 +128,6 @@ var _ = Describe("FusionAccess Utilities", func() {
 				Type: corev1.SecretTypeOpaque,
 			}
 			clientset = fakeClientBuilder.WithRuntimeObjects(secret).Build()
-
-			// secret := newSecret(secretName, "default", data, corev1.SecretTypeOpaque, nil)
-			// _, _ = clientset.CoreV1().Secrets("default").Create(ctx, secret, metav1.CreateOptions{})
-
 			content, err := getPullSecretContent(secretName, "default", ctx, clientset)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(content).To(Equal([]byte("my-secret-data")))
