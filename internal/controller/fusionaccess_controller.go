@@ -32,9 +32,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,15 +49,12 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 )
 
-type CanPullImageFunc func(ctx context.Context, client kubernetes.Interface, ns, image, pullSecret string) (bool, error)
+type CanPullImageFunc func(ctx context.Context, client client.Client, ns, image, pullSecret string) (bool, error)
 
 // FusionAccessReconciler reconciles a FusionAccess object
 type FusionAccessReconciler struct {
 	client.Client
-	Scheme        *runtime.Scheme
-	config        *rest.Config
-	dynamicClient dynamic.Interface
-	fullClient    kubernetes.Interface
+	Scheme *runtime.Scheme
 	// Need this for mocking when needed
 	CanPullImage CanPullImageFunc
 }
@@ -366,14 +360,14 @@ func (r *FusionAccessReconciler) Reconcile(
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
 	// If we don't find it, we don't create the entitlement secrets and we keep going as a user might be
 	// patching the global pull secret
-	secret, err := getPullSecretContent(FUSIONPULLSECRETNAME, ns, ctx, r.fullClient)
+	secret, err := getPullSecretContent(FUSIONPULLSECRETNAME, ns, ctx, r.Client)
 	if err != nil {
 		log.Log.Info(
 			"Pull secret not found, skipping entitlement secret creation, we will watch this secret",
 		)
 	} else {
 		// Create entitlement secrets
-		err = updateEntitlementPullSecrets(secret, ctx, r.fullClient, ns)
+		err = updateEntitlementPullSecrets(secret, ctx, r.Client, ns)
 		if err != nil {
 			log.Log.Error(err, "Error creating entitlement secrets")
 			return reconcile.Result{}, err
@@ -470,14 +464,6 @@ func (r *FusionAccessReconciler) Reconcile(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	var err error
-	r.config = mgr.GetConfig()
-	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
-		return err
-	}
-	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
-		return err
-	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&fusionv1alpha1.FusionAccess{}).
 		Watches(
@@ -531,7 +517,7 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 		log.Log.Error(err, "Could not figure out test image", "testImage", testImage)
 		return err
 	}
-	ok, err := r.CanPullImage(ctx, r.fullClient, ns, testImage, IBMENTITLEMENTNAME)
+	ok, err := r.CanPullImage(ctx, r.Client, ns, testImage, IBMENTITLEMENTNAME)
 	if ok {
 		log.Log.Info("Image pull test succeeded", "ns", ns, "testImage", testImage)
 	} else {

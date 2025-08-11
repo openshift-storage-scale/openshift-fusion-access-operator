@@ -30,7 +30,8 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -233,10 +234,11 @@ func GetExternalTestImage(cnsaVersion string) (string, error) {
 // CreateImageCheckPod creates a pod with the specified image and returns its name.
 func CreateImageCheckPod(
 	ctx context.Context,
-	client kubernetes.Interface,
+	cl client.Client,
 	namespace, image, imagePullSecretName string,
 ) (string, error) {
-	existingPod, err := client.CoreV1().Pods(namespace).Get(ctx, CheckPodName, metav1.GetOptions{})
+	existingPod := &corev1.Pod{}
+	err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: CheckPodName}, existingPod)
 	if err == nil {
 		return existingPod.Name, nil // Pod already exists
 	}
@@ -263,18 +265,18 @@ func CreateImageCheckPod(
 			{Name: imagePullSecretName},
 		}
 	}
-	createdPod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	err = cl.Create(ctx, pod)
 	if err != nil {
 		return "", fmt.Errorf("failed to create pod: %w", err)
 	}
 
-	return createdPod.Name, nil
+	return pod.Name, nil
 }
 
 // PollPodPullStatus checks if a pod successfully pulled its image or hit an error.
 func PollPodPullStatus(
 	ctx context.Context,
-	client kubernetes.Interface,
+	cl client.Client,
 	namespace, podName string,
 ) (bool, error) {
 	ticker := time.NewTicker(2 * time.Second)
@@ -284,7 +286,8 @@ func PollPodPullStatus(
 		case <-ctx.Done():
 			return false, fmt.Errorf("timeout while checking image pull status")
 		case <-ticker.C:
-			pod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			pod := &corev1.Pod{}
+			err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: podName}, pod)
 			if err != nil {
 				return false, fmt.Errorf("failed to get pod: %w", err)
 			}
@@ -312,22 +315,20 @@ var pollStatusFunc = PollPodPullStatus
 // CanPullImage is a wrapper combining both steps.
 func CanPullImage(
 	ctx context.Context,
-	client kubernetes.Interface,
+	cl client.Client,
 	namespace, image, imagePullSecret string,
 ) (bool, error) {
-	podName, err := createPodFunc(ctx, client, namespace, image, imagePullSecret)
+	podName, err := createPodFunc(ctx, cl, namespace, image, imagePullSecret)
 	if err != nil {
 		return false, err
 	}
 
 	// Ensure cleanup
 	defer func() {
-		_ = client.CoreV1().
-			Pods(namespace).
-			Delete(context.Background(), podName, metav1.DeleteOptions{})
+		_ = cl.Delete(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace}})
 	}()
 
-	return pollStatusFunc(ctx, client, namespace, podName)
+	return pollStatusFunc(ctx, cl, namespace, podName)
 }
 
 func GetInstallPath(cnsaVersion string) (string, error) {

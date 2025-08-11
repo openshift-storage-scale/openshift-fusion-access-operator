@@ -33,8 +33,10 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/types"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestDevicefinder(t *testing.T) {
@@ -137,17 +139,18 @@ var _ = Describe("IsOpenShiftSupported", func() {
 
 var _ = Describe("Image Pull Checker", func() {
 	var (
-		client      *fake.Clientset
-		namespace   string
-		image       string
-		testTimeout time.Duration
+		cl                client.Client
+		fakeClientBuilder *fake.ClientBuilder
+		namespace         string
+		image             string
+		testTimeout       time.Duration
 	)
 
 	BeforeEach(func() {
-		client = fake.NewSimpleClientset()
 		namespace = "default"
 		image = "test.registry.io/valid/image:latest"
 		testTimeout = 3 * time.Second
+		fakeClientBuilder = fake.NewClientBuilder()
 	})
 
 	Describe("PollPodPullStatus", func() {
@@ -170,16 +173,14 @@ var _ = Describe("Image Pull Checker", func() {
 					},
 				},
 			}
+			cl = fakeClientBuilder.WithRuntimeObjects(pod).Build()
 
-			_, err := client.CoreV1().
-				Pods(namespace).
-				Create(context.TODO(), pod, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(cl).NotTo(BeNil())
 
 			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
-			success, err := PollPodPullStatus(ctx, client, namespace, pod.Name)
+			success, err := PollPodPullStatus(ctx, cl, namespace, pod.Name)
 			Expect(success).To(BeFalse())
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("image pull failed"))
@@ -204,15 +205,14 @@ var _ = Describe("Image Pull Checker", func() {
 				},
 			}
 
-			_, err := client.CoreV1().
-				Pods(namespace).
-				Create(context.TODO(), pod, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			cl = fakeClientBuilder.WithRuntimeObjects(pod).Build()
+
+			Expect(cl).NotTo(BeNil())
 
 			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
-			success, err := PollPodPullStatus(ctx, client, namespace, pod.Name)
+			success, err := PollPodPullStatus(ctx, cl, namespace, pod.Name)
 			Expect(success).To(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -226,15 +226,14 @@ var _ = Describe("Image Pull Checker", func() {
 				Status: corev1.PodStatus{}, // no ContainerStatuses
 			}
 
-			_, err := client.CoreV1().
-				Pods(namespace).
-				Create(context.TODO(), pod, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			cl = fakeClientBuilder.WithRuntimeObjects(pod).Build()
+
+			Expect(cl).NotTo(BeNil())
 
 			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
-			success, err := PollPodPullStatus(ctx, client, namespace, pod.Name)
+			success, err := PollPodPullStatus(ctx, cl, namespace, pod.Name)
 			Expect(success).To(BeFalse())
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("timeout"))
@@ -243,12 +242,19 @@ var _ = Describe("Image Pull Checker", func() {
 
 	Describe("CreateImageCheckPod", func() {
 		It("should create a pod successfully", func() {
-			ctx := context.Background()
-			podName, err := CreateImageCheckPod(ctx, client, namespace, image, "")
+			cl = fakeClientBuilder.WithRuntimeObjects().Build()
+
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+			defer cancel()
+
+			podName, err := CreateImageCheckPod(ctx, cl, namespace, image, "")
+
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podName).To(Equal(CheckPodName))
 
-			pod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			pod := &corev1.Pod{}
+			err = cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: podName}, pod)
+
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pod.Spec.Containers[0].Image).To(Equal(image))
 		})
@@ -258,15 +264,15 @@ var _ = Describe("Image Pull Checker", func() {
 var _ = Describe("CanPullImage", func() {
 	const MaxPullTimeout = 5 * time.Second
 	var (
-		client         *fake.Clientset
+		cl             client.Client
 		namespace      string
 		image          string
-		originalCreate func(context.Context, kubernetes.Interface, string, string, string) (string, error)
-		originalPoll   func(context.Context, kubernetes.Interface, string, string) (bool, error)
+		originalCreate func(context.Context, client.Client, string, string, string) (string, error)
+		originalPoll   func(context.Context, client.Client, string, string) (bool, error)
 	)
 
 	BeforeEach(func() {
-		client = fake.NewSimpleClientset()
+		cl = fake.NewClientBuilder().Build()
 		namespace = "default"
 		image = "quay.io/example/image:latest"
 		originalCreate = CreateImageCheckPod
@@ -281,7 +287,7 @@ var _ = Describe("CanPullImage", func() {
 	})
 
 	It("returns true when pod is created and image is pullable", func() {
-		createPodFunc = func(ctx context.Context, clientset kubernetes.Interface, ns, img, pullSecret string) (string, error) {
+		createPodFunc = func(ctx context.Context, cl client.Client, ns, img, pullSecret string) (string, error) {
 			// Simulate pod creation
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -289,48 +295,47 @@ var _ = Describe("CanPullImage", func() {
 					Namespace: ns,
 				},
 			}
-			_, err := clientset.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
 			return pod.Name, nil
 		}
 
-		pollStatusFunc = func(ctx context.Context, clientset kubernetes.Interface, ns, podName string) (bool, error) {
+		pollStatusFunc = func(ctx context.Context, cl client.Client, ns, podName string) (bool, error) {
 			return true, nil
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), MaxPullTimeout)
 		defer cancel()
 
-		ok, err := CanPullImage(ctx, client, namespace, image, "")
+		ok, err := CanPullImage(ctx, cl, namespace, image, "")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ok).To(BeTrue())
 
-		_, err = client.CoreV1().Pods(namespace).Get(ctx, "image-check-pod", metav1.GetOptions{})
+		pod := &corev1.Pod{}
+		err = cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "image-check-pod"}, pod)
 		Expect(err).To(HaveOccurred()) // Pod should have been deleted
 	})
 
 	It("returns error if image cannot be pulled", func() {
-		createPodFunc = func(ctx context.Context, clientset kubernetes.Interface, ns, img, pullSecret string) (string, error) {
+		createPodFunc = func(ctx context.Context, cl client.Client, ns, img, pullSecret string) (string, error) {
 			return "fail-pod", nil
 		}
-		pollStatusFunc = func(ctx context.Context, clientset kubernetes.Interface, ns, podName string) (bool, error) {
+		pollStatusFunc = func(ctx context.Context, cl client.Client, ns, podName string) (bool, error) {
 			return false, errors.New("image pull failed")
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), MaxPullTimeout)
 		defer cancel()
 
-		ok, err := CanPullImage(ctx, client, namespace, image, "")
+		ok, err := CanPullImage(ctx, cl, namespace, image, "")
 		Expect(err).To(HaveOccurred())
 		Expect(ok).To(BeFalse())
 	})
 
 	It("returns error if pod creation fails", func() {
-		createPodFunc = func(ctx context.Context, clientset kubernetes.Interface, ns, img, pullSecret string) (string, error) {
+		createPodFunc = func(ctx context.Context, cl client.Client, ns, img, pullSecret string) (string, error) {
 			return "", errors.New("create failed")
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), MaxPullTimeout)
 		defer cancel()
 
-		ok, err := CanPullImage(ctx, client, namespace, image, "")
+		ok, err := CanPullImage(ctx, cl, namespace, image, "")
 		Expect(err).To(HaveOccurred())
 		Expect(ok).To(BeFalse())
 	})
