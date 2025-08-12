@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -78,12 +77,12 @@ func (discovery *DeviceDiscovery) Start() error {
 			"",
 		)
 		discovery.eventSync.Report(e, discovery.localVolumeDiscovery)
-		return errors.Wrapf(err, message)
+		return fmt.Errorf("%s: %w", message, err)
 	}
 
 	err = discovery.discoverDevices()
 	if err != nil {
-		return errors.Wrapf(err, "failed to discover devices")
+		return fmt.Errorf("failed to discover devices: %w", err)
 	}
 
 	// Watch udev events for continuous discovery of devices
@@ -127,7 +126,7 @@ func (discovery *DeviceDiscovery) discoverDevices() error {
 			"",
 		)
 		discovery.eventSync.Report(e, discovery.localVolumeDiscovery)
-		return errors.Wrapf(err, message)
+		return fmt.Errorf("%s: %w", message, err)
 	}
 
 	klog.Infof("valid block devices: %+v", validDevices)
@@ -148,7 +147,7 @@ func (discovery *DeviceDiscovery) discoverDevices() error {
 				"",
 			)
 			discovery.eventSync.Report(e, discovery.localVolumeDiscovery)
-			return errors.Wrapf(err, message)
+			return fmt.Errorf("%s: %w", message, err)
 		}
 		message := "successfully updated discovered device details in the LocalVolumeDiscoveryResult resource"
 		e := devicefinder.NewSuccessEvent(devicefinder.UpdatedDiscoveredDeviceList, message, "")

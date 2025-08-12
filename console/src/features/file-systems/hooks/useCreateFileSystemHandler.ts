@@ -147,7 +147,7 @@ function createLocalDisks(
   namespace: string
 ) {
   const promises: Promise<LocalDisk>[] = [];
-  for (const lun of luns.data) {
+  for (const lun of luns.data.filter(l => l.isSelected)) {
     const localDiskName =
       `${lun.path.slice("/dev/".length)}-${lun.wwn}`.replaceAll(".", "-");
     const promise = k8sCreate<LocalDisk>({

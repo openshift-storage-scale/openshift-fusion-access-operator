@@ -12,16 +12,16 @@ import {
 } from "@patternfly/react-icons";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { StorageClustersCreateButton } from "@/features/storage-clusters/components/StorageClustersCreateButton";
+import { LEARN_MORE_LINK } from "@/constants";
 
 interface StorageClusterEmptyStateProps {
   onCreateStorageCluster: React.MouseEventHandler<HTMLButtonElement>;
-  learnMoreHref?: string;
 }
 
 export const StorageClusterEmptyState: React.FC<
   StorageClusterEmptyStateProps
 > = (props) => {
-  const { onCreateStorageCluster, learnMoreHref = "" } = props;
+  const { onCreateStorageCluster } = props;
   const { t } = useFusionAccessTranslations();
 
   return (
@@ -45,7 +45,7 @@ export const StorageClusterEmptyState: React.FC<
             variant="link"
             target="_blank"
             rel="noopener noreferrer"
-            href={learnMoreHref}
+            href={LEARN_MORE_LINK}
           >
             {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
             <ExternalLinkAltIcon />

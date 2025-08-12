@@ -10,7 +10,12 @@ GIT_VERSION=$(git describe --always --tags || true)
 VERSION=${CI_UPSTREAM_VERSION:-${GIT_VERSION}}
 GIT_COMMIT=$(git rev-list -1 HEAD || true)
 COMMIT=${CI_UPSTREAM_COMMIT:-${GIT_COMMIT}}
-BUILD_DATE=$(date --utc -Iseconds)
+if date --utc -Iseconds >/dev/null 2>&1; then
+    BUILD_DATE=$(date --utc -Iseconds)
+else
+    # macOS fallback: emulate --utc -Iseconds
+    BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+fi
 
 LDFLAGS="-s -w "
 REPO="github.com/openshift-storage-scale/openshift-fusion-access-operator"

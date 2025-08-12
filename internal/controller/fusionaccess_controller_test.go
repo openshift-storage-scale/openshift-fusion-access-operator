@@ -29,8 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	kubeclient "k8s.io/client-go/kubernetes/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -117,10 +115,9 @@ var _ = Describe("FusionAccess Controller", func() {
 
 			By("Reconciling the custom resource created")
 			FusionAccessReconciler := &FusionAccessReconciler{
-				Client:     k8sClient,
-				Scheme:     k8sClient.Scheme(),
-				fullClient: kubeclient.NewSimpleClientset(),
-				CanPullImage: func(ctx context.Context, client kubernetes.Interface, ns, image, pullSecret string) (bool, error) {
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				CanPullImage: func(ctx context.Context, client client.Client, ns, image, pullSecret string) (bool, error) {
 					return true, nil
 				},
 			}
@@ -161,10 +158,6 @@ var _ = Describe("FusionAccessReconciler Setup", func() {
 
 		err := reconciler.SetupWithManager(k8sMgr)
 		Expect(err).NotTo(HaveOccurred())
-
-		Expect(reconciler.config).ToNot(BeNil())
-		Expect(reconciler.dynamicClient).ToNot(BeNil())
-		Expect(reconciler.fullClient).ToNot(BeNil())
 
 	})
 })

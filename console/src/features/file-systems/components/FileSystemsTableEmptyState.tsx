@@ -8,6 +8,7 @@ import { ExternalLinkAltIcon, FolderIcon } from "@patternfly/react-icons";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 import { FileSystemsCreateButton } from "./FileSystemsCreateButton";
+import { LEARN_MORE_LINK } from "@/constants";
 
 export const FileSystemsTableEmptyState: React.FC = () => {
   const { t } = useFusionAccessTranslations();
@@ -32,7 +33,7 @@ export const FileSystemsTableEmptyState: React.FC = () => {
             variant="link"
             target="_blank"
             rel="noopener noreferrer"
-            href="#"
+            href={LEARN_MORE_LINK}
           >
             {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
             <ExternalLinkAltIcon />

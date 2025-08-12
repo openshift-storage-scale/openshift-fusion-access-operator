@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/kubeutils"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -45,8 +47,9 @@ func newSecret(name, namespace string, secret map[string][]byte, secretType core
 	return k8sSecret
 }
 
-func getPullSecretContent(name, namespace string, ctx context.Context, full kubernetes.Interface) ([]byte, error) { //nolint:unparam
-	secret, err := full.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+func getPullSecretContent(name, namespace string, ctx context.Context, cl client.Client) ([]byte, error) { //nolint:unparam
+	secret := &corev1.Secret{}
+	err := cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, secret)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func getDockerConfigSecretJSON(secret []byte) ([]byte, error) {
 	return authsJSON, nil
 }
 
-func updateEntitlementPullSecrets(secret []byte, ctx context.Context, full kubernetes.Interface, ns string) error {
+func updateEntitlementPullSecrets(secret []byte, ctx context.Context, cl client.Client, ns string) error {
 	secretJson, err := getDockerConfigSecretJSON(secret)
 	if err != nil {
 		return err
@@ -91,11 +94,13 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, full kuber
 	}
 	destSecretName := IBMENTITLEMENTNAME //nolint:gosec
 
-	extraPullSecret, err := full.CoreV1().Secrets(ns).Get(ctx, EXTRAFUSIONPULLSECRETNAME, metav1.GetOptions{})
+	extraPullSecret := &corev1.Secret{}
+	err = cl.Get(ctx, types.NamespacedName{Namespace: ns, Name: EXTRAFUSIONPULLSECRETNAME}, extraPullSecret)
 	if err != nil {
 		log.Log.Info(
 			"No extra pull secret found",
 		)
+		extraPullSecret = nil
 	}
 
 	for _, destNamespace := range IbmEntitlementSecrets(ns) {
@@ -103,34 +108,25 @@ func updateEntitlementPullSecrets(secret []byte, ctx context.Context, full kuber
 			destSecretName,
 			destNamespace,
 			secretData,
-			"kubernetes.io/dockerconfigjson",
+			corev1.SecretTypeDockerConfigJson,
 			nil,
 		)
 		if extraPullSecret != nil {
 			mergedSecret, err := utils.MergeDockerSecrets(ibmPullSecret, extraPullSecret)
-			if err == nil {
-				ibmPullSecret = mergedSecret
+			if err != nil {
+				return fmt.Errorf("failed to merge secret in updateEntitlementPullSecrets: %w", err)
 			}
+			ibmPullSecret = mergedSecret
 		}
-		_, err = full.CoreV1().Secrets(destNamespace).Get(ctx, destSecretName, metav1.GetOptions{})
-		if err != nil {
-			if kerrors.IsNotFound(err) {
-				// Resource does not exist, create it
-				_, err := full.CoreV1().Secrets(destNamespace).Create(context.TODO(), ibmPullSecret, metav1.CreateOptions{})
-				if err != nil {
-					return err
-				}
-				log.Log.Info(fmt.Sprintf("Created Secret %s in ns %s", destSecretName, destNamespace))
-				continue
-			}
-			return err
+
+		if err := kubeutils.CreateOrUpdateResource(ctx, cl, ibmPullSecret, func(existing, desired *corev1.Secret) error {
+			existing.Type = desired.Type
+			existing.Data = desired.Data
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to update secret in updateEntitlementPullSecrets: %w", err)
 		}
-		// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
-		_, err = full.CoreV1().Secrets(destNamespace).Update(context.TODO(), ibmPullSecret, metav1.UpdateOptions{})
-		if err == nil {
-			log.Log.Info(fmt.Sprintf("Updated Secret %s in ns %s", destSecretName, destNamespace))
-			continue
-		}
+		continue
 	}
 	return nil
 }
