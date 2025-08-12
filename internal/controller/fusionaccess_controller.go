@@ -35,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -699,11 +700,11 @@ func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, 
 		},
 	}
 
-	_, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
+	operatorResult, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
 		pdb.Spec = policyv1.PodDisruptionBudgetSpec{
-			MinAvailable: &intstr.IntOrString{
+			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
-				IntVal: 1,
+				IntVal: 0,
 			},
 			Selector: &v1.LabelSelector{
 				MatchExpressions: []v1.LabelSelectorRequirement{
@@ -718,5 +719,11 @@ func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, 
 		// return ctrl.SetControllerReference(fusionaccess, pdb, r.Scheme)
 		return nil
 	})
+	switch operatorResult {
+	case controllerutil.OperationResultCreated:
+		log.Log.Info("Created PDB", "name", pdb.Name, "namespace", pdb.Namespace)
+	case controllerutil.OperationResultUpdated:
+		log.Log.Info("Updated PDB", "name", pdb.Name, "namespace", pdb.Namespace)
+	}
 	return err
 }
