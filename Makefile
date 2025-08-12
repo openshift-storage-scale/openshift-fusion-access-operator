@@ -9,6 +9,12 @@ export VERSION ?= $(shell cat VERSION.txt)
 # annotations
 export SUPPORTED_OCP_VERSIONS ?= v4.19
 
+ifeq ($(shell uname), Darwin)
+  SED = gsed
+else
+  SED = sed
+endif
+
 OPERATOR_DOCKERFILE ?= operator.Dockerfile
 DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
@@ -75,6 +81,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 	BUNDLE_GEN_FLAGS += --use-image-digests
 endif
 
+
 # Image URL to use all building/pushing image targets
 export OPERATOR_IMG ?= $(IMAGE_TAG_BASE)-operator:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -125,7 +132,7 @@ manifests: yq controller-gen ## Generate WebhookConfiguration, ClusterRole and C
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	# This reads config/samples/fusion_v1alpha1_fusionaccess.yaml and keeps it in sync
 	# with the initialization-resource
-	sed -i "s|^\(.*operatorframework.io/initialization-resource:\).*|\1 '$$($(YQ) -o=json -I=0 config/samples/fusion_v1alpha1_fusionaccess.yaml)'|" config/manifests/bases/openshift-fusion-access-operator.clusterserviceversion.yaml
+	$(SED) -i "s|^\(.*operatorframework.io/initialization-resource:\).*|\1 '$$($(YQ) -o=json -I=0 config/samples/fusion_v1alpha1_fusionaccess.yaml)'|" config/manifests/bases/openshift-fusion-access-operator.clusterserviceversion.yaml
 
 .PHONY: cnsa-supported-versions
 cnsa-supported-versions: ## Generates CNSA supported version metadata from files/ folder
@@ -244,7 +251,7 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	$(SED) -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
 	$(CONTAINER_TOOL) buildx use project-v3-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(OPERATOR_IMG) -f Dockerfile.cross .
@@ -319,7 +326,7 @@ set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
 GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+mv "$$(echo "$(1)" | $(SED) "s/-$(3)$$//")" $(1) ;\
 }
 endef
 
@@ -406,7 +413,7 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
 # Push the catalog image.
 .PHONY: catalog-push
@@ -421,7 +428,7 @@ catalog-install: config/samples/fusionaccess-catalog-$(VERSION).yaml ## Install 
 .PHONY: config/samples/fusionaccess-catalog-$(VERSION).yaml
 config/samples/fusionaccess-catalog-$(VERSION).yaml:
 	cp config/samples/fusionaccess-catalog.yaml config/samples/fusionaccess-catalog-$(VERSION).yaml
-	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/fusionaccess-catalog-$(VERSION).yaml
+	$(SED) -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/fusionaccess-catalog-$(VERSION).yaml
 
 .PHONY: fetchyaml
 fetchyaml: ## Fetches install yaml files
@@ -430,5 +437,5 @@ fetchyaml: ## Fetches install yaml files
 .PHONY: rbacs-generates
 rbacs-generate: ## Generates RBACs and injects them in .go file
 	CMD_OUTPUT=$$(go run scripts/create-rbacs.go "files/$(RBAC_VERSION)/install.yaml"); \
-	sed -i '/IBM_RBAC_MARKER_START/,/IBM_RBAC_MARKER_END/{//!d}' internal/controller/fusionaccess_controller.go; \
-	sed -i "/IBM_RBAC_MARKER_START/ r /dev/stdin" internal/controller/fusionaccess_controller.go <<< "$$CMD_OUTPUT"
+	$(SED) -i '/IBM_RBAC_MARKER_START/,/IBM_RBAC_MARKER_END/{//!d}' internal/controller/fusionaccess_controller.go; \
+	$(SED) -i "/IBM_RBAC_MARKER_START/ r /dev/stdin" internal/controller/fusionaccess_controller.go <<< "$$CMD_OUTPUT"

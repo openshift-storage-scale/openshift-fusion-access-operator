@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -95,12 +96,47 @@ func CreateOrUpdateKMMResources(ctx context.Context, cl client.Client) error {
 	}
 	signModules := doSigningSecretsExist(ctx, cl, ns)
 
-	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules, &KMMImageConfig)
+	spectrumCluster, err := getCluster(ctx, cl)
+	if err != nil {
+		return fmt.Errorf("failed to get spectrumCluster in CreateOrUpdateKMMResources: %w", err)
+	}
+
+	labelSelector := getLabelSelector(spectrumCluster)
+
+	kernelModule := NewKMMModule(ns, ibmScaleImage, signModules, &KMMImageConfig, labelSelector)
 	if err := kubeutils.CreateOrUpdateResource(ctx, cl, kernelModule, mutateKMMModule); err != nil {
 		return fmt.Errorf("failed to update kernelModule in CreateOrUpdateKMMResources: %w", err)
 	}
 
 	return nil
+}
+
+func getCluster(ctx context.Context, cl client.Client) (*unstructured.Unstructured, error) {
+	spectrumCluster := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "scale.spectrum.ibm.com/v1beta1",
+			"kind":       "Cluster",
+			"metadata": map[string]any{
+				"name":      "ibm-spectrum-scale",
+				"namespace": "ibm-spectrum-scale",
+			},
+		},
+	}
+
+	if err := cl.Get(ctx, types.NamespacedName{Namespace: "ibm-spectrum-scale", Name: "ibm-spectrum-scale"}, spectrumCluster); err != nil {
+		return nil, fmt.Errorf("failed to get spectrumCluster, please make sure your storage cluster has been created: %w", err)
+	}
+
+	return spectrumCluster, nil
+}
+
+func getLabelSelector(spectrumCluster *unstructured.Unstructured) map[string]string {
+	nodeSelectorRaw := spectrumCluster.Object["spec"].(map[string]any)["daemon"].(map[string]any)["nodeSelector"].(map[string]any)
+	labelSelector := make(map[string]string)
+	for k, v := range nodeSelectorRaw {
+		labelSelector[k] = v.(string)
+	}
+	return labelSelector
 }
 
 func doSigningSecretsExist(ctx context.Context, cl client.Client, namespace string) bool {
@@ -126,9 +162,8 @@ func mutateKMMModule(existing, desired *kmmv1beta1.Module) error {
 	return nil
 }
 
-func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KMMImageConfig) *kmmv1beta1.Module {
+func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KMMImageConfig, labelSelector map[string]string) *kmmv1beta1.Module {
 	var signing *kmmv1beta1.Sign
-	var selector map[string]string
 
 	ibmImageHash := getIBMCoreImageHash(ibmScaleImage)
 
@@ -136,18 +171,6 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 	const maxHashLength = 32
 	if len(ibmImageHash) > maxHashLength {
 		ibmImageHash = ibmImageHash[:maxHashLength]
-	}
-
-	ibmImageHashLabel := getIBMCoreImageHashForLabel(ibmScaleImage)
-	if ibmImageHashLabel != "" {
-		selector = map[string]string{
-			"kubernetes.io/arch":                  "amd64",
-			"scale.spectrum.ibm.com/image-digest": ibmImageHashLabel,
-		}
-	} else {
-		selector = map[string]string{
-			"kubernetes.io/arch": "amd64",
-		}
 	}
 
 	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/
@@ -217,7 +240,7 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 			ImageRepoSecret: func() *corev1.LocalObjectReference {
 				return &corev1.LocalObjectReference{Name: KMMRegistryPushPullSecretName}
 			}(),
-			Selector: selector,
+			Selector: labelSelector,
 		},
 	}
 }
