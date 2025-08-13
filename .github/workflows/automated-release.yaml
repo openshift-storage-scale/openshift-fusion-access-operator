@@ -1,0 +1,233 @@
+name: Automated Release (Steps 4-6)
+
+on:
+  push:
+    branches:
+      - v1
+    paths:
+      - 'VERSION.txt'
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Konflux merge commit SHA to use for release'
+        required: true
+        type: string
+      force_run:
+        description: 'Force run even if VERSION.txt was not changed'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DEST_REGISTRY: quay.io/openshift-storage-scale
+  KONFLUX_APPLICATION: operator-1-0
+
+jobs:
+  automated-release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/v1'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for git operations
+        
+    - name: Detect version change or manual trigger
+      id: version-check
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ inputs.force_run }}" = "true" ]; then
+            echo "Manual trigger with force_run=true"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "Manual trigger without force_run, checking VERSION.txt change"
+            if git diff HEAD~1 HEAD --name-only | grep -q "VERSION.txt"; then
+              echo "VERSION.txt changed in last commit"
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            else
+              echo "VERSION.txt not changed in last commit"
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+        else
+          echo "Push trigger detected, checking if VERSION.txt changed"
+          if git diff HEAD~1 HEAD --name-only | grep -q "VERSION.txt"; then
+            echo "VERSION.txt changed, proceeding with release"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION.txt not changed, skipping release"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+    - name: Exit if no version change detected
+      if: steps.version-check.outputs.should_run != 'true'
+      run: |
+        echo "No VERSION.txt change detected and not forced. Exiting."
+        exit 0
+
+    - name: Get version and commit
+      id: release-info
+      run: |
+        VERSION=$(cat VERSION.txt | tr -d '\n')
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          COMMIT="${{ inputs.commit_sha }}"
+        else
+          # For push events, try to find the last konflux commit
+          # This is a best-effort attempt - may need adjustment based on commit patterns
+          COMMIT=$(git log --oneline -n 20 | grep -i "konflux\|nudge" | head -1 | cut -d' ' -f1 || echo "")
+          if [ -z "$COMMIT" ]; then
+            echo "Could not automatically detect konflux commit. Using HEAD."
+            COMMIT=$(git rev-parse HEAD)
+          fi
+        fi
+        echo "COMMIT=${COMMIT}" >> $GITHUB_OUTPUT
+        echo "Using VERSION: ${VERSION}"
+        echo "Using COMMIT: ${COMMIT}"
+
+    - name: Set up container tools
+      run: |
+        # Install skopeo
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+        
+        # Install podman
+        sudo apt-get install -y podman
+        
+        # Install oc CLI
+        curl -LO "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz"
+        tar -xf openshift-client-linux.tar.gz
+        sudo mv oc /usr/local/bin/
+        sudo chmod +x /usr/local/bin/oc
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Install operator-sdk
+      run: |
+        RELEASE_VERSION=v1.32.0
+        curl -LO https://github.com/operator-framework/operator-sdk/releases/download/${RELEASE_VERSION}/operator-sdk_linux_amd64
+        chmod +x operator-sdk_linux_amd64
+        sudo mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+
+    - name: Login to OpenShift Konflux
+      run: |
+        echo "${{ secrets.KONFLUX_TOKEN }}" | oc login --token=- ${{ secrets.KONFLUX_SERVER }}
+        oc project storage-scale-releng-tenant
+
+    - name: Login to Quay.io
+      run: |
+        echo "${{ secrets.QUAY_PASSWORD }}" | podman login quay.io -u "${{ secrets.QUAY_USERNAME }}" --password-stdin
+
+    - name: Run konflux release process (Step 4)
+      env:
+        VERSION: ${{ steps.release-info.outputs.VERSION }}
+        COMMIT: ${{ steps.release-info.outputs.COMMIT }}
+      run: |
+        echo "Running konflux release with commit: ${COMMIT}"
+        
+        # Execute the konflux-release.sh script logic
+        ./scripts/konflux-release.sh "${COMMIT}"
+
+    - name: Create and push git tag (Step 5)
+      env:
+        VERSION: ${{ steps.release-info.outputs.VERSION }}
+        COMMIT: ${{ steps.release-info.outputs.COMMIT }}
+      run: |
+        echo "Creating git tag v${VERSION} for commit ${COMMIT}"
+        git tag "v${VERSION}" "${COMMIT}"
+        git push origin "v${VERSION}"
+
+    - name: Create PR for released bundle (Step 6)
+      env:
+        VERSION: ${{ steps.release-info.outputs.VERSION }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        BUNDLE_DIR="released-bundles/${VERSION}"
+        
+        if [ ! -d "${BUNDLE_DIR}" ]; then
+          echo "Error: Bundle directory ${BUNDLE_DIR} was not created by konflux-release.sh"
+          exit 1
+        fi
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create a new branch for the bundle PR
+        BRANCH_NAME="release-bundle-${VERSION}"
+        git checkout -b "${BRANCH_NAME}"
+        
+        # Add the released bundle
+        git add "${BUNDLE_DIR}"
+        git commit -m "Add released bundle for version ${VERSION}
+
+        This bundle was automatically generated by the automated release workflow.
+        
+        - Version: ${VERSION}
+        - Commit: ${{ steps.release-info.outputs.COMMIT }}
+        - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
+        # Push the branch
+        git push origin "${BRANCH_NAME}"
+        
+        # Create PR using GitHub CLI (included in ubuntu-latest)
+        gh pr create \
+          --title "Release bundle for version ${VERSION}" \
+          --body "This PR adds the released bundle for version ${VERSION}.
+
+        **Auto-generated by:** [Automated Release Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        
+        **Release Information:**
+        - Version: \`${VERSION}\`
+        - Konflux Commit: \`${{ steps.release-info.outputs.COMMIT }}\`
+        - Bundle Directory: \`${BUNDLE_DIR}\`
+        
+        **What's included:**
+        - Generated bundle manifests
+        - Bundle metadata
+        - Command log (\`cmd.txt\`)
+        
+        This PR should be reviewed and merged to complete step 6 of the release process." \
+          --base v1 \
+          --head "${BRANCH_NAME}" \
+          --label "release" \
+          --label "automated"
+
+    - name: Summary
+      env:
+        VERSION: ${{ steps.release-info.outputs.VERSION }}
+      run: |
+        echo "🎉 Automated release steps completed successfully!"
+        echo ""
+        echo "**Completed Steps:**"
+        echo "✅ Step 4: Images built and pushed to quay.io/openshift-storage-scale"
+        echo "✅ Step 5: Git tag v${VERSION} created and pushed"
+        echo "✅ Step 6: PR created for released bundle"
+        echo ""
+        echo "**Next Manual Steps:**"
+        echo "📋 Review and merge the bundle PR"
+        echo "📋 Test the :latest catalog on AWS"
+        echo "📋 Tag the catalog as :stable when ready"
+        echo "📋 Update install docs and announce on Slack"
+        echo ""
+        echo "**Catalog Information:**"
+        echo "🐳 Latest catalog: ${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
+        echo ""
+        echo "**To promote to stable:**"
+        echo "\`\`\`bash"
+        echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:${VERSION} ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+        echo "podman push ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+        echo "\`\`\`"
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Automated release failed!"
+        echo "Please check the workflow logs and complete the release manually."
+        echo "Manual release command: ./scripts/konflux-release.sh ${{ steps.release-info.outputs.COMMIT }}"
