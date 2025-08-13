@@ -30,12 +30,14 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -692,38 +694,82 @@ func didTheKmmConfigMapChange() builder.WatchesOption {
 	})
 }
 
-func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess) error {
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "kmm-pdb",
-			Namespace: fusionaccess.Namespace,
-		},
+func (r *FusionAccessReconciler) getKMMBuilderPods(ctx context.Context, namespace string) (*corev1.PodList, error) {
+	builderPods := &corev1.PodList{}
+
+	req, err := labels.NewRequirement("openshift.io/build.name", selection.Exists, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create label requirement: %w", err)
+	}
+	selector := labels.NewSelector().Add(*req)
+
+	listOptions := &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: selector,
 	}
 
-	operatorResult, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
-		pdb.Spec = policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &intstr.IntOrString{
-				Type:   intstr.Int,
-				IntVal: 0,
-			},
-			Selector: &v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
-					{
-						Key:      "openshift.io/build.name",
-						Operator: v1.LabelSelectorOpExists,
-					},
-				},
+	if err := r.List(ctx, builderPods, listOptions); err != nil {
+		return nil, fmt.Errorf("failed to list builder pods: %w", err)
+	}
+
+	return builderPods, nil
+}
+
+func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess) error {
+	builderPods, err := r.getKMMBuilderPods(ctx, fusionaccess.Namespace)
+	if err != nil {
+		return err
+	}
+
+	pdbName := "kmm-pdb"
+	pdb := &policyv1.PodDisruptionBudget{}
+	pdbKey := types.NamespacedName{Namespace: fusionaccess.Namespace, Name: pdbName}
+
+	if len(builderPods.Items) > 0 {
+		log.Log.Info("KMM builder pods found, ensuring PDB exists", "podCount", len(builderPods.Items))
+
+		pdb = &policyv1.PodDisruptionBudget{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      pdbName,
+				Namespace: fusionaccess.Namespace,
 			},
 		}
-		// TODO: If we decide to include the PDB in the uninstall process, include the controller reference below
-		// return ctrl.SetControllerReference(fusionaccess, pdb, r.Scheme)
-		return nil
-	})
-	switch operatorResult {
-	case controllerutil.OperationResultCreated:
-		log.Log.Info("Created PDB", "name", pdb.Name, "namespace", pdb.Namespace)
-	case controllerutil.OperationResultUpdated:
-		log.Log.Info("Updated PDB", "name", pdb.Name, "namespace", pdb.Namespace)
+
+		_, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
+			pdb.Spec = policyv1.PodDisruptionBudgetSpec{
+				MaxUnavailable: &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 0,
+				},
+				Selector: &v1.LabelSelector{
+					MatchExpressions: []v1.LabelSelectorRequirement{
+						{
+							Key:      "openshift.io/build.name",
+							Operator: v1.LabelSelectorOpExists,
+						},
+					},
+				},
+			}
+			return nil
+		})
+
+		return err
+	} else {
+		err := r.Get(ctx, pdbKey, pdb)
+		if err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("failed to get PDB: %w", err)
+		}
+
+		log.Log.Info("No KMM builder pods found, but PDB exists, ensuring it's removed")
+		err = r.Delete(ctx, pdb)
+		if err != nil {
+			return fmt.Errorf("failed to delete PDB: %w", err)
+		}
+		log.Log.Info("Deleted PDB", "name", pdbName, "namespace", fusionaccess.Namespace)
 	}
-	return err
+
+	return nil
 }
