@@ -26,8 +26,9 @@ const FusionAccessHomePage: React.FC = () => {
   const loaded = useMemo(
     () =>
       fusionAccess.loaded &&
-      storageClusters.loaded &&
-      fusionAccessStatus === "Ready",
+      storageClusters.loaded,
+    // #TODO check if we really need Ready status from fusionaccess for the UI to show the home page
+    // (fusionAccessStatus === "Ready",
     [fusionAccess.loaded, fusionAccessStatus, storageClusters.loaded]
   );
 
