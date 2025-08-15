@@ -54,6 +54,10 @@ const (
 	KMMImageConfigKeyTLSSkipVerify      = "kmm_tls_skip_verify"
 	KMMImageConfigKeyRegistrySecretName = "kmm_image_registry_secret_name" //nolint:gosec
 	KMMRegistryPushPullSecretName       = "kmm-registry-push-pull-secret"  //nolint:gosec
+
+	// These has to match the values we use in the plugin code to label the selected nodes (STORAGE_ROLE_LABEL)
+	KMMNodeSelectorKey   = "scale.spectrum.ibm.com/daemon-selector"
+	KMMNodeSelectorValue = ""
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
@@ -138,10 +142,9 @@ func NewKMMModule(namespace, ibmScaleImage string, sign bool, kmmImageConfig *KM
 		ibmImageHash = ibmImageHash[:maxHashLength]
 	}
 
-	// TODO: Fetch the selector from the cluster CR
 	selector = map[string]string{
-		"kubernetes.io/arch":                     "amd64",
-		"scale.spectrum.ibm.com/daemon-selector": "",
+		"kubernetes.io/arch": "amd64",
+		KMMNodeSelectorKey:   KMMNodeSelectorValue,
 	}
 
 	// See https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/specialized_hardware_and_driver_enablement/
