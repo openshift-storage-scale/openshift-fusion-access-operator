@@ -10,7 +10,7 @@ GIT_VERSION=$(git describe --always --tags || true)
 VERSION=${CI_UPSTREAM_VERSION:-${GIT_VERSION}}
 GIT_COMMIT=$(git rev-list -1 HEAD || true)
 COMMIT=${CI_UPSTREAM_COMMIT:-${GIT_COMMIT}}
-BUILD_DATE=$(date --utc -Iseconds)
+BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S:%z")
 
 LDFLAGS="-s -w "
 REPO="github.com/openshift-storage-scale/openshift-fusion-access-operator"
