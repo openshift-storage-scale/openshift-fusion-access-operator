@@ -357,6 +357,16 @@ func (r *FusionAccessReconciler) Reconcile(
 		return ctrl.Result{}, serr
 	}
 
+	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully created / updated console plugin resources")
+
+	if err := console.EnablePlugin(ctx, r.Client); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully enabled console plugin")
+
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
 	// If we don't find it, we don't create the entitlement secrets and we keep going as a user might be
 	// patching the global pull secret
@@ -412,15 +422,6 @@ func (r *FusionAccessReconciler) Reconcile(
 
 		log.Log.Info("Successfully created kernel module resources")
 	}
-	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
-		return ctrl.Result{}, err
-	}
-	log.Log.Info("Successfully created / updated console plugin resources")
-
-	if err := console.EnablePlugin(ctx, r.Client); err != nil {
-		return ctrl.Result{}, err
-	}
-	log.Log.Info("Successfully enabled console plugin")
 
 	// Check if can pull the image if we have not already or if it failed previously
 	// Only do this check if we have a set cnsa version
