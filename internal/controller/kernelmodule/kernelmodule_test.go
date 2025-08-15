@@ -9,7 +9,6 @@ import (
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var _ = Describe("ExtractImageVersion", func() {
@@ -317,46 +316,6 @@ var _ = Describe("mutateKMMModule", func() {
 			Expect(existing.Spec.ModuleLoader.ServiceAccountName).To(Equal("new-service-account"))
 			Expect(existing.Spec.Selector).To(HaveKeyWithValue("env", "test"))
 			Expect(existing.Spec.ImageRepoSecret.Name).To(Equal("new-secret"))
-		})
-	})
-})
-
-var _ = Describe("getLabelSelector", func() {
-	var spectrumCluster *unstructured.Unstructured
-
-	Context("when spectrum cluster has valid nodeSelector", func() {
-		BeforeEach(func() {
-			spectrumCluster = &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "scale.spectrum.ibm.com/v1beta1",
-					"kind":       "Cluster",
-					"spec": map[string]any{
-						"daemon": map[string]any{
-							"nodeSelector": map[string]any{
-								"scale.spectrum.ibm.com/daemon-selector": "",
-								"kubernetes.io/arch":                     "amd64",
-							},
-						},
-					},
-				},
-			}
-		})
-
-		It("should return the correct label selector", func() {
-			result := getLabelSelector(spectrumCluster)
-
-			Expect(result).To(HaveLen(2))
-			Expect(result).To(HaveKeyWithValue("scale.spectrum.ibm.com/daemon-selector", ""))
-			Expect(result).To(HaveKeyWithValue("kubernetes.io/arch", "amd64"))
-		})
-
-		It("should return a map of string to string", func() {
-			result := getLabelSelector(spectrumCluster)
-
-			for k, v := range result {
-				Expect(k).To(BeAssignableToTypeOf(""))
-				Expect(v).To(BeAssignableToTypeOf(""))
-			}
 		})
 	})
 })
