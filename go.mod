@@ -10,7 +10,7 @@ require (
 	github.com/onsi/gomega v1.38.0
 	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
-	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250716080751-315689322647
+	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20250806122250-04655fff3f7f
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
