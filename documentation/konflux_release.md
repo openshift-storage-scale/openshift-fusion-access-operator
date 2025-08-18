@@ -1,0 +1,572 @@
+# Release the operator (for OCP) with Konflux
+
+## Table of contents
+* [Introduction](#introduction)
+* [Audience](#audience)
+* [Prerequisites](#prerequisites)
+* [Releasing](#releasing)
+  * [Staging](#staging-release)
+      * [Releasing the container images to the staging registry](#releasing-the-container-images-to-the-staging-registry)
+      * [Releasing a new FBC index to staging](#releasing-a-new-fbc-index-to-staging)
+  * [Production](#production-release)
+      * [Releasing the container images to the production registry](#releasing-the-container-images-to-the-production-registry)
+      * [Releasing a new FBC index to production](#releasing-a-new-fbc-index-to-production)
+* [Troubleshooting](#troubleshooting)
+* [Command tips](#command-tips)
+
+## Introduction
+This document captures the steps required to release a new version of the Orchestrator Operator interacting with Konflux's resources using the CLI, as opposed to the Konflux UI which can also achieve the same goals. The purposse of this document is to allow users to benefit from a CLI approach on releasing the operator, with the end goal of achieving as much automation as possible to reduce the manual effort required to release it with Konflux. Note that everything that is describe here can be achieved as well using the [Konflux UI](https://console.redhat.com/application-pipeline/workspaces).
+
+## Audience
+This document is aimed for those who need to release a new version of the Orchestrator operator using Konflux pipelines. This guide assumes that the user has some knowledge on Konflux and its types of resources and that the release process has already been introduced by someone else with understanding, otherwise the document might seem confusing and not clear on the goals.
+
+For further reading on Konflux, visit their [documentation website](https://konflux-ci.dev/docs/releasing/) to get acquainted with it and understand the release process as described in it.
+
+## Prerequisites:
+To be able to release the operator, you will need first to have access to the orchestrator-releng workspace in konflux via the [Red Hat Console](https://console.redhat.com/application-pipeline/workspaces/storage-scale-releng/applications). If you don't, please reach out to @jordigilh, @mbaldessari or @darkdoc to request access. You'll also need to be able to create PRs to the [operator](https://github.com/openshift-storage-scale/openshift-fusion-access-operator) and [fbc](https://github.com/openshift-storage-scale/openshift-fusion-access-fbc) repositories.
+
+Accessing the Konflux cluster via oc CLI requires an auth token from the OCP. Once you've been added to the workspace, head to [this URL](https://oauth-openshift.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/oauth/token/request) to obtain a new token and login to the
+Konflux cluster.
+
+## Releasing
+Releasing the operator is a 3 stage operation:
+* Build the container images using Konflux's pipelines as part of a PR merge. The bundle image needs to be built with the latest controller image so that they are matched. This is usually handled via Konflux's nudges that trigger PRs with an updated digest of the controller to the bundle after a successful controller PR is merged.
+* Release these images to the staging repository. The images are basically inspected based on predefined rules by Konflux and deposited to the staging repository upon success.
+* Release the [FBC](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html) (File Based Catalog) fragment to the RH catalog staging index using the pullspec of the images pushed to the staging registry.
+
+Production releases builds on top of the staging releases to do more or less the same, except that in this case it goes though a more detailed scrutiny, ending up in the production registry. Past this step, it's the same FBC graph generation using the image pullspec in production.
+
+* Release these images to the production repository based on the same snapshot used to release to staging.
+* Release the [FBC](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html) (File Based Catalog) fragment to the RH catalog index in production after updating the FBC graph file to include the new fragment like it was done in staging, but using the production image pullspec.
+
+### Preparing the environment
+The release of the operator includes support for multiple versions within the same repository. The git repository for the operator defines branches as `release-X.Y` as the location of the semantic X and Y version. In turn, Konflux supports different versions by defining their own uniquely named application, with each containing their own set of components, also unique in their name, such as `controller-rhel9-operator-1-2` or `controller-rhel9-operator-1-3`.
+
+Thus, to make it easy and reusable, the release process defined in this page needs to parametrize the names of the components so that the process can be reused as much as possible. We will start the process by defining an environment variable that contains the name of the application that holds the controller and bundle. The next command lists all the applications in the workspace:
+```
+oc get application -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+```
+Example:
+```console
+fbc-v4-18
+operator-0-1
+```
+For our case, we'll use the `operator-0-1` application:
+```console
+applicationName=operator-0-1
+releaseVersion=$(echo $applicationName| sed  's/operator//g')
+```
+
+Retrieve the names of the components that match the controller and bundle based on the prefixed component names as we know them `controller-rhel9-operator` and `operator-bundle`:
+```console
+operator_bundle=$(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'|grep bundle)
+echo "Bundle component registered as $operator_bundle"
+```
+
+Capture all components in an array for later usage
+```console
+unset components
+declare -A components
+componentNames=($(oc get components -ojsonpath='{range .items[?(@.spec.application=="'$applicationName'")]}{.metadata.name}{"\n"}{end}'))
+for name in ${componentNames[@]}; do genericName=$(echo $name | sed 's/'$releaseVersion'//g'); components[$genericName]=$name; done
+
+```
+
+### Staging release
+Initiating a staging release requires both a successful build and subsequent integration tests for all components of the application. The result of this is a snapshot object generated by Konflux. Think of a snapshot as a tag in git, but in Konflux it is an object that contains the pullspect of all components of an application, in our case the controller and bundle.
+
+#### Releasing the container images to the staging registry
+* Filter the latest snapshot. Keep in mind that we need to filter based on the bundle push event since that will most probably contain the nudged update from the controller. But first, let's capture the component names based on the application, since each release has it's own component name associated to it.
+
+
+Now we're ready to retrieve the snapshots and filter by those that were triggered by a nudge. The following commands sorts all the snapshots for the operator application that were created as a result of a nudge, by timestamp in ascending order and displays the name, integration tests success status and the merge PR number and remote branch used in the commit.
+```console
+oc get snapshots --sort-by .metadata.creationTimestamp \
+-l appstudio.openshift.io/component=$operator_bundle  \
+-l pac.test.appstudio.openshift.io/event-type=push \
+-ojsonpath='{range .items[*]}{@.metadata.name}{"\t"}{@.status.conditions[?(@.type=="AppStudioTestSucceeded")].status}{"\t"}{@.metadata.annotations.pac\.test\.appstudio\.openshift\.io/sha-title}{"\n"}{end}' \
+| grep "Konflux nudge"
+```
+Example:
+```console
+operator-0-1-sdrjp	True	[Konflux nudge]: Update console-plugin-0-1 to 7a49908
+operator-0-1-xqgz9	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 0c53ba4
+operator-0-1-6wlcl	True	[Konflux nudge]: Update must-gather-0-1 to e53dce4
+operator-0-1-n2kj2	True	[Konflux nudge]: Update devicefinder-0-1 to b003ba7
+operator-0-1-gndwm	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 73c76a2
+operator-0-1-n885g	True	[Konflux nudge]: Update console-plugin-0-1 to 3a8732a
+operator-0-1-vsq4s	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to fd0c38e
+operator-0-1-td552	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 8538a87
+operator-0-1-6qd4c	True	[Konflux nudge]: Update must-gather-0-1 to 9cf742d
+operator-0-1-nlk97	True	[Konflux nudge]: Update controller-rhel9-operator-0-1 to 92aa455
+operator-0-1-mgqwn	True	[Konflux nudge]: Update devicefinder-0-1 to 0cc47b2
+operator-0-1-k7zzw	True	[Konflux nudge]: Update console-plugin-0-1 to 99e0851
+```
+
+If you're releasing from a controller's update nudge, which is the most probable case, check the last snapshot that has passed the integration tests:
+```console
+operator-0-1-k7zzw	True	[Konflux nudge]: Update console-plugin-0-1 to 99e0851
+```
+Capture the snapshot in an environment variable:
+```console
+snapshot=operator-0-1-k7zzw
+```
+
+* Ensure that the bundle's controller pullspec and release labels matches the ones in the snapshot. The bundle's container image contains a label with the image pullspec of the components used in the bundle. Use the following commands to validate the snapshot `operator-0-1-qd2pr`:
+```console
+bundle=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$operator_bundle'")].containerImage}')
+releaseLabelInBundle=$(skopeo inspect docker://$bundle --format "{{.Labels.release}}")
+
+unset errors
+declare -A errors
+for genericName versionedName in ${(kv)components}; do
+  if [[ "$versionedName" == "$operator_bundle" ]]; then
+    continue
+  fi
+  print -n "Checking component $versionedName..."
+  print -n -a "\tImage digest: "
+  imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+  imageSHAInSnapshot=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInSnapshot")
+  imagePullSpecInBundle=$(skopeo inspect docker://$bundle --format '{{ index .Labels "'$genericName'" }}')
+  imageSHAInBundle=$(awk -F'@' '{print $2}' <<< "$imagePullSpecInBundle")
+  if [ -n "$imagePullSpecInSnapshot" ] && [ "$imageSHAInBundle" = "$imageSHAInSnapshot" ]; then
+    print -n Match! 👍;
+  else
+    errors+="$versionedName has digest $imageSHAInBundle in bundle but in snapshot it is $imageSHAInSnapshot \n";
+    print -n Mismatch 👎;
+  fi
+  print -n -a "\tRelease version: "
+  imagePullSpecInSnapshot=$(oc get snapshot $snapshot -ojsonpath='{.spec.components[?(@.name=="'$versionedName'")].containerImage}')
+  releaseLabelInComponent=$(skopeo inspect docker://$imagePullSpecInSnapshot --format "{{.Labels.release}}")
+  if [ -n "$imagePullSpecInSnapshot" ] && [ "$releaseLabelInBundle" = "$releaseLabelInComponent" ]; then
+    print Match! 👍;
+  else
+    errors+="$versionedName has release $releaseLabelInBundle in bundle but in snapshot it is $releaseLabelInComponent \n";
+    print Mismatch 👎;
+  fi
+done
+print "\n\n"
+if [[ ${#errors[@]} == 0 ]];then
+  print  🦄🦄🦄 snapshot $snapshot image pullspecs and release versions match with bundle\'s labels. Launch is a GO! 🚀🚀🚀;
+else
+  print 🛑🛑🛑 This snapshot is not a good candidate for a release:
+  for error in ${(v)errors}; do
+    print -a $error
+  done
+fi
+```
+
+Example:
+
+```
+Checking component console-plugin-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component must-gather-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component devicefinder-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+Checking component controller-rhel9-operator-0-1...	Image digest: Match! 👍	Release version: Match! 👍
+
+🦄🦄🦄 snapshot operator-0-1-k7zzw image pullspecs and release versions match with bundle's labels. Launch is a GO! 🚀🚀🚀
+```
+
+* Create a new Release manifest for staging
+
+Before triggering the release, we need to populate a few fields in the releaseNotes that are mandatory for passing the security advisory checks. For more information check [this page](https://konflux.pages.redhat.com/docs/users/releasing/releasing-with-an-advisory.html#release from the Konflux documentation, and this [knowledge page](https://access.redhat.com/webassets/avalon/j/includes/session/scribe/?redirectTo=https://access.redhat.com/articles/explaining_redhat_errata) that explains the types of erratas:
+| Field Name   | Description      |
+| ------------- | ------------- |
+| type | Advisory type: RHBA, RHEA or RHSA |
+| issues| list of issues fixed by this release |
+| cves | list of CVEs fixed in this release, broken down by component|
+| references | advisory references |
+
+
+The following example creates a Release for the advisory type RHEA, which translates to enhancement or new features and contains no CVEs or bugs fixed.
+
+```console
+releaseName=$(bash -c "oc create -f - <<EOF
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  generateName: operator-staging$releaseVersion-
+  namespace: storage-scale-releng-tenant
+spec:
+  releasePlan: operator-staging$releaseVersion
+  snapshot: $snapshot
+  data:
+    releaseNotes:
+      type: RHEA
+EOF" | awk '{print $1}')
+```
+
+* Wait for the release to be validated:
+```console
+while [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ]];do sleep 5;done
+[[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Failed" ]] && echo Release failed: $(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].message}') || echo "Release successful"
+```
+
+If the release fails, follow the [troubleshooting](#release-pipeline-failed) guide to find out the root cause.
+
+* Validate that the container images are in the staging registry by inspecting them with skopeo. **You will need to be connected with the VPN to reach out to the advisory manifest**. The pullspec of the images are defined in the advisory manifest:
+
+```console
+advisoryURL=$(oc get $releaseName -ojsonpath='{.status.artifacts.advisory.url}' | sed  's/blob/raw/')
+advisoryContents=$(curl $advisoryURL |yq '.spec.content' )
+for  genericName versionedName in ${(kv)components}; do
+	imagePullspec=$( print $advisoryContents | yq  -r  '.images[]| select(.component=="'$versionedName'") | .containerImage')
+	skopeo inspect docker://$imagePullspec >/dev/null && print $genericName" image found in "$imagePullspec || echo $genericName" image not found in "$imagePullspec
+done
+```
+
+At this point we can confirm that we have a successful release of the images and that they are ready to be used to release a new FBC version.
+
+#### Releasing a new FBC index to staging
+To release a new version of the operator in the Red Hat Catalog, you'll have to release an updated FBC graph of the IIB catalog. For staging, this means you'll end upd having to add a new IIB catalog source to your cluster so that your
+new operator is available for consumption. In production however, this is not necessary as the release is published directly to the production index.
+
+Note, if you haven't yet released the operator in production, you'll need to follow this [documentation](https://gitlab.cee.redhat.com/konflux/docs/users/-/blob/main/topics/releasing/preparing-for-release.md#publishing-a-fbc-graph) to request your operator to be added to the production index. It is not added by default.
+
+
+* Clone the orchestrator-fbc repository:
+
+```console
+git clone https://github.com/openshift-storage-scale/openshift-fusion-access-fbc.git
+```
+
+* Update the graph.yaml in the OCP version following the FBC documentation to ensure that each each version published has an upgrade path. Check [this page](https://docs.openshift.com/container-platform/4.17/extensions/catalogs/fbc.html#olm-channel-schema_fbc) to understand the different options when updating the fragment.
+  The most common case is when updating the [z-stream version](https://github.com/openshift-storage-scale/openshift-fusion-access-fbc/pull/92), in which case you will have to amend the original fragment (graph.yaml) and define the linkage between releases, so that the newest one is marked as a replacement to the previous one, and so on. So if we wanted to add the new release as `0.1.0` to the current graph.yaml, we'd be adding a value in the `entries:` section, and another pair for the `image` and `schema` with the pullspec of the bundle. Note that you should have the digest of the bundle image in `$bundlePullSpec`.
+
+```console
+schema: olm.template.basic
+name: orchestrator-operator
+entries:
+  - schema: olm.package
+    name: openshift-fusion-access-operator
+    defaultChannel: alpha
+  - entries:
+      - name: openshift-fusion-access-operator.v0.0.9
+    name: alpha
+    package: openshift-fusion-access-operator
+    schema: olm.channel
+  - schema: olm.bundle
+    image: registry.stage.redhat.io/openshift-storage-scale-operator-tech-preview/openshift-fusion-access-operator-bundle@sha256:4515faa5d7e14f992f187853eee1de469e3c3b48f59a4cd7bfccb79ecf99a6a5
+    # openshift-fusion-access-bundle-registry v0.0.9
+```
+
+
+* Run the `generate-fbc.sh --render <OCP version>` command to generate the new catalog and then update the resulting catalog manifest to ensure that it references the staging repository for the controller. Review the changes and revert any reference to the `quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator` pullspec in the generated images, if any. This is a leftover from the first publishes of the catalog where the initial bundle was referencing this pullspec instead of staging or production.
+
+If you have authentication issues with opm, first login to the stage repository with docker and try again. The opm binary is using the docker libraries to interact with the registry, so it requires to have access to the docker config. If you're still [having issues](https://github.com/operator-framework/operator-registry/issues/919#issuecomment-1382675497), expose the environment variable `DOCKER_CONFIG` and try again. Example:
+
+```
+  DOCKER_CONFIG=~/.docker/config.json ./generate-fbc.sh --render v4.18
+```
+
+* Create a PR with the changes and merge it once it's green. Ensure that the on-push and ECP pipelines finish before proceeding. You'll need the snapshot generated from the ECP pipeline to release the FBC fragment to the index.
+
+* Follow these steps for each OCP version:
+
+  * Identify the snapshot that contains the PR you just merged:
+
+  ```console
+  applicationName=fbc-v4-14
+  oc get snapshots --sort-by .metadata.creationTimestamp -l pac.test.appstudio.openshift.io/event-type=push,appstudio.openshift.io/application=$applicationName -ojsonpath='{range .items[*]}{@.metadata.name}{"\t"}{@.status.conditions[?(@.type=="AppStudioTestSucceeded")].status}{"\t"}{@.metadata.annotations.pac\.test\.appstudio\.openshift\.io/sha-title}{"\n"}{end}'
+  ```
+
+  Example:
+
+  ```console
+  fbc-v4-18-qn4tq	True	Merge pull request #5 from openshift-storage-scale/appstudio-fbc-v4-18
+  ```
+
+  The last one matches the source branch for the PR and it's Integration Tests are successful.
+
+  ```console
+  fbc-v4-18-qn4tq	True	Merge pull request #5 from openshift-storage-scale/appstudio-fbc-v4-18
+  ```
+
+  * Create a new Release manifest for staging
+  ```console
+snapshot=fbc-v4-18-qn4tq
+releaseName=$(bash -c "oc create -f - <<EOF
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  generateName: $applicationName-
+  namespace: storage-scale-releng-tenant
+spec:
+  releasePlan: $applicationName-release-as-staging-fbc
+  snapshot: $snapshot
+EOF" | awk '{print $1}')
+  ```
+
+  * Wait for the release to be validated:
+  ```console
+  while [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ]];do sleep 5;done
+  [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Failed" ]] && echo Release failed: $(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].message}') || echo "Release successful"
+  ```
+  If the release fails, follow the [troubleshooting](#release-pipeline-failed) guide to find out the root cause.
+
+  * Extract the catalog IIB container image pullspec digest from the `status` of the release.
+
+  ```console
+  imagePullSpec=$(oc get $releaseName -ojsonpath={.status.artifacts.index_image.index_image_resolved})
+  ```
+
+  * With the retrieved container image pullspec stored in `$imagePullSpec`, run the following command to generate a new `catalogsource` that references the staging catalog and deploy it in your cluster:
+
+  ```console
+oc create -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: openshift-fusion-access-operator
+  namespace: openshift-marketplace
+spec:
+  displayName: OpenShift Fusion Access Operator
+  publisher: Red Hat
+  sourceType: grpc
+  grpcPodConfig:
+    securityContextConfig: restricted
+  image: $imagePullSpec
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+  ```
+
+  * To deploy the operator, using the CLI, deploy a subscription that references the `openshift-fusion-access-operator` as the `source` or use the OLM UI in your OCP environment:
+
+  ```console
+  apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: openshift-fusion-access-operator
+    namespace: openshift-operators
+  spec:
+    channel: alpha
+    installPlanApproval: Automatic
+    name: openshift-fusion-access-operator
+    source: openshift-fusion-access-operator
+    sourceNamespace: openshift-marketplace
+  ```
+
+
+### Production release
+A pre-requisite to release to production is for the controller and bundle images to have been released to the staging registry. There is no shortcut that bypasses staging for this. However, releasing the image to the production registry does not deviate much from releasing to staging, even though its required to release to staging before production.
+
+#### Releasing the container images to the production registry
+Releasing to production requires the images to be processed in staging first. Once that's successful, the process resolves in taking the staging snapshots from the helm-operator application and creating a new release using the production RPA. The FBC follows a similar step in that it needs a release aiming at the production RPA for each OCP release using the same snapshot. Let's start with the helm-operator application and then move on to the FBC release:
+
+* Identify the snapshot used in the stage release. List all the releases for staging and extract the snapshot used for that release. We will be using this snapshot for the production release. The next command will list all releases in staging that were successful sorted by `creationTimestamp` in ascending order (latest are the newest releases). In case you have cleared your environment values from the previous steps, here are the commands to initialize the required environment variables to proceed in this section:
+
+```
+oc get application -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+```
+Example:
+```console
+fbc-v4-18
+operator-0-1
+```
+For our case, we'll use the `operator-0-1` application:
+```console
+applicationName=operator-0-1
+releaseVersion=$(echo $applicationName| sed  's/operator//g')
+```
+
+```console
+oc get release --sort-by .metadata.creationTimestamp | grep staging$releaseVersion |grep Succeeded
+```
+
+Example:
+```console
+operator-staging-0-1-qll8h   operator-0-1-dv4dw   operator-staging-0-1               Succeeded        26h
+operator-staging-0-1-wccpv   operator-0-1-92q54   operator-staging-0-1               Succeeded        22h
+```
+
+We'll use the snapshot `helm-operator-1-2-gsxpz` for the production release, being the last successful release.
+
+```console
+snapshot=operator-staging-0-1-wccpv
+```
+* Create a new release manifest for Production:
+```console
+releaseName=$(bash -c "oc create -f - <<EOF
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  generateName: operator-production$releaseVersion-
+  namespace: storage-scale-releng-tenant
+spec:
+  releasePlan: fusion-access-operator-production$releaseVersion
+  snapshot: $snapshot
+  data:
+  releaseNotes:
+    type: RHEA
+EOF" | awk '{print $1}')
+```
+
+* Wait for the release to be validated:
+
+You can also use the [UI](https://console.redhat.com/application-pipeline/workspaces/storage-scale-releng/applications/) and navigate through the application's link to view the status of the release as it is being processed in the pipeline.
+
+```console
+while [ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ];do sleep 5;done
+[[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Failed" ]] && echo Release failed: $(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].message}') || echo "Release successful"
+```
+
+If the release fails, follow the [troubleshooting](#release-pipeline-failed) guide to find out the root cause.
+
+* Validate that the container images are in the production registry by inspecting them with skopeo. The pullspec of the images are defined in the advisory manifest:
+
+```console
+advisoryURL=$(oc get $releaseName -ojsonpath='{.status.artifacts.advisory.url}' | sed  's/blob/raw/')
+advisoryContents=$(curl $advisoryURL |yq '.spec.content' )
+for  genericName versionedName in ${(kv)components}; do
+	imagePullspec=$( print $advisoryContents | yq  -r  '.images[]| select(.component=="'$versionedName'") | .containerImage')
+	skopeo inspect docker://$imagePullspec >/dev/null && print $genericName" image found in "$imagePullspec || echo $genericName" image not found in "$imagePullspec
+done
+```
+
+At this point, the container images have been pushed to the production registry. What's left is to update the FBC graph to aim for production registry, with no changes to the digest.
+
+
+#### Releasing a new FBC index to production
+Releasing the fragment is a simple step to update the FBC graph manifest to point to the production registry and run the command to generate the catalog. The lastest commit in the repo should reflect the bundle's container image pullspec being the same as the one in the snapshot we retrieved from the stage build.
+
+```console
+schema: olm.template.basic
+name: orchestrator-operator
+entries:
+  - schema: olm.package
+    name: openshift-fusion-access-operator
+    defaultChannel: alpha
+  - entries:
+      - name: openshift-fusion-access-operator.v0.0.9
+    name: alpha
+    package: openshift-fusion-access-operator
+    schema: olm.channel
+  - schema: olm.bundle
+    image: registry.redhat.io/openshift-storage-scale-operator-tech-preview/openshift-fusion-access-operator-bundle@sha256:4515faa5d7e14f992f187853eee1de469e3c3b48f59a4cd7bfccb79ecf99a6a5
+    # openshift-fusion-access-bundle-registry v0.0.9
+```
+
+* Run the `generate-fbc.sh --render <OCP version>` command to generate the new catalog and then update the resulting catalog manifest to ensure that it references the production repository for the controller. Review the changes and revert any reference to the `quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator` pullspec in the generated images, if any. This is a leftover from the first publishes of the catalog where the initial bundle was referencing this pullspec instead of staging or production.
+
+* Create a PR with the changes and merge it once it's green. Ensure that the on-push and ECP pipelines finish before proceeding. You'll need the snapshot generated from the ECP pipeline to add the FBC fragment to the production index.
+
+* Follow these steps for each OCP version:
+
+  * Identify the snapshot that contains the PR you just merged:
+
+  ```console
+  applicationName=fbc-v4-18
+  oc get snapshots --sort-by .metadata.creationTimestamp -l pac.test.appstudio.openshift.io/event-type=push,appstudio.openshift.io/application=$applicationName -ojsonpath='{range .items[*]}{@.metadata.name}{"\t"}{@.status.conditions[?(@.type=="AppStudioTestSucceeded")].status}{"\t"}{@.metadata.annotations.pac\.test\.appstudio\.openshift\.io/sha-title}{"\n"}{end}'
+  ```
+
+  Example:
+
+  ```console
+  ...
+  ...
+  fbc-v4-18-qn4tq	True	Merge pull request #5 from openshift-storage-scale/appstudio-fbc-v4-18
+  ```
+
+  The last one matches the source branch for the PR and it's Integration Tests are successful.
+
+  ```console
+  fbc-v4-18-qn4tq	True	Merge pull request #5 from openshift-storage-scale/appstudio-fbc-v4-18
+  ```
+
+  * Create a new Release manifest for production
+  ```console
+  snapshot=fbc-v4-18-qn4tq
+
+  releaseName=$(bash -c "oc create -f - <<EOF
+  apiVersion: appstudio.redhat.com/v1alpha1
+  kind: Release
+  metadata:
+    generateName: $applicationName-
+    namespace: storage-scale-releng-tenant
+  spec:
+    releasePlan: $applicationName-release-as-production-fbc
+    snapshot: $snapshot
+    data:
+      releaseNotes:
+        type: RHEA
+  EOF" | awk '{print $1}')
+  ```
+
+  * Wait for the release to be validated:
+
+  You can also use the [UI](https://console.redhat.com/application-pipeline/workspaces/orchestrator-releng/applications/helm-operator/releases) to view the status of the release as it is being processed in the pipeline.
+  ```console
+  while [ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Progressing" ];do sleep 5;done
+  [[ "$(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].reason}')" == "Failed" ]] && echo Release failed: $(oc get $releaseName -ojsonpath='{.status.conditions[?(@.type=="Released")].message}') || echo "Release successful"
+  ```
+
+  If the release fails, follow the [troubleshooting](#release-pipeline-failed) guide to find out the root cause.
+
+  And that's all: the operator FBC's fragment has been added to the Red Hat Catalog. It will take some minutes for clusters to pull the new image and make the operator available.
+
+## Troubleshooting
+This section is meant to grow as more experience is gained in Konflux. For now, the main goal is to describe the steps to identify which tasks and capture the error message generated by Konflux. If you need help on Konflux, open an "Ask for support" ticket in #konflux-users.
+
+### Release pipeline failed
+
+If the release fails, you'll need to indentify which task failed and why. This gets a bit tricky as you'll have to jump over different objects until you get the information you seek. First, you'll need to get the pipelinerun from the status in the release. The following command will list the failed tasksrun objects for the pipelinerun
+
+```console
+pipelineRunName=$(oc get $releaseName -ojsonpath='{.status.processing.pipelineRun}{"\n"}' | awk -F'/' '{print $2}')
+oc get taskrun -n rhtap-releng-tenant -l tekton.dev/pipelineRun=$pipelineRunName -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Succeeded")].status}{"\t"}{.metadata.name}{"\n"}{end}' | awk '{ if ($1=="False") print $2 }'
+```
+
+For each failed task, follow these steps to determine the problem:
+
+* Retrieve the pod. Remember to define `failedTask` with the name of the task from the previous command.
+```console
+taskRunPodName=$(oc get taskrun $failedTask -n rhtap-releng-tenant -ojsonpath='{.status.podName}')
+```
+
+* Retrieve the logs from the pod. Each task has different containers, so in some cases you'll have to dig in to find out which is the container that has the logs. For instance, the `verify-enteprise-contract` task has the logs in the `step-validate` container. The `rh-sign-image` has only one container, so there is no need to specify any.
+
+```console
+oc logs $taskRunPodName -n rhtap-releng-tenant -c step-validate
+```
+
+* Analyze the logs and determine the cause of the failure This is an example of a failed enterprise contract taskrun:
+
+```console
+Success: false
+Result: FAILURE
+Violations: 1, Warnings: 15, Successes: 196
+
+Components:
+- Name: orchestrator-operator-bundle
+  ImageRef: quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator/orchestrator-operator-bundle@sha256:0...
+  Violations: 1, Warnings: 7, Successes: 98
+
+- Name: controller-rhel9-operator
+  ImageRef: quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator/controller-rhel9-operator@sha256:f...
+  Violations: 0, Warnings: 8, Successes: 98
+
+Results:
+✕ [Violation] olm.allowed_registries
+  ImageRef: quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator/orchestrator-operator-bundle@sha256:0...
+  Reason: The
+  "quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator/controller-rhel9-operator@sha256:f...
+  CSV image reference is not from an allowed registry.
+  Title: Images referenced by OLM bundle are from allowed registries
+  Description: Each image referenced by the OLM bundle should match an entry in the list of prefixes defined by the rule data key
+  `allowed_registry_prefixes` in your policy configuration. To exclude this rule add
+  "olm.allowed_registries:quay.io/redhat-user-workloads/storage-scale-releng-tenant/helm-operator/controller-rhel9-operator" to the
+  `exclude` section of the policy configuration.
+  Solution: Use image from an allowed registry, or modify your xref:ec-cli:ROOT:configuration.adoc#_data_sources[policy
+  configuration] to include additional registry prefixes.
+```
+
+### Cluster fails to pull images from production registry (registry.redhat.io) because images are only in staging
+Deploy this [ImageDigestMirrorSet](imagedigestmirrorset.yaml) to your cluster to configure the cluster to use the staging registry as mirror to the production registry.
+
+## Command tips
+* Retrieve the components for a given application:
+```console
+oc get components -ojsonpath='{range .items[?(@.spec.application=="helm-operator-1-2")]}{.metadata.name}{"\n"}{end}}'
+```
