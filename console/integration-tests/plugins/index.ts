@@ -1,4 +1,4 @@
-import * as wp from '@cypress/webpack-preprocessor';
+const wp = require('@cypress/webpack-preprocessor');
 
 module.exports = (on, config) => {
   const options = {
