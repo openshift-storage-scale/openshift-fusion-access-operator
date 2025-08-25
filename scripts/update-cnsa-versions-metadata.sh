@@ -17,7 +17,7 @@ while IFS= read -r dir; do
 done < <(find files/ -mindepth 1 -maxdepth 1 -type d)
 
 echo "Found the following CNSA Versions: ${CNSA_VERSIONS[@]}"
-TECTONIC_VERSIONS="{$(for d in ${CNSA_VERSIONS[@]}; do echo "$d" | sed 's/.*/"urn:alm:descriptor:com.tectonic.ui:select:&"/'; done | paste -sd, -)}"
+TECTONIC_VERSIONS="{$(for d in ${CNSA_VERSIONS[@]}; do echo "$d" | sed 's/.*/"urn:alm:descriptor:com.tectonic.ui:text:&"/'; done | paste -sd, -)}"
 echo $TECTONIC_VERSIONS
 
 ENUM_VERSIONS="$(IFS=\; ; echo "${CNSA_VERSIONS[*]}")"
