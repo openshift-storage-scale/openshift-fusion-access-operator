@@ -47,7 +47,7 @@ spec:
         displayName: IBM Storage Scale Version
         path: storageScaleVersion
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.1
+        - urn:alm:descriptor:com.tectonic.ui:text:v5.2.3.1
       - displayName: Local Volume Discovery
         path: storageDeviceDiscovery
         x-descriptors:
@@ -64,9 +64,8 @@ spec:
     observability, platform-storage separation, and\ntrue storage abstraction, Fusion
     Access simplifies management and boosts\nefficiency.\n\n## Prerequisites and warnings\n\n-
     storage clusters require at least 3 available nodes\n- each available node must
-    have at least 20 GiB of RAM\n\nFor more information, see [Prerequisites and
-    configuration](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/virtualization-with-ibm-fusion-access-for-san#prerequisites).\n\nThis
-    operator will need an IBM Fusion Entitlement. See [https://access.ibmfusion.eu/](https://access.ibmfusion.eu/)\nfor
+    have at least 20 GiB of RAM\n\nFor more information, see [Prerequisites and configuration](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/virtualization-with-ibm-fusion-access-for-san#prerequisites).\n\n
+    This operator will need an IBM Fusion Entitlement. See [https://access.ibmfusion.eu/](https://access.ibmfusion.eu/)\nfor
     additional information.\n"
   displayName: Fusion Access for SAN
   icon:
