@@ -4,17 +4,20 @@ This is totally temporary for now. We'll automate this later
 
 1. In the *main* branch change the version in file *VERSION.txt* to the new release version and submit a PR.
 
-1. Merge the PR and wait for the three konflux PRs that change the nudges on the three containers.
+1. Merge the PR to *main*. It isn't necessary to wait for the three konflux PRs that change the nudges on the three containers before moving on the next step.
 
-1. Merge *main* into branch *v1*. _(Eventually we may wish to cherry-pick from main into v1)_
+1. Merge *main* via a PR into branch *v1*. _(Eventually we may wish to cherry-pick from main into v1)_
 
-1. Take the commit of the last nudge konflux commit and pass it to
-   run `./scripts/konflux-release.sh <commit>`
-   _(Before doing the above you need to be logged in to the konflux cluster.)_
-   This will pull the images out of konflux and push them into quay.io/openshift-storage-scale
+1. Wait for the three Konflux PRs in the *operator (release-1-0) application*[^1], and then take the commit of the last nudge konflux commit and pass it to run
+   ```
+   ./scripts/konflux-release.sh <commit>
+   ```
+   _(Before running the script you need to be logged in to the Konflux cluster[^2] and to `quay.io/openshift-storage-scale`[^3]. If you are not logged in the script will error out and then once you have logged in it is safe to re-run the script.)_
+
+   This will pull the images out of Konflux and push them into `quay.io/openshift-storage-scale`
    and create a bundle pointing to these images.
-   It will also build them locally and push the images with the non-konflux name (openshift-storage-scale)
-   to quay.io/openshift-storage-scale
+   It will also build them locally and push the images with the non-Konflux name (openshift-storage-scale)
+   to `quay.io/openshift-storage-scale`
 
 1. Add a tag (the release version) for the *commit* used above and push it to github.
 
@@ -40,7 +43,7 @@ Images will be the following on the non authenticated path:
 - icr.io/cpopen/controller-rhel10-operator
 - icr.io/cpopen/controller-rhel10-operator-bundle
 
-We do the build as usual, upload it quay.io/openshift-storage-scale and add a
+We do the build as usual, upload it `quay.io/openshift-storage-scale` and add a
 tag with the VERSION.txt so it won't be garbage collected.
 
 Poke Socheat Sou _(IBM associate @ssou in #scale-cnsa-redhat-guest)_ to pull them by digest and upload them to the icr, so the commands will
@@ -66,3 +69,7 @@ Then we can do the ISV release on the web page:
 - After the preflight is submitted we can create the PR to the certified-operators
 
 - Once the PR is merged we can publish (or it might happen automatically, to be checked)
+
+[^1]: https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/storage-scale-releng-tenant/applications/operator-1-0/
+[^2]: `oc login --web --server=https://api.stone-prd-rh01.pg1f.p1.openshiftapps.com:6443`
+[^3]: `podman login quay.io/openshift-storage-scale`
