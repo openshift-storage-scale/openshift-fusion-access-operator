@@ -1,0 +1,13 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-configuration
+webhooks:
+- name: kmm-builder-pod-protection.fusion.storage.openshift.io
+  namespaceSelector:
+    matchLabels:
+      name: ibm-fusion-access
+  objectSelector:
+    matchExpressions:
+    - key: openshift.io/build.name
+      operator: Exists

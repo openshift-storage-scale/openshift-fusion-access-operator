@@ -27,11 +27,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
-	policyv1 "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -315,12 +313,6 @@ func (r *FusionAccessReconciler) Reconcile(
 	// }
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = r.createPodDisruptionBudget(ctx, fusionaccess)
-	if err != nil {
-		log.Log.Error(err, "Failed to create or update PodDisruptionBudget")
 		return ctrl.Result{}, err
 	}
 
@@ -689,34 +681,4 @@ func didTheKmmConfigMapChange() builder.WatchesOption {
 		},
 		GenericFunc: func(_ event.GenericEvent) bool { return false },
 	})
-}
-
-func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess) error {
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "kmm-pdb",
-			Namespace: fusionaccess.Namespace,
-		},
-	}
-
-	_, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
-		pdb.Spec = policyv1.PodDisruptionBudgetSpec{
-			MinAvailable: &intstr.IntOrString{
-				Type:   intstr.Int,
-				IntVal: 1,
-			},
-			Selector: &v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
-					{
-						Key:      "openshift.io/build.name",
-						Operator: v1.LabelSelectorOpExists,
-					},
-				},
-			},
-		}
-		// TODO: If we decide to include the PDB in the uninstall process, include the controller reference below
-		// return ctrl.SetControllerReference(fusionaccess, pdb, r.Scheme)
-		return nil
-	})
-	return err
 }
