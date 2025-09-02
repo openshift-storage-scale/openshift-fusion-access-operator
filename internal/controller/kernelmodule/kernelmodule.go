@@ -56,8 +56,9 @@ const (
 	KMMRegistryPushPullSecretName       = "kmm-registry-push-pull-secret"  //nolint:gosec
 
 	// These has to match the values we use in the plugin code to label the selected nodes (STORAGE_ROLE_LABEL)
-	KMMNodeSelectorKey   = "scale.spectrum.ibm.com/daemon-selector"
-	KMMNodeSelectorValue = ""
+	// Do not change this without also implementing a solution for upgrade of existing clusters using the current value.
+	KMMNodeSelectorKey   = "scale.spectrum.ibm.com/role"
+	KMMNodeSelectorValue = "storage"
 )
 
 // CreateOrUpdateKMMResources creates or updates the resources needed for the kernel module builds
