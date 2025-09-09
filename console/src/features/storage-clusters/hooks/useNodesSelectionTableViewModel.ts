@@ -9,7 +9,7 @@ import type { TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useValidateMinimumRequirements } from "./useValidateMinimumRequirements";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
 import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
+import type { Actions, State } from "@/shared/store/types";
 
 export interface NodesSelectionTableViewModel {
   columns: TableColumn<IoK8sApiCoreV1Node>[];
@@ -84,7 +84,7 @@ export const useNodesSelectionTableViewModel =
         ? wwnSetsList.reduce((previous, current) =>
             previous.intersection(current)
           ).size
-        : new Set<string>().size;
+        : 0;
     }, [lvdrs, selectedNodes]);
 
     const sharedDisksCountMessage = useMemo(() => {
@@ -96,10 +96,16 @@ export const useNodesSelectionTableViewModel =
         case n === 1:
           return t("{{n}} node selected", { n });
         case n >= 2 && s === 1:
-          return t("{{n}} nodes were selected, sharing {{s}} disk between them", { n, s });
+          return t(
+            "{{n}} nodes were selected, sharing {{s}} disk between them",
+            { n, s }
+          );
         default:
           // n >= 2 && s >= 2
-          return t("{{n}} nodes were selected, sharing {{s}} disks between them", { n, s });
+          return t(
+            "{{n}} nodes were selected, sharing {{s}} disks between them",
+            { n, s }
+          );
       }
     }, [selectedNodes.length, sharedDisksCount, t]);
 

@@ -62,6 +62,7 @@ pocker_args=(
     --pull=always
     --platform="$CONSOLE_IMAGE_PLATFORM"
     --name="openshift-console-${CONSOLE_VERSION%.*}"
+    -v="console-public-dir:/opt/bridge/static"
 )
 
 echo "Checking if the volume containing the console-app is already available..."
@@ -75,8 +76,6 @@ if ! pocker volume inspect console-public-dir; then
     pocker cp "${OPENSHIFT_CONSOLE_TMP}/frontend/public/dist/." tmp:/data/
     pocker stop tmp >/dev/null
     rm -rf "$OPENSHIFT_CONSOLE_TMP"
-
-    pocker_args+=(-v="console-public-dir:/opt/bridge/static")    
 fi
 
 if [ -x "$(command -v podman)" ]; then

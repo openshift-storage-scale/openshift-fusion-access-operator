@@ -48,18 +48,6 @@ export const useCreateFileSystemHandler = (
   });
 
   return useCallback(async () => {
-    if (!luns.nodeName) {
-      dispatch({
-        type: "global/addAlert",
-        payload: {
-          title: "Node name is required to create a file system.",
-          variant: "warning",
-          dismiss: () => dispatch({ type: "global/dismissAlert" }),
-        },
-      });
-      return;
-    }
-
     try {
       dispatch({
         type: "global/updateCta",
@@ -147,18 +135,17 @@ function createLocalDisks(
   namespace: string
 ) {
   const promises: Promise<LocalDisk>[] = [];
-  for (const lun of luns.data.filter(l => l.isSelected)) {
-    const localDiskName =
-      `${lun.path.slice("/dev/".length)}-${lun.wwn}`.replaceAll(".", "-");
+  const selectedLuns = luns.data.filter((l) => l.isSelected);
+  for (const selectedLun of selectedLuns) {
     const promise = k8sCreate<LocalDisk>({
       model: localDiskModel,
       data: {
         apiVersion: "scale.spectrum.ibm.com/v1beta1",
         kind: "LocalDisk",
-        metadata: { name: localDiskName, namespace },
+        metadata: { name: selectedLun.wwn, namespace },
         spec: {
-          device: lun.path,
-          node: luns.nodeName!,
+          device: selectedLun.path,
+          node: selectedLun.nodeName,
         },
       },
     });

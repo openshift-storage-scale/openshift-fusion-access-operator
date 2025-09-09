@@ -35,7 +35,7 @@ export const FileSystemCreateForm: React.FC = () => {
               id="name"
               name="name"
               isRequired
-              minLength={1}
+              maxLength={vm.fileSystemNameMaxLength}
               value={vm.fileSystemName}
               placeholder="file-system-1"
               validated={vm.fileSystemNameErrorMessage ? "error" : "default"}

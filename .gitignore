@@ -42,3 +42,7 @@ bundle/*
 
 *Dockerfile
 .claude
+
+# govulncheck outputs
+govulncheck.results
+/database

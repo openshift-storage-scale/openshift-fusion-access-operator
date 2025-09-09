@@ -21,7 +21,7 @@ export const useStorageNodesLvdrs = (): NormalizedWatchK8sResult<
           (node) => node.metadata?.name === lvdr.spec.nodeName
         )
       ),
-    [lvdrs, storageNodes]
+    [lvdrs.data, storageNodes.data]
   );
 
   return useMemo(

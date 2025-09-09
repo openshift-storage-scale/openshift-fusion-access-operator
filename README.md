@@ -78,7 +78,7 @@ The operator continuously monitors the system status and reports:
 
 ## Prerequisites
 
-- OpenShift 4.19 or higher
+- OpenShift 4.19 (Exclusively)
 - IBM Fusion Access entitlement (see https://access.ibmfusion.eu/)
 - Cluster administrator privileges
 - Supported storage hardware
@@ -109,7 +109,7 @@ The operator is distributed through the OpenShift OperatorHub:
 
 The operator currently supports:
 - IBM Storage Scale v5.2.3.1
-- OpenShift 4.12+
+- OpenShift 4.19 (Exclusively)
 - Architecture: x86_64, ppc64le, s390x
 
 ## Security Considerations

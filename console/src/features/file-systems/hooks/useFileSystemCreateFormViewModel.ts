@@ -9,6 +9,7 @@ import { useLunsViewModel, type Lun } from "./useLunsViewModel";
 
 type OnSelect = NonNullable<NonNullable<ThProps["select"]>["onSelect"]>;
 
+const NAME_FIELD_MAX_LENGTH = 128;
 const NAME_FIELD_VALIDATION_REGEX =
   /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
 
@@ -75,15 +76,25 @@ export const useFileSystemCreateFormViewModel = () => {
       return;
     }
 
-    if (NAME_FIELD_VALIDATION_REGEX.test(fileSystemName)) {
-      form.setError("name", undefined);
-    } else {
-      form.setError(
-        "name",
-        t("Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}", {
-          NAME_FIELD_VALIDATION_REGEX,
-        })
-      );
+    switch (true) {
+      case fileSystemName.length > NAME_FIELD_MAX_LENGTH:
+        form.setError(
+          "name",
+          t("Must contain at most {{NAME_FIELD_MAX_LENGTH}} characters", {
+            NAME_FIELD_MAX_LENGTH,
+          })
+        );   
+        break;
+      case !NAME_FIELD_VALIDATION_REGEX.test(fileSystemName):
+        form.setError(
+          "name",
+          t("Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}", {
+            NAME_FIELD_VALIDATION_REGEX,
+          })
+        );
+        break;      
+      default:
+        form.setError("name", undefined);
     }
   }, [fileSystemName, form, t]);
 
@@ -104,6 +115,7 @@ export const useFileSystemCreateFormViewModel = () => {
       ({
         columns,
         fileSystemName,
+        fileSystemNameMaxLength: NAME_FIELD_MAX_LENGTH,
         fileSystemNameErrorMessage,
         luns,
         handleSelectLun,

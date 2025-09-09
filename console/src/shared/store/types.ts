@@ -9,7 +9,7 @@ export type Actions =
 
 export interface State {
   docTitle: string;
-  alerts: Array<Alert>;
+  alerts: Alert[];
   cta: {
     isDisabled?: boolean;
     isLoading?: boolean;

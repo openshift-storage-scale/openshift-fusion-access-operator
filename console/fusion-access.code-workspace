@@ -28,11 +28,11 @@
       {
         "type": "chrome",
         "request": "launch",
-        "name": "with Google Chrome",
+        "name": "Google Chrome",
         "url": "http://localhost:9000/fusion-access",
         "webRoot": "${workspaceFolder}/src",
-      }
+      },
     ],
-    "compounds": []
-  }
+    "compounds": [],
+  },
 }

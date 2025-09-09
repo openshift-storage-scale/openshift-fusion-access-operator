@@ -304,6 +304,9 @@ GOLANGCI_LINT_VERSION ?= v2.2.2
 # update for major version updates to YQ_VERSION!
 YQ_API_VERSION = v4
 YQ_VERSION = v4.45.4
+GOVULNCHECK_VERSION ?= v1.1.4
+# parameters to pass to govulnscan
+GOVULNCHECK_OPTS ?=
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -314,6 +317,7 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 YQ ?= $(LOCALBIN)/yq-$(YQ_VERSION)
 OPERATOR_SDK_VERSION ?= v1.39.2
 OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+GOVULNCHECK ?= $(LOCALBIN)/govulncheck-$(GOVULNCHECK_VERSION)
 
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
@@ -354,6 +358,15 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/${YQ_API_VERSION},${YQ_VERSION})
+
+.PHONY: govulncheck
+govulncheck: $(GOVULNCHECK) ## Download govulncheck if necessary
+$(GOVULNCHECK): $(LOCALBIN)
+	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck,$(GOVULNCHECK_VERSION))
+
+.PHONY: govulnscan
+govulnscan: govulncheck ## Run govulnscan
+	$(GOVULNCHECK) $(GOVULNCHECK_OPTS) ./... 2>&1 | tee govulncheck.results
 
 .PHONY: operator-sdk
 operator-sdk: $(OPERATOR_SDK)
