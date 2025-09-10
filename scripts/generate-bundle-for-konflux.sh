@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
+set -eux -o pipefail
+
 # Source the environment values that contain the component image pullspecs coming from the  nudges
-for file in nudges/*.env
-do export $(cat $file)
+for file in nudges/*.env; do
+    export "$(cat "$file")"
 done
 
 # Expose the operator's version as an env variable to be used when building the operator-sdk's bundle
