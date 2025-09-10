@@ -16,7 +16,6 @@ export VERSION=$(cat VERSION.txt)
 kustomize build config/manifests/ | \
 envsubst | \
 operator-sdk generate bundle \
-        -q \
         --overwrite \
         --version $VERSION \
         --output-dir bundle \
