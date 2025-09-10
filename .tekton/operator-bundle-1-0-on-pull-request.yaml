@@ -12,6 +12,7 @@ metadata:
       ("templates/bundle.Dockerfile.template".pathChanged() ||
       ".tekton/operator-bundle-1-0-on-pull-request.yaml".pathChanged() ||
       ".tekton/operator-bundle-common.yaml".pathChanged() ||
+      source_branch == "annot-test" ||
       "bundle/***".pathChanged() ||
       "nudges/***".pathChanged() ||
       "scripts/generate-bundle-for-konflux.sh".pathChanged())
