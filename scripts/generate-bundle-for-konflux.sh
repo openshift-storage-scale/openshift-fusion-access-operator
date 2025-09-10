@@ -20,8 +20,7 @@ operator-sdk generate bundle \
         --version $VERSION \
         --output-dir bundle \
         --channels development \
-        --default-channel development \
-        --use-image-digests
+        --default-channel development
 operator-sdk bundle validate ./bundle
 
 # Generate the bundle.Dockerfile with the label values for the components that
