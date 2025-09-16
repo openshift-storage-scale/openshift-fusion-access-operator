@@ -51,6 +51,7 @@
     "@patternfly/react-icons": "^6.2.2",
     "@patternfly/react-styles": "^6.2.2",
     "@types/node": "^22.0.0",
+    "@types/pluralize": "^0.0.33",
     "@types/react": "^17.0.37",
     "@types/react-helmet": "^6.1.4",
     "@types/react-router-dom": "^5.3.2",
