@@ -1,9 +1,8 @@
-#!/usr/bin/env -S npx ts-node
 import process from "node:process";
 import fs from "node:fs";
 import path from "node:path";
 import pluralize from "pluralize";
-import * as common from "./i18n/common.ts";
+import * as common from "./common.ts";
 
 const pwd = process.cwd();
 const publicDir = path.join(pwd, "locales");
