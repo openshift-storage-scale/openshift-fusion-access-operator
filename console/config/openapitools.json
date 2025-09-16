@@ -2,12 +2,12 @@
   "$schema": "../node_modules/@openapitools/openapi-generator-cli/config.schema.json",
   "spaces": 2,
   "generator-cli": {
-    "version": "7.12.0",
+    "version": "7.14.0",
     "generators": {
-      "k8s-1.30": {
+      "kubernetes": {
         "generatorName": "typescript-fetch",
-        "inputSpec": "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.30/api/openapi-spec/v3/api__v1_openapi.json",
-        "output": "codegen/k8s/release-1.30",
+        "inputSpec": "https://raw.githubusercontent.com/kubernetes/kubernetes/release-%VERSION%/api/openapi-spec/v3/api__v1_openapi.json",
+        "output": "src/shared/types/kubernetes/%VERSION%",
         "skipValidateSpec": true,
         "templateDir": "config/openapi-generator/templates/typescript-fetch",
         "additionalProperties": {
