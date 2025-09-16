@@ -20,7 +20,7 @@ export const useFileSystemCreateFormViewModel = () => {
     () =>
       ({
         PATH: t("Path"),
-        WWN: t("WWN"),
+        WWN: "WWN",
         CAPACITY: t("Capacity"),
       }) as const,
     [t]
