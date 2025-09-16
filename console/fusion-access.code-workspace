@@ -22,17 +22,40 @@
       "redhat.vscode-yaml",
     ],
   },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "command": "oc login -w",
+        "label": "Log in to OpenShift cluster",
+        "type": "shell",
+        "presentation": {
+          "close": true,
+        }
+      }
+    ]
+  },
   "launch": {
     "version": "0.2.0",
     "configurations": [
       {
+        "name": "Debug",
         "type": "chrome",
         "request": "launch",
-        "name": "Google Chrome",
         "url": "http://localhost:9000/fusion-access",
         "webRoot": "${workspaceFolder}/src",
-      },
-    ],
-    "compounds": [],
-  },
+        "skipFiles": [
+          "<node_internals>/**",
+          "**/node_modules/**"
+        ],
+        "server": {
+          "program": "",
+          "args": ["--run", "start"],
+          "console": "integratedTerminal",
+          "killBehavior": "polite"
+        },
+        "preLaunchTask": "Log in to OpenShift cluster",
+      }
+    ]
+  }
 }

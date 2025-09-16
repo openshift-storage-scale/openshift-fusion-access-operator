@@ -87,10 +87,7 @@ const config: Configuration = {
     },
     devMiddleware: {
       writeToDisk: true,
-    },
-    open: {
-      target: "http://localhost:9000/fusion-access",
-    },
+    }
   },
   plugins: [
     new ConsoleRemotePlugin({
