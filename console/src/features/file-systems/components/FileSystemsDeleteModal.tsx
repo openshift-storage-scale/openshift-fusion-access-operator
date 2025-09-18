@@ -35,7 +35,7 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
       onClose={vm.handleClose}
     >
       <ModalHeader
-        title={t("Delete File system")}
+        title={t("Delete file system")}
         titleIconVariant="warning"
         labelId="delete-filesystem-title"
       />
