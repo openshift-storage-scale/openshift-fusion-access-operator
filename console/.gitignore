@@ -8,6 +8,7 @@ codegen
 .tmp
 .env
 *.local.*
+*.log
 locales/en/public.json
 
 # Modern Yarn with Zero-Installs

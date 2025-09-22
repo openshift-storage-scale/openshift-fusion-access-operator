@@ -33,7 +33,7 @@ run() {
     fi
   }
 
-  trap copy_artifacts EXIT
+  trap 'copy_artifacts' EXIT
 
   # don't log kubeadmin-password
   set +x

@@ -8,10 +8,21 @@
         "generatorName": "typescript-fetch",
         "inputSpec": "https://raw.githubusercontent.com/kubernetes/kubernetes/release-%VERSION%/api/openapi-spec/v3/api__v1_openapi.json",
         "output": "src/shared/types/kubernetes/%VERSION%",
-        "skipValidateSpec": true,
         "templateDir": "config/openapi-generator/templates/typescript-fetch",
+        "skipValidateSpec": true,
         "additionalProperties": {
           "withoutRuntimeChecks": true
+        }
+      },
+      "openshift": {
+        "generatorName": "typescript-fetch",
+        "inputSpec": "%OPENSHIFT_OAS_FILE%",
+        "output": "src/shared/types/openshift/%VERSION%",
+        "templateDir": "config/openapi-generator/templates/typescript-fetch",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "withoutRuntimeChecks": true,
+          "stringEnums": true
         }
       }
     }

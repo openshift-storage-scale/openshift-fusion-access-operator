@@ -74,20 +74,72 @@ generate_plugin_types() {
   done
 }
 
-generate_k8s_types() {
+generate_openshift_types() {
+  echo "[info] Generating OpenShift types"
+  
+  echo "[info] Getting cluster versions"
+  local version
+  version="$(get_cluster_versions | jq -r '.openshift' | awk -F '.' '{print $1"."$2}')"
+  echo "[info] Cluster version: $version"
+  
+  echo "[info] Getting OpenAPI spec from $(oc whoami --show-server)"
+  local spec_temp_file
+  spec_temp_file="$(mktemp -t "openshift-$version-openapi.json")"
+  # shellcheck disable=SC2064
+  trap "rm -f $spec_temp_file" EXIT
+  oc get --raw "/openapi/v2" > "$spec_temp_file"
+  if [[ ! -s "$spec_temp_file" ]]; then
+    echo "[error] Failed to download OpenAPI spec"
+    exit 1
+  fi
+
+  echo "[info] Configuring openapi-generator-cli"
+  local config_temp_file
+  config_temp_file="$(mktemp -t "openapitools-openshift.json")"
+  # shellcheck disable=SC2064
+  trap "rm -f $config_temp_file" EXIT
+  sed \
+    -e 's/%VERSION%/'"$version"'/g' \
+    -e 's|%OPENSHIFT_OAS_FILE%|'"$spec_temp_file"'|g' \
+    config/openapitools.json > "$config_temp_file"
+  
+  echo "[info] Running openapi-generator-cli"
+  local output_dir
+  output_dir="$(jq -r '.["generator-cli"].generators.openshift.output' "$config_temp_file")"
+  mkdir -p "$output_dir"
+  npx openapi-generator-cli generate \
+    --generator-key openshift \
+    --openapitools "$config_temp_file" | tee openapi-generator.log > /dev/null
+  
+  echo "[info] Fixing models/index.ts file"
+  # Fixes:
+  #   - Occurences of */ in jsdoc comments
+  #   - Malformed string enum symbols where their values are =~ and !~
+  sed -E \
+    -e 's|(["'\''])\*/|\1*\\/|g' \
+    -e 's/^(    ) = ('\''=~'\'',)$/\1 RegexMatch = \2/g' \
+    -e 's/^(    )2 = ('\''!~'\'')$/\1 NotRegexMatch = \2/g' \
+    "$output_dir/models/index.ts" > "$output_dir/types.ts"
+  
+  echo "[info] Cleaning up"
+  find "$output_dir" -mindepth 1 -not -name 'types.ts' -exec rm -rf {} +
+  echo "[info] Done"
+}
+
+generate_kubernetes_types() {
   local version
   version="${1:-$(get_cluster_versions | jq -r '.kubernetes' | awk -F '.' '{print $1"."$2}')}"
 
-  config=$(sed 's/%VERSION%/'"$version"'/g' config/openapitools.json)
-
   local config_temp_file
-  config_temp_file="$(mktemp --tmpdir "kubernetes.XXXXXX")"
+  config_temp_file="$(mktemp -t "openapitools-kubernetes.json")"
   # shellcheck disable=SC2064
   trap "rm -f $config_temp_file" EXIT
   
-  echo "$config" > "$config_temp_file"
+  sed 's/%VERSION%/'"$version"'/g' config/openapitools.json > "$config_temp_file"
 
-  local output_dir="src/shared/types/kubernetes/$version"
+  local output_dir
+  output_dir="$(jq -r '.["generator-cli"].generators.kubernetes.output' "$config_temp_file")"
+
   mkdir -p "$output_dir"
   npx openapi-generator-cli generate \
     --generator-key kubernetes \
