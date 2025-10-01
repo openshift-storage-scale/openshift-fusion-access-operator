@@ -10,10 +10,15 @@
     "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
     "typescript.preferences.preferTypeOnlyAutoImports": true,
     "editor.formatOnSave": true,
+    "git.enableCommitSigning": true,
     "eslint.options": {
       "overrideConfigFile": "./config/eslint.config.mjs",
     },
     "files.autoSave": "afterDelay",
+    "json.schemaDownload.enable": true,
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
   },
   "extensions": {
     "recommendations": [
@@ -26,14 +31,52 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "command": "oc login -w",
         "label": "Log in to OpenShift cluster",
         "type": "shell",
+        "command": "oc login -w",
         "presentation": {
           "close": true,
-        }
-      }
-    ]
+        },
+      },
+      {
+        "label": "Start dev server",
+        "type": "shell",
+        "command": "npm",
+        "args": ["run", "start"],
+        "dependsOn": ["Log in to OpenShift cluster"],
+        "isBackground": true,
+        "presentation": {
+          "panel": "new",
+          "close": false,
+          "showReuseMessage": true,
+        },
+        "problemMatcher": [
+          {
+            "owner": "webpack",
+            "pattern": {
+              "regexp": "ERROR in (.*)\\n(.*)\\n(.*)\\n(.*)",
+              "file": 1,
+              "message": 2,
+            },
+            "background": {
+              "activeOnStart": true,
+              "beginsPattern": ".*webpack serve --progress*",
+              "endsPattern": ".*webpack.*compiled.*successfully.*",
+            },
+          },
+        ],
+      },
+      {
+        "label": "Stop dev server",
+        "type": "shell",
+        "command": "pkill",
+        "args": ["-f", "npm run start:console"],
+        "presentation": {
+          "reveal": "never",
+          "close": true
+        },
+      },
+    ],
   },
   "launch": {
     "version": "0.2.0",
@@ -44,18 +87,10 @@
         "request": "launch",
         "url": "http://localhost:9000/fusion-access",
         "webRoot": "${workspaceFolder}/src",
-        "skipFiles": [
-          "<node_internals>/**",
-          "**/node_modules/**"
-        ],
-        "server": {
-          "program": "",
-          "args": ["--run", "start"],
-          "console": "integratedTerminal",
-          "killBehavior": "polite"
-        },
-        "preLaunchTask": "Log in to OpenShift cluster",
-      }
-    ]
-  }
+        "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+        "preLaunchTask": "Start dev server",
+        "postDebugTask": "Stop dev server",
+      },
+    ],
+  },
 }

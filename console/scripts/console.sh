@@ -129,6 +129,10 @@ create_console_volume() {
     rm -rf "$console_repo_dir"
 }
 
+stop() {
+    pocker stop "openshift-console-${CONSOLE_VERSION%.*}"
+}
+
 start() {
     echo "Starting local OpenShift console v${CONSOLE_VERSION}..."
     echo "API Server: $BRIDGE_K8S_MODE_OFF_CLUSTER_ENDPOINT"
@@ -155,8 +159,11 @@ start() {
         pocker_args+=(-p="$CONSOLE_PORT:9000")
     fi
 
+    trap stop EXIT INT TERM
+
     echo "Starting the console container..."
     pocker run "${pocker_args[@]}" --env-file=<(set | grep -E '^BRIDGE') "$CONSOLE_IMAGE"
+    wait $!
 }
 
 test_env() {
