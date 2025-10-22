@@ -54,7 +54,7 @@
     "babel-loader": "^8.0.2",
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^6.4.1",
-    "css-loader": "^6.7.1",
+    "css-loader": "^7.0.0",
     "cypress": "^12.17.4",
     "cypress-multi-reporters": "^1.6.2",
     "eslint": "^9.24.0",
