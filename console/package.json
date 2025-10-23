@@ -12,6 +12,9 @@
   "scripts": {
     "clean": "rm -rf dist",
     "codegen": "scripts/codegen.sh",
+    "codegen:kubernetes-types": "scripts/codegen.sh generate_kubernetes_types",
+    "codegen:openshift-types": "scripts/codegen.sh generate_openshift_types",
+    "codegen:plugin-types": "scripts/codegen.sh generate_plugin_types",
     "build": "npm run clean && NODE_ENV=production npm run ts:webpack -- -c config/webpack.config.ts",
     "build:dev": "npm run clean && npm run ts:webpack -- -c config/webpack.config.ts",
     "i18n": "scripts/i18n.sh",
