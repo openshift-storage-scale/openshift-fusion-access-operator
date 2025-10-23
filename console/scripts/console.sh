@@ -133,6 +133,13 @@ stop() {
     pocker stop "openshift-console-${CONSOLE_VERSION%.*}"
 }
 
+force_update() {
+    if pocker volume inspect console-public-dir &>/dev/null; then
+      echo "Force updating the console image..."
+      pocker volume rm console-public-dir
+    fi
+}
+
 start() {
     echo "Starting local OpenShift console v${CONSOLE_VERSION}..."
     echo "API Server: $BRIDGE_K8S_MODE_OFF_CLUSTER_ENDPOINT"
