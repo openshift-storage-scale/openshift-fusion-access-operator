@@ -70,6 +70,7 @@ generate_plugin_types() {
   for crd_name in "${!WELL_KNOWN_CRDS[@]}"; do
     # Get all versions for this CRD
     for version in $(get_crd_versions "$crd_name"); do
+      echo "[info] Generating $crd_name ($version)"
       generate_type_from_schema "$crd_name" "$version"
     done
   done
