@@ -49,7 +49,7 @@ generate_type_from_schema() {
   local version="$2"
   
   local schema_temp_file
-  schema_temp_file="$(mktemp -t "$crd_name.XXXXXX")"
+  schema_temp_file="$(mktemp -t "$crd_name")"
   # shellcheck disable=SC2064
   trap "rm -f $schema_temp_file" EXIT
   
