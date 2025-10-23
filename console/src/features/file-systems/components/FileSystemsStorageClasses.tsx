@@ -3,12 +3,12 @@ import {
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Stack, StackItem } from "@patternfly/react-core";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { getFileSystemStorageClasses } from "@/features/file-systems/utils/FileSystems";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 
 type FileSystemStorageClassesProps = {
-  fileSystem: FileSystem;
+  fileSystem: Filesystem;
   storageClasses: StorageClass[] | null;
   isNotAvailable?: boolean;
 };

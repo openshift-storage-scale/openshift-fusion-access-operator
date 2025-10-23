@@ -5,11 +5,11 @@ import {
   useMemo,
   useCallback,
 } from "react";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { immutableStateUpdateHelper } from "@/shared/store/helpers";
 
 interface DeleteModalState {
-  fileSystem?: FileSystem;
+  fileSystem?: Filesystem;
   isOpen: boolean;
   isDeleting: boolean;
   errors: string[];
@@ -20,7 +20,7 @@ interface DeleteModalActions {
   setIsDeleting: Dispatch<SetStateAction<DeleteModalState["isDeleting"]>>;
   setIsOpen: Dispatch<SetStateAction<DeleteModalState["isOpen"]>>;
   setErrors: Dispatch<SetStateAction<DeleteModalState["errors"]>>;
-  handleDelete: (fileSystem: FileSystem) => VoidFunction;
+  handleDelete: (fileSystem: Filesystem) => VoidFunction;
   handleClose: VoidFunction;
 }
 
@@ -43,7 +43,7 @@ export const useDeleteModal = (
     setState(immutableStateUpdateHelper<DeleteModalState>(value, "errors"));
   const handleClose = useCallback(() => setIsOpen(false), []);
   const handleDelete = useCallback(
-    (fileSystem: FileSystem) => () => {
+    (fileSystem: Filesystem) => () => {
       setState((prevState) => {
         const draft = window.structuredClone(prevState);
         draft.fileSystem = fileSystem;

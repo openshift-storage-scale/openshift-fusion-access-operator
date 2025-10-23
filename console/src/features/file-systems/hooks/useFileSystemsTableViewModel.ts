@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
 import { useDeleteModal } from "./useDeleteModal";
@@ -9,7 +9,7 @@ import { useRoutes } from "./useRoutes";
 export const useFileSystemsTableViewModel = () => {
   const { t } = useFusionAccessTranslations();
 
-  const columns: TableColumn<FileSystem>[] = useMemo(
+  const columns: TableColumn<Filesystem>[] = useMemo(
     () => [
       {
         id: "name",

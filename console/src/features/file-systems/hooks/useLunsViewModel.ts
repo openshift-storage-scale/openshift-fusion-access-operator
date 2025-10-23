@@ -6,10 +6,12 @@ import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTrans
 import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
 import { useWatchLocalDisk } from "@/shared/hooks/useWatchLocalDisk";
 import type {
-  DiscoveredDevice,
   LocalVolumeDiscoveryResult,
-} from "@/shared/types/fusion-access/LocalVolumeDiscoveryResult";
-import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
+} from "@/shared/types/fusion-storage-openshift-io/v1alpha1/LocalVolumeDiscoveryResult";
+import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
+import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
+
+type DiscoveredDevice = NonNullable<NonNullable<LocalVolumeDiscoveryResult['status']>['discoveredDevices']>[number];
 
 export const useLunsViewModel = () => {
   const { t } = useFusionAccessTranslations();
@@ -162,7 +164,7 @@ export interface Lun {
 const outDevicesUsedByLocalDisks =
   (localDisks: LocalDisk[]) =>
   (dd: WithNodeName<DiscoveredDevice>): boolean =>
-    !localDisks.some((localDisk) => localDisk.metadata?.name === dd.WWN);
+    !localDisks.some((localDisk) => (localDisk.metadata as K8sResourceCommon['metadata'])?.name === dd.WWN);
 
 /**
  * Transforms a discovered device entry (with nodeName) into a Lun object suitable to be displayed by the UI.
@@ -195,7 +197,7 @@ const toDiscoveredDeviceWithNodeName =
   (lvdr: LocalVolumeDiscoveryResult) =>
   (dd: DiscoveredDevice): WithNodeName<DiscoveredDevice> => ({
     ...dd,
-    nodeName: lvdr.spec.nodeName,
+    nodeName: lvdr.spec?.nodeName ?? "",
   });
 
 /**

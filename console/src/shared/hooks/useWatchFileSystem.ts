@@ -1,6 +1,6 @@
 import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 
 export const useWatchFileSystem = (
   options: Omit<
@@ -8,7 +8,7 @@ export const useWatchFileSystem = (
     "groupVersionKind" | "namespaced" | "isList"
   > = {}
 ) =>
-  useNormalizedK8sWatchResource<FileSystem>({
+  useNormalizedK8sWatchResource<Filesystem>({
     ...options,
     isList: true,
     namespaced: true,

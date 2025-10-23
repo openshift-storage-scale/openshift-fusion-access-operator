@@ -6,6 +6,7 @@ import {
 } from "@/shared/utils/console/UseK8sWatchResource";
 import type { Route } from "../types/Route";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
+import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 
 export const useRoutes = (): NormalizedWatchK8sResult<Route[]> => {
   const storageClusters = useWatchStorageCluster({ limit: 1 });
@@ -13,7 +14,7 @@ export const useRoutes = (): NormalizedWatchK8sResult<Route[]> => {
   // Currently, we support creation of a single StorageCluster.
   const [storageCluster] = storageClusters.data ?? [];
   const storageClusterName =
-    storageCluster?.metadata?.name ?? VALUE_NOT_AVAILABLE;
+    (storageCluster?.metadata as K8sResourceCommon['metadata'])?.name ?? VALUE_NOT_AVAILABLE;
 
   const routes = useNormalizedK8sWatchResource<Route>({
     groupVersionKind: {

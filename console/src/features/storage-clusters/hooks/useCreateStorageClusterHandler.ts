@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { k8sCreate, useK8sModel } from "@openshift-console/dynamic-plugin-sdk";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { Cluster } from "@/shared/types/ibm-spectrum-scale/Cluster";
+import type { Cluster } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Cluster";
 import { STORAGE_ROLE_LABEL } from "@/constants";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";

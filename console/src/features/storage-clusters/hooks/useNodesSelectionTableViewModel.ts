@@ -5,7 +5,7 @@ import { hasLabel } from "@/shared/utils/console/K8sResourceCommon";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchLocalVolumeDiscoveryResult } from "@/shared/hooks/useWatchLocalVolumeDiscoveryResult";
 import { useWatchNode } from "@/shared/hooks/useWatchNode";
-import type { TableColumn } from "@openshift-console/dynamic-plugin-sdk";
+import type { K8sResourceCommon, TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useValidateMinimumRequirements } from "./useValidateMinimumRequirements";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/console/UseK8sWatchResource";
 import { useStore } from "@/shared/store/provider";
@@ -75,7 +75,7 @@ export const useNodesSelectionTableViewModel =
     const sharedDisksCount = useMemo(() => {
       const wwnSetsList = (lvdrs.data ?? [])
         .filter((lvdr) =>
-          selectedNodes.find((n) => n.metadata?.name === lvdr.spec.nodeName)
+          selectedNodes.find((n) => (n.metadata as K8sResourceCommon['metadata'])?.name === lvdr.spec?.nodeName)
         )
         .map((lvdr) => lvdr?.status?.discoveredDevices ?? [])
         .map((dd) => new Set(dd.map((d) => d.WWN)));

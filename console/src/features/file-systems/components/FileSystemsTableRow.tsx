@@ -6,7 +6,7 @@ import {
 import { Skeleton } from "@patternfly/react-core";
 import { KebabMenu, type KebabMenuProps } from "@/shared/components/KebabMenu";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
@@ -16,7 +16,7 @@ import { FileSystemsStatus } from "./FileSystemsStatus";
 export type RowData = Pick<FileSystemsTableViewModel, "columns" | "routes"> &
   Pick<FileSystemsTableViewModel["deleteModal"], "handleDelete">;
 
-type FileSystemsTabTableRowProps = RowProps<FileSystem, RowData>;
+type FileSystemsTabTableRowProps = RowProps<Filesystem, RowData>;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
   props

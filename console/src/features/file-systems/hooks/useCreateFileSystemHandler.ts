@@ -3,13 +3,14 @@ import {
   k8sCreate,
   useK8sModel,
   type K8sModel,
+  type K8sResourceCommon,
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { SC_PROVISIONER } from "@/constants";
 import { useStore } from "@/shared/store/provider";
 import type { State, Actions } from "@/shared/store/types";
-import type { LocalDisk } from "@/shared/types/ibm-spectrum-scale/LocalDisk";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 import type { LunsViewModel } from "./useLunsViewModel";
@@ -103,8 +104,8 @@ function createFileSystem(
   localDisks: LocalDisk[],
   fileSystemModel: K8sModel,
   namespace: string
-): Promise<FileSystem> {
-  return k8sCreate<FileSystem>({
+): Promise<Filesystem> {
+  return k8sCreate<Filesystem>({
     model: fileSystemModel,
     data: {
       apiVersion: "scale.spectrum.ibm.com/v1beta1",
@@ -116,7 +117,7 @@ function createFileSystem(
             {
               disks: Array.from(
                 new Set(
-                  localDisks.map((ld) => ld.metadata?.name).filter(Boolean)
+                  localDisks.map((ld) => (ld.metadata as K8sResourceCommon['metadata'])?.name).filter(Boolean)
                 )
               ) as string[],
             },

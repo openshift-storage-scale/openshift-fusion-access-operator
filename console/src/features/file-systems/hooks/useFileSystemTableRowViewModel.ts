@@ -9,14 +9,14 @@ import {
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import type { SVGIconProps } from "@patternfly/react-icons/dist/esm/createIcon";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { FileSystem } from "@/shared/types/ibm-spectrum-scale/FileSystem";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { getName } from "@/shared/utils/console/K8sResourceCommon";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 import { getFileSystemStorageClasses } from "../utils/FileSystems";
 
-export const useFileSystemTableRowViewModel = (fileSystem: FileSystem) => {
+export const useFileSystemTableRowViewModel = (fileSystem: Filesystem) => {
   const { t } = useFusionAccessTranslations();
 
   const persistentVolumeClaims =
@@ -197,7 +197,7 @@ export type FileSystemTableRowViewModel = ReturnType<
 >;
 
 export const isFilesystemInUse = (
-  fileSystem: FileSystem,
+  fileSystem: Filesystem,
   scs: StorageClass[],
   pvcs: IoK8sApiCoreV1PersistentVolumeClaim[]
 ) => {

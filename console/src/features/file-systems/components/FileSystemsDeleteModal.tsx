@@ -12,6 +12,7 @@ import {
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useDeleteFileSystemsHandler } from "../hooks/useDeleteFileSystemHandler";
+import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 
 interface FileSystemsDeleteModalProps {
   vm: FileSystemsTableViewModel["deleteModal"];
@@ -46,11 +47,11 @@ export const FileSystemsDeleteModal: React.FC<FileSystemsDeleteModalProps> = (
               <Trans t={t} ns="public">
                 Are you sure you want to delete{" "}
                 <strong>
-                  {{ resourceName: vm.fileSystem?.metadata?.name }}
+                  {{ resourceName: (vm.fileSystem?.metadata as K8sResourceCommon['metadata'])?.name }}
                 </strong>{" "}
                 in namespace{" "}
                 <strong>
-                  {{ namespace: vm.fileSystem?.metadata?.namespace }}
+                  {{ namespace: (vm.fileSystem?.metadata as K8sResourceCommon['metadata'])?.namespace }}
                 </strong>
                 ?
               </Trans>

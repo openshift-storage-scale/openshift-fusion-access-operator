@@ -6,6 +6,7 @@ import {
   k8sPatch,
   k8sDelete,
   k8sGet,
+  type K8sResourceCommon,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { FS_ALLOW_DELETE_LABEL } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
@@ -54,8 +55,8 @@ export const useDeleteFileSystemsHandler = (
     }
 
     const [fsName, fsNamespace] = [
-      vm.fileSystem.metadata?.name,
-      vm.fileSystem.metadata?.namespace,
+      (vm.fileSystem.metadata as K8sResourceCommon['metadata'])?.name,
+      (vm.fileSystem.metadata as K8sResourceCommon['metadata'])?.namespace,
     ];
 
     if (!fsName || !fsNamespace) {
@@ -101,8 +102,9 @@ export const useDeleteFileSystemsHandler = (
         )
       );
 
+      const fileSystemLocalPools = vm.fileSystem.spec?.local?.pools ?? [];
       const disks = Array.from(
-        vm.fileSystem.spec?.local?.pools.reduce((disks, pool) => {
+        fileSystemLocalPools.reduce((disks, pool) => {
           pool.disks.forEach((d) => disks.add(d));
           return disks;
         }, new Set<string>()) ?? []

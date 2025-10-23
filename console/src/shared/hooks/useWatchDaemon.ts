@@ -1,6 +1,6 @@
 import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
-import type { Daemon } from "@/shared/types/ibm-spectrum-scale/Daemon";
+import type { Daemon } from "../types/scale-spectrum-ibm-com/v1beta1/Daemon";
 
 export const useWatchDaemon = (
   options: Omit<

@@ -8,9 +8,13 @@ import {
 import { Checkbox, Tooltip, Icon } from "@patternfly/react-core";
 import { ExclamationTriangleIcon } from "@patternfly/react-icons";
 import { useNodesSelectionTableRowViewModel } from "../hooks/useNodesSelectionTableRowViewModel";
-import { cx } from "@emotion/css";
-import { styles } from "@/shared/styles";
+import { cx, css } from "@emotion/css";
 
+export const styles = {
+  tabularNums: css`
+    font-variant-numeric: tabular-nums;
+  `,
+} as const;
 type TableRowProps = RowProps<
   IoK8sApiCoreV1Node,
   TableColumn<IoK8sApiCoreV1Node>[]
