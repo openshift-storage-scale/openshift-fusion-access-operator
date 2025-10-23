@@ -25,6 +25,7 @@
       "dbaeumer.vscode-eslint",
       "esbenp.prettier-vscode",
       "redhat.vscode-yaml",
+      "styled-components.vscode-styled-components",
     ],
   },
   "tasks": {
@@ -73,7 +74,7 @@
         "args": ["-f", "npm run start:console"],
         "presentation": {
           "reveal": "never",
-          "close": true
+          "close": true,
         },
       },
     ],
