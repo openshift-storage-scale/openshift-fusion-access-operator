@@ -8,7 +8,7 @@
 /**
  * FileSystemClaim is the Schema for the filesystemclaims API.
  */
-export interface FailSystemClaim {
+export interface FileSystemClaim {
   /**
    * APIVersion defines the versioned schema of this representation of an object.
    * Servers should convert recognized schemas to the latest internal value, and
