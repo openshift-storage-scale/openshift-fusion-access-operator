@@ -11,7 +11,7 @@ WELL_KNOWN_CRDS=(
   [Filesystem]='filesystems.scale.spectrum.ibm.com'
   [LocalDisk]='localdisks.scale.spectrum.ibm.com'
   [FusionAccess]='fusionaccesses.fusion.storage.openshift.io'
-  [FailSystemClaim]='filesystemclaims.fusion.storage.openshift.io'
+  [FileSystemClaim]='filesystemclaims.fusion.storage.openshift.io'
   [LocalVolumeDiscoveryResult]='localvolumediscoveryresults.fusion.storage.openshift.io'
 )
 
