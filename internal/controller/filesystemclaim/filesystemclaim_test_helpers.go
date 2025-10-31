@@ -168,3 +168,60 @@ func createV1Filesystem(name, namespace string) *unstructured.Unstructured {
 	fs.SetNamespace(namespace)
 	return fs
 }
+
+// createLocalDiskWithOwner creates a LocalDisk owned by a FileSystemClaim
+func createLocalDiskWithOwner(name, namespace, devicePath, nodeName string, fsc *fusionv1alpha1.FileSystemClaim) *unstructured.Unstructured {
+	ld := &unstructured.Unstructured{}
+	ld.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   LocalDiskGroup,
+		Version: LocalDiskVersion,
+		Kind:    LocalDiskKind,
+	})
+	ld.SetName(name)
+	ld.SetNamespace(namespace)
+
+	// Set owner reference
+	ld.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion: "fusion.storage.openshift.io/v1alpha1",
+			Kind:       "FileSystemClaim",
+			Name:       fsc.Name,
+			UID:        fsc.UID,
+		},
+	})
+
+	// Set ownership labels
+	ld.SetLabels(map[string]string{
+		FileSystemClaimOwnedByNameLabel:      fsc.Name,
+		FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
+	})
+
+	// Set spec
+	ld.Object = map[string]any{
+		"apiVersion": LocalDiskGroup + "/" + LocalDiskVersion,
+		"kind":       LocalDiskKind,
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+			"labels": map[string]any{
+				FileSystemClaimOwnedByNameLabel:      fsc.Name,
+				FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
+			},
+			"ownerReferences": []any{
+				map[string]any{
+					"apiVersion": "fusion.storage.openshift.io/v1alpha1",
+					"kind":       "FileSystemClaim",
+					"name":       fsc.Name,
+					"uid":        string(fsc.UID),
+				},
+			},
+			"resourceVersion": "999",
+		},
+		"spec": map[string]any{
+			"device": devicePath,
+			"node":   nodeName,
+		},
+	}
+
+	return ld
+}

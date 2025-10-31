@@ -35,6 +35,8 @@ type FileSystemClaimStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=fsc
+//nolint:lll
+// +kubebuilder:webhook:verbs=create;update,path=/validate-fusion-storage-openshift-io-v1alpha1-filesystemclaim,mutating=false,failurePolicy=fail,groups=fusion.storage.openshift.io,resources=filesystemclaims,versions=v1alpha1,name=vfilesystemclaim.kb.io,admissionReviewVersions=v1,sideEffects=None
 
 // FileSystemClaim is the Schema for the filesystemclaims API.
 type FileSystemClaim struct {

@@ -49,3 +49,23 @@ webhooks:
     resources:
     - fusionaccesses
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-fusion-storage-openshift-io-v1alpha1-filesystemclaim
+  failurePolicy: Fail
+  name: vfilesystemclaim.kb.io
+  rules:
+  - apiGroups:
+    - fusion.storage.openshift.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - filesystemclaims
+  sideEffects: None

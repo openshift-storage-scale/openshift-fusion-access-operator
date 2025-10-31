@@ -1777,4 +1777,103 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationFailed))
 		})
 	})
+
+	Describe("Device Update Protection", func() {
+		Context("Controller Safety Check - Detect spec.devices mismatch", func() {
+			It("should detect and block when spec.devices changed after LocalDisks created", func() {
+				// Scenario: Webhook is bypassed and spec.devices is modified
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme500n500"}, // Changed from original
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Create LocalDisk with original device path using helper
+				ld1 := createLocalDiskWithOwner("test-ld-1", fsc.Namespace, "/dev/nvme1n1", "node1", fsc)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should detect the mismatch
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify error condition was set
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				cond := findCondition(updated.Status.Conditions, ConditionTypeReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
+				Expect(cond.Message).To(ContainSubstring("spec.devices was modified after LocalDisks were created"))
+				Expect(cond.Message).To(ContainSubstring("Original:"))
+				Expect(cond.Message).To(ContainSubstring("Current:"))
+				Expect(cond.Message).To(ContainSubstring("/dev/nvme1n1"))
+			})
+
+			It("should allow when spec.devices matches owned LocalDisks", func() {
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme1n1", "/dev/nvme2n2"},
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Create LocalDisks matching spec.devices using helpers
+				ld1 := createLocalDiskWithOwner("test-ld-1", fsc.Namespace, "/dev/nvme1n1", "node1", fsc)
+				ld2 := createLocalDiskWithOwner("test-ld-2", fsc.Namespace, "/dev/nvme2n2", "node1", fsc)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1, ld2).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should allow - devices match
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeFalse()) // No change needed
+			})
+		})
+	})
 })
