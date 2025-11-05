@@ -22,27 +22,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = Describe("FileSystemClaim Webhook", func() {
 	var (
-		validator  *FileSystemClaimValidator
-		ctx        context.Context
-		fakeClient client.Client
+		validator *FileSystemClaimValidator
+		ctx       context.Context
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		// Create a fake client with the scheme
-		scheme := runtime.NewScheme()
-		Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
-		Expect(AddToScheme(scheme)).To(Succeed())
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
-		validator = &FileSystemClaimValidator{Client: fakeClient}
+		validator = &FileSystemClaimValidator{}
 	})
 
 	Describe("ValidateCreate", func() {
@@ -74,7 +64,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			oldDevices      []string
 			newDevices      []string
 			oldConditions   []metav1.Condition
-			setupClient     bool // whether to create the FSC in fake client
 			expectError     bool
 			errorSubstrings []string
 		}
@@ -104,10 +93,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 				}
 
-				if tc.setupClient {
-					Expect(fakeClient.Create(ctx, oldFSC)).To(Succeed())
-				}
-
 				warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
 
 				if tc.expectError {
@@ -127,7 +112,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					oldDevices:    []string{"/dev/nvme1n100"},
 					newDevices:    []string{"/dev/nvme1n1"},
 					oldConditions: []metav1.Condition{},
-					setupClient:   true,
 					expectError:   false,
 				},
 			),
@@ -143,7 +127,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							Reason: "DeviceValidationFailed",
 						},
 					},
-					setupClient: true,
 					expectError: false,
 				},
 			),
@@ -164,7 +147,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							Reason: "LocalDiskCreationInProgress",
 						},
 					},
-					setupClient: true,
 					expectError: false,
 				},
 			),
@@ -183,7 +165,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					setupClient:     true,
 					expectError:     true,
 					errorSubstrings: []string{"spec.devices cannot be modified", "LocalDisks were created"},
 				},
@@ -201,7 +182,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					setupClient:     true,
 					expectError:     true,
 					errorSubstrings: []string{"spec.devices cannot be modified"},
 				},
@@ -219,7 +199,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					setupClient:     true,
 					expectError:     true,
 					errorSubstrings: []string{"spec.devices cannot be modified"},
 				},
@@ -237,7 +216,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					setupClient:     true,
 					expectError:     true,
 					errorSubstrings: []string{"spec.devices cannot be modified"},
 				},
@@ -257,7 +235,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					setupClient: true,
 					expectError: false,
 				},
 			),
@@ -266,7 +243,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					description: "should handle missing FSC gracefully (allow update)",
 					oldDevices:  []string{"/dev/nvme1n1"},
 					newDevices:  []string{"/dev/nvme2n2"},
-					setupClient: false, // Don't create in client
 					expectError: false,
 				},
 			),
@@ -308,9 +284,6 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					Devices: []string{"/dev/nvme1n1"}, // Same devices
 				},
 			}
-
-			// Create the FSC with LocalDiskCreated=True
-			Expect(fakeClient.Create(ctx, oldFSC)).To(Succeed())
 
 			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
 			Expect(err).NotTo(HaveOccurred())

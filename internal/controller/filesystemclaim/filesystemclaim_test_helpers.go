@@ -76,7 +76,7 @@ func deviceValidatedCondition(status metav1.ConditionStatus) metav1.Condition {
 		reason = ReasonDeviceValidationFailed
 	}
 	return metav1.Condition{
-		Type:   ConditionTypeDeviceValidated,
+		Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 		Status: status,
 		Reason: reason,
 	}
@@ -85,7 +85,7 @@ func deviceValidatedCondition(status metav1.ConditionStatus) metav1.Condition {
 // localDiskCreatedCondition returns a LocalDiskCreated condition
 func localDiskCreatedCondition(status metav1.ConditionStatus, reason string) metav1.Condition {
 	return metav1.Condition{
-		Type:   ConditionTypeLocalDiskCreated,
+		Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 		Status: status,
 		Reason: reason,
 	}
@@ -94,7 +94,7 @@ func localDiskCreatedCondition(status metav1.ConditionStatus, reason string) met
 // filesystemCreatedCondition returns a FileSystemCreated condition
 func filesystemCreatedCondition(status metav1.ConditionStatus, reason string) metav1.Condition {
 	return metav1.Condition{
-		Type:   ConditionTypeFileSystemCreated,
+		Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 		Status: status,
 		Reason: reason,
 	}
@@ -103,7 +103,7 @@ func filesystemCreatedCondition(status metav1.ConditionStatus, reason string) me
 // storageClassCreatedCondition returns a StorageClassCreated condition
 func storageClassCreatedCondition(status metav1.ConditionStatus, reason string) metav1.Condition {
 	return metav1.Condition{
-		Type:   ConditionTypeStorageClassCreated,
+		Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 		Status: status,
 		Reason: reason,
 	}

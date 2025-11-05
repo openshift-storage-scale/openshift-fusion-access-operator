@@ -58,42 +58,40 @@ const (
 
 	maxKubernetesNameLength = 253
 
-	// Reasource Creation Condition types
-	ConditionTypeLocalDiskCreated     = "LocalDiskCreated"
+	// Reason constants for LocalDisk creation
 	ReasonLocalDiskCreationFailed     = "LocalDiskCreationFailed"
 	ReasonLocalDiskCreationSucceeded  = "LocalDiskCreationSucceeded"
 	ReasonLocalDiskCreationInProgress = "LocalDiskCreationInProgress"
 
-	ConditionTypeFileSystemCreated     = "FileSystemCreated"
+	// Reason constants for FileSystem creation
 	ReasonFileSystemCreationFailed     = "FileSystemCreationFailed"
 	ReasonFileSystemCreationSucceeded  = "FileSystemCreationSucceeded"
 	ReasonFileSystemCreationInProgress = "FileSystemCreationInProgress"
 
-	ConditionTypeStorageClassCreated     = "StorageClassCreated"
+	// Reason constants for StorageClass creation
 	ReasonStorageClassCreationFailed     = "StorageClassCreationFailed"
 	ReasonStorageClassCreationSucceeded  = "StorageClassCreationSucceeded"
 	ReasonStorageClassCreationInProgress = "StorageClassCreationInProgress"
 
-	// VALIDATION CONDITION TYPES
-	ConditionTypeDeviceValidated    = "DeviceValidated"
+	// Reason constants for Device validation
 	ReasonDeviceValidationFailed    = "DeviceValidationFailed"
 	ReasonDeviceValidationSucceeded = "DeviceValidationSucceeded"
 
-	// DELETION CONDITION
-	ConditionTypeDeletionBlocked    = "DeletionBlocked"
+	// Reason constants for Deletion blocking
 	ReasonStorageClassInUse         = "StorageClassInUse"
 	ReasonFileSystemLabelNotPresent = "FileSystemLabelNotPresent"
 
+	// Reason constants for successful deletions
 	ReasonStorageClassDeleted = "StorageClassDeleted"
 	ReasonFilesystemDeleted   = "FilesystemDeleted"
 	ReasonLocalDiskDeleted    = "LocalDiskDeleted"
 
-	// OVERALL STATUS CONDITIONS
-	ConditionTypeReady           = "Ready"
+	// Reason constants for overall provisioning status
 	ReasonProvisioningFailed     = "ProvisioningFailed"
 	ReasonProvisioningSucceeded  = "ProvisioningSucceeded"
 	ReasonProvisioningInProgress = "ProvisioningInProgress"
 
+	// Reason constants for validation failures
 	ReasonValidationFailed       = "ValidationFailed"
 	ReasonDeviceNotFound         = "DeviceNotFound"
 	ReasonDeviceInUse            = "DeviceInUse"
@@ -307,7 +305,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 
 	// If LocalDisks are already created, verify spec.devices hasn't changed
 	// This is a safety check in case the webhook is disabled or bypassed
-	if r.isConditionTrue(fsc, ConditionTypeLocalDiskCreated) {
+	if r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
 		// Get owned LocalDisks and verify they match current spec.devices
 		owned, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
 			Group:   LocalDiskGroup,
@@ -346,7 +344,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			if e := r.patchFSCStatus(ctx, fsc, func(cur *fusionv1alpha1.FileSystemClaim) {
 				cur.Status.Conditions = utils.UpdateCondition(
 					cur.Status.Conditions,
-					ConditionTypeReady,
+					fusionv1alpha1.ConditionTypeReady,
 					metav1.ConditionFalse,
 					ReasonImmutableFieldModified,
 					errMsg,
@@ -362,12 +360,12 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 	}
 
 	// If localDisk creation is in progress, no need to create LocalDisks again
-	if r.hasConditionWithReason(fsc.Status.Conditions, ConditionTypeLocalDiskCreated, ReasonLocalDiskCreationInProgress) {
+	if r.hasConditionWithReason(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated, ReasonLocalDiskCreationInProgress) {
 		return false, nil
 	}
 
 	// Phase 1: validate once
-	if !r.isConditionTrue(fsc, ConditionTypeDeviceValidated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) {
 		if err := r.validateDevices(ctx, fsc); err != nil {
 			logger.Error(err, "Device validation failed")
 			if e := r.handleValidationError(ctx, fsc, err); e != nil {
@@ -377,7 +375,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			return true, nil
 		}
 
-		if _, e := r.updateConditionIfChanged(ctx, fsc, ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device/s validation succeeded"); e != nil {
+		if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device/s validation succeeded"); e != nil {
 			logger.Error(e, "Failed to update status after device validation success")
 			return false, e
 		}
@@ -446,7 +444,14 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			}
 
 			logger.Info("Creating LocalDisk", "name", localDiskName, "device", devicePath, "node", nodeName)
-			if _, e := r.updateConditionIfChanged(ctx, fsc, ConditionTypeLocalDiskCreated, metav1.ConditionFalse, ReasonLocalDiskCreationInProgress, "LocalDisks created, waiting for them to become ready"); e != nil {
+			_, e := r.updateConditionIfChanged(
+				ctx, fsc,
+				fusionv1alpha1.ConditionTypeLocalDiskCreated,
+				metav1.ConditionFalse,
+				ReasonLocalDiskCreationInProgress,
+				"LocalDisks created, waiting for them to become ready",
+			)
+			if e != nil {
 				return false, e
 			}
 
@@ -474,7 +479,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 }
 
 // syncLocalDiskConditions inspects all LocalDisks owned by this FSC and updates
-// ConditionTypeLocalDiskCreated with a precise reason/message. Returns changed=true if we wrote status.
+// fusionv1alpha1.ConditionTypeLocalDiskCreated with a precise reason/message. Returns changed=true if we wrote status.
 func (r *FileSystemClaimReconciler) syncLocalDiskConditions(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
@@ -490,8 +495,8 @@ func (r *FileSystemClaimReconciler) syncLocalDiskConditions(ctx context.Context,
 
 	// 2) If none yet but validated, mark in-progress (idempotent)
 	if len(owned) == 0 {
-		if r.isConditionTrue(fsc, ConditionTypeDeviceValidated) {
-			changed, err := r.updateConditionIfChanged(ctx, fsc, ConditionTypeLocalDiskCreated, metav1.ConditionFalse, ReasonLocalDiskCreationInProgress, "Waiting for LocalDisk objects to appear")
+		if r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) {
+			changed, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated, metav1.ConditionFalse, ReasonLocalDiskCreationInProgress, "Waiting for LocalDisk objects to appear")
 			if err != nil {
 				return false, err
 			}
@@ -541,7 +546,7 @@ func (r *FileSystemClaimReconciler) syncLocalDiskConditions(ctx context.Context,
 	}
 
 	// 6) Update condition if changed
-	changed, err := r.updateConditionIfChanged(ctx, fsc, ConditionTypeLocalDiskCreated, desiredStatus, desiredReason, desiredMsg)
+	changed, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated, desiredStatus, desiredReason, desiredMsg)
 	if err != nil {
 		return false, err
 	}
@@ -561,7 +566,7 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 	logger := log.FromContext(ctx)
 
 	// If localdisks are not created, we can't create a filesystem
-	if !r.isConditionTrue(fsc, ConditionTypeLocalDiskCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
 		return false, nil
 	}
 
@@ -616,7 +621,7 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 			return true, nil
 		}
 
-		if _, e := r.updateConditionIfChanged(ctx, fsc, ConditionTypeFileSystemCreated, metav1.ConditionFalse, ReasonFileSystemCreationInProgress, "Filesystem created; waiting to become Ready"); e != nil {
+		if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeFileSystemCreated, metav1.ConditionFalse, ReasonFileSystemCreationInProgress, "Filesystem created; waiting to become Ready"); e != nil {
 			return false, e
 		}
 		return true, nil
@@ -649,13 +654,13 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 	}
 }
 
-// syncFilesystemConditions updates ConditionTypeFileSystemCreated by inspecting owned Filesystem objects.
+// syncFilesystemConditions updates fusionv1alpha1.ConditionTypeFileSystemCreated by inspecting owned Filesystem objects.
 // Keep this conservative: "InProgress" unless we can positively assert success or failure.
 func (r *FileSystemClaimReconciler) syncFilesystemConditions(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	// Do not surface FilesystemCreated at all until LocalDiskCreated is True.
-	if !r.isConditionTrue(fsc, ConditionTypeLocalDiskCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
 		return false, nil
 	}
 
@@ -690,7 +695,7 @@ func (r *FileSystemClaimReconciler) syncFilesystemConditions(ctx context.Context
 	}
 
 	// Update condition if changed
-	changed, err := r.updateConditionIfChanged(ctx, fsc, ConditionTypeFileSystemCreated, desiredStatus, desiredReason, desiredMsg)
+	changed, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeFileSystemCreated, desiredStatus, desiredReason, desiredMsg)
 	if err != nil {
 		return false, err
 	}
@@ -710,7 +715,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 	logger := log.FromContext(ctx)
 
 	// Gate on Filesystem being ready
-	if !r.isConditionTrue(fsc, ConditionTypeFileSystemCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
 		return false, nil
 	}
 
@@ -732,7 +737,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 		}
 
 		// mark SC created (idempotent guard)
-		changed, err := r.updateConditionIfChanged(ctx, fsc, ConditionTypeStorageClassCreated, metav1.ConditionTrue, ReasonStorageClassCreationSucceeded, "StorageClass created")
+		changed, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeStorageClassCreated, metav1.ConditionTrue, ReasonStorageClassCreationSucceeded, "StorageClass created")
 		if err != nil {
 			return false, err
 		}
@@ -749,7 +754,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 		}
 
 		// Ensure condition is True (idempotent)
-		conditionChanged, err := r.updateConditionIfChanged(ctx, fsc, ConditionTypeStorageClassCreated, metav1.ConditionTrue, ReasonStorageClassCreationSucceeded, "StorageClass present")
+		conditionChanged, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeStorageClassCreated, metav1.ConditionTrue, ReasonStorageClassCreationSucceeded, "StorageClass present")
 		if err != nil {
 			return false, err
 		}
@@ -759,10 +764,10 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 
 // syncFSCReady aggregates the overall Ready condition from the sub-conditions.
 func (r *FileSystemClaimReconciler) syncFSCReady(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
-	readyNow := r.isConditionTrue(fsc, ConditionTypeDeviceValidated) &&
-		r.isConditionTrue(fsc, ConditionTypeLocalDiskCreated) &&
-		r.isConditionTrue(fsc, ConditionTypeFileSystemCreated) &&
-		r.isConditionTrue(fsc, ConditionTypeStorageClassCreated)
+	readyNow := r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated)
 
 	var status metav1.ConditionStatus
 	var reason, msg string
@@ -772,7 +777,7 @@ func (r *FileSystemClaimReconciler) syncFSCReady(ctx context.Context, fsc *fusio
 		status, reason, msg = metav1.ConditionFalse, ReasonProvisioningInProgress, "Provisioning in progress"
 	}
 
-	return r.updateConditionIfChanged(ctx, fsc, ConditionTypeReady, status, reason, msg)
+	return r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeReady, status, reason, msg)
 }
 
 // Handlers for FileSystemClaim reconciliation -- END
@@ -803,7 +808,7 @@ func (r *FileSystemClaimReconciler) calculateDeletionBackoff(fsc *fusionv1alpha1
 		maxDelay     = 10 * time.Minute
 	)
 
-	cond := apimeta.FindStatusCondition(fsc.Status.Conditions, ConditionTypeDeletionBlocked)
+	cond := apimeta.FindStatusCondition(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeDeletionBlocked)
 	if cond == nil || cond.Reason != reason {
 		// First time seeing this blocker, start with initial delay
 		return initialDelay
@@ -1219,13 +1224,13 @@ func (r *FileSystemClaimReconciler) handleResourceCreationError(
 
 	switch resourceType {
 	case "LocalDisk":
-		conditionType = ConditionTypeLocalDiskCreated
+		conditionType = fusionv1alpha1.ConditionTypeLocalDiskCreated
 		reason = ReasonLocalDiskCreationFailed
 	case "Filesystem":
-		conditionType = ConditionTypeFileSystemCreated
+		conditionType = fusionv1alpha1.ConditionTypeFileSystemCreated
 		reason = ReasonFileSystemCreationFailed
 	case "StorageClass":
-		conditionType = ConditionTypeStorageClassCreated
+		conditionType = fusionv1alpha1.ConditionTypeStorageClassCreated
 		reason = ReasonStorageClassCreationFailed
 	default:
 		return fmt.Errorf("unknown resource type: %s", resourceType)
@@ -1243,7 +1248,7 @@ func (r *FileSystemClaimReconciler) handleResourceCreationError(
 		)
 		cur.Status.Conditions = utils.UpdateCondition(
 			cur.Status.Conditions,
-			ConditionTypeReady,
+			fusionv1alpha1.ConditionTypeReady,
 			metav1.ConditionFalse,
 			ReasonProvisioningFailed,
 			fmt.Sprintf("%s creation failed", resourceType),
@@ -1386,11 +1391,11 @@ func (r *FileSystemClaimReconciler) handleValidationError(
 ) error {
 	return r.patchFSCStatus(ctx, fsc, func(cur *fusionv1alpha1.FileSystemClaim) {
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, ConditionTypeReady,
+			cur.Status.Conditions, fusionv1alpha1.ConditionTypeReady,
 			metav1.ConditionFalse, ReasonValidationFailed, err.Error(), cur.Generation,
 		)
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, ConditionTypeDeviceValidated,
+			cur.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated,
 			metav1.ConditionFalse, ReasonDeviceValidationFailed, err.Error(), cur.Generation,
 		)
 	})
@@ -1544,9 +1549,9 @@ func (r *FileSystemClaimReconciler) isStorageClassInUse(
 
 // markDeletionRequested sets Ready=False with ReasonDeletionRequested
 func (r *FileSystemClaimReconciler) markDeletionRequested(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
-	if !r.hasConditionWithReason(fsc.Status.Conditions, ConditionTypeReady, ReasonDeletionRequested) {
+	if !r.hasConditionWithReason(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeReady, ReasonDeletionRequested) {
 		changed, err := r.updateConditionIfChanged(ctx, fsc,
-			ConditionTypeReady,
+			fusionv1alpha1.ConditionTypeReady,
 			metav1.ConditionFalse,
 			ReasonDeletionRequested,
 			"FileSystemClaim deletion was requested, proceeding with cleanup in this order: StorageClass, Filesystem, LocalDisk")
@@ -1565,7 +1570,7 @@ func (r *FileSystemClaimReconciler) markDeletionRequested(ctx context.Context, f
 func (r *FileSystemClaimReconciler) checkStorageClassUsage(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
 	logger := log.FromContext(ctx)
 
-	if !r.isConditionTrue(fsc, ConditionTypeStorageClassCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated) {
 		return 0, false, nil // Already deleted
 	}
 
@@ -1576,7 +1581,7 @@ func (r *FileSystemClaimReconciler) checkStorageClassUsage(ctx context.Context, 
 
 	if inUse {
 		changed, e := r.updateConditionIfChanged(ctx, fsc,
-			ConditionTypeDeletionBlocked,
+			fusionv1alpha1.ConditionTypeDeletionBlocked,
 			metav1.ConditionTrue,
 			ReasonStorageClassInUse,
 			who)
@@ -1596,7 +1601,7 @@ func (r *FileSystemClaimReconciler) checkStorageClassUsage(ctx context.Context, 
 func (r *FileSystemClaimReconciler) checkFilesystemDeletionLabel(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
 	logger := log.FromContext(ctx)
 
-	if !r.isConditionTrue(fsc, ConditionTypeFileSystemCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
 		return 0, false, nil // Already deleted
 	}
 
@@ -1621,7 +1626,7 @@ func (r *FileSystemClaimReconciler) checkFilesystemDeletionLabel(ctx context.Con
 				"To confirm this action, please label the filesystem (%s) with scale.spectrum.ibm.com/allowDelete and try again.",
 				fs.GetName())
 			changed, e := r.updateConditionIfChanged(ctx, fsc,
-				ConditionTypeDeletionBlocked,
+				fusionv1alpha1.ConditionTypeDeletionBlocked,
 				metav1.ConditionTrue,
 				ReasonFileSystemLabelNotPresent,
 				msg,
@@ -1644,7 +1649,7 @@ func (r *FileSystemClaimReconciler) checkFilesystemDeletionLabel(ctx context.Con
 func (r *FileSystemClaimReconciler) deleteStorageClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	if !r.isConditionTrue(fsc, ConditionTypeStorageClassCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated) {
 		return false, nil // Already deleted
 	}
 
@@ -1663,7 +1668,7 @@ func (r *FileSystemClaimReconciler) deleteStorageClass(ctx context.Context, fsc 
 
 	// Mark as deleted
 	changed, err := r.updateConditionIfChanged(ctx, fsc,
-		ConditionTypeStorageClassCreated,
+		fusionv1alpha1.ConditionTypeStorageClassCreated,
 		metav1.ConditionFalse,
 		ReasonStorageClassDeleted,
 		"StorageClass deleted, proceeding with Filesystem deletion")
@@ -1682,7 +1687,7 @@ func (r *FileSystemClaimReconciler) deleteFilesystem(ctx context.Context, fsc *f
 
 	logger := log.FromContext(ctx)
 
-	if !r.isConditionTrue(fsc, ConditionTypeFileSystemCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
 		return 0, false, nil // Already deleted
 	}
 
@@ -1707,7 +1712,7 @@ func (r *FileSystemClaimReconciler) deleteFilesystem(ctx context.Context, fsc *f
 
 	// Mark as deleted
 	changed, err := r.updateConditionIfChanged(ctx, fsc,
-		ConditionTypeFileSystemCreated,
+		fusionv1alpha1.ConditionTypeFileSystemCreated,
 		metav1.ConditionFalse,
 		ReasonFilesystemDeleted,
 		"Filesystem deleted, proceeding with LocalDisk deletion")
@@ -1727,7 +1732,7 @@ func (r *FileSystemClaimReconciler) deleteLocalDisks(ctx context.Context, fsc *f
 
 	logger := log.FromContext(ctx)
 
-	if !r.isConditionTrue(fsc, ConditionTypeLocalDiskCreated) {
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
 		return 0, false, nil // Already deleted
 	}
 
@@ -1754,7 +1759,7 @@ func (r *FileSystemClaimReconciler) deleteLocalDisks(ctx context.Context, fsc *f
 
 	// Mark as deleted
 	changed, err := r.updateConditionIfChanged(ctx, fsc,
-		ConditionTypeLocalDiskCreated,
+		fusionv1alpha1.ConditionTypeLocalDiskCreated,
 		metav1.ConditionFalse,
 		ReasonLocalDiskDeleted,
 		"LocalDisks deleted, proceeding with finalizer removal")

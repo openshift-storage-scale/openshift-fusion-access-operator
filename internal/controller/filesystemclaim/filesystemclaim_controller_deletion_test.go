@@ -79,7 +79,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeReady)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonDeletionRequested))
@@ -94,7 +94,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeReady,
+							Type:   fusionv1alpha1.ConditionTypeReady,
 							Status: metav1.ConditionFalse,
 							Reason: ReasonDeletionRequested,
 						},
@@ -129,7 +129,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -163,7 +163,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -215,7 +215,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeDeletionBlocked)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeDeletionBlocked)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonStorageClassInUse))
@@ -254,7 +254,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -300,7 +300,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeDeletionBlocked)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeDeletionBlocked)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemLabelNotPresent))
@@ -315,7 +315,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -390,7 +390,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -461,7 +461,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -506,7 +506,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -534,7 +534,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeStorageClassCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeStorageClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonStorageClassDeleted))
@@ -599,7 +599,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -643,7 +643,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 
 		It("should mark FileSystemCreated=False when FS already gone", func() {
 			testMarkAsDeleted(
-				ConditionTypeFileSystemCreated,
+				fusionv1alpha1.ConditionTypeFileSystemCreated,
 				ReasonFileSystemCreationSucceeded,
 				ReasonFilesystemDeleted,
 				func(r *FileSystemClaimReconciler, ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
@@ -663,7 +663,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -725,7 +725,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 
 		It("should mark LocalDiskCreated=False when LDs already gone", func() {
 			testMarkAsDeleted(
-				ConditionTypeLocalDiskCreated,
+				fusionv1alpha1.ConditionTypeLocalDiskCreated,
 				ReasonLocalDiskCreationSucceeded,
 				ReasonLocalDiskDeleted,
 				func(r *FileSystemClaimReconciler, ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
@@ -782,17 +782,17 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -840,7 +840,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 
 			// Verify Ready=False
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, fsc)).To(Succeed())
-			cond := findCondition(fsc.Status.Conditions, ConditionTypeReady)
+			cond := findCondition(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Reason).To(Equal(ReasonDeletionRequested))
 		})
@@ -857,12 +857,12 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeReady,
+							Type:   fusionv1alpha1.ConditionTypeReady,
 							Status: metav1.ConditionFalse,
 							Reason: ReasonDeletionRequested,
 						},
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -912,7 +912,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 
 			// Verify DeletionBlocked
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, fsc)).To(Succeed())
-			cond := findCondition(fsc.Status.Conditions, ConditionTypeDeletionBlocked)
+			cond := findCondition(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeDeletionBlocked)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonStorageClassInUse))

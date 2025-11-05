@@ -24,15 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
-var filesystemclaimlog = logf.Log.WithName("filesystemclaim-resource")
+var logger = logf.Log.WithName("filesystemclaim-resource")
 
 // +kubebuilder:object:generate=false
 // +k8s:deepcopy-gen=false
@@ -43,14 +41,13 @@ var filesystemclaimlog = logf.Log.WithName("filesystemclaim-resource")
 // NOTE: The +kubebuilder:object:generate=false and +k8s:deepcopy-gen=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type FileSystemClaimValidator struct {
-	Client client.Client
 }
 
 // SetupWebhookWithManager sets up the webhook with the Manager.
 func (r *FileSystemClaim) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
-		WithValidator(&FileSystemClaimValidator{Client: mgr.GetClient()}).
+		WithValidator(&FileSystemClaimValidator{}).
 		Complete()
 }
 
@@ -58,31 +55,31 @@ func (r *FileSystemClaim) SetupWebhookWithManager(mgr ctrl.Manager) error {
 func (v *FileSystemClaimValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	fsc, err := convertToFileSystemClaim(obj)
 	if err != nil {
-		filesystemclaimlog.Error(err, "validate create: failed to convert object")
+		logger.Error(err, "validate create: failed to convert object")
 		return nil, err
 	}
 
-	filesystemclaimlog.Info("validate create", "name", fsc.Name, "namespace", fsc.Namespace, "devices", fsc.Spec.Devices)
+	logger.Info("validate create", "name", fsc.Name, "namespace", fsc.Namespace, "devices", fsc.Spec.Devices)
 
 	// Allow all creates - device validation will be performed by the controller
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *FileSystemClaimValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	oldFSC, err := convertToFileSystemClaim(oldObj)
 	if err != nil {
-		filesystemclaimlog.Error(err, "validate update: failed to convert old object")
+		logger.Error(err, "validate update: failed to convert old object")
 		return nil, err
 	}
 
 	newFSC, err := convertToFileSystemClaim(newObj)
 	if err != nil {
-		filesystemclaimlog.Error(err, "validate update: failed to convert new object")
+		logger.Error(err, "validate update: failed to convert new object")
 		return nil, err
 	}
 
-	filesystemclaimlog.Info("validate update",
+	logger.Info("validate update",
 		"name", newFSC.Name,
 		"namespace", newFSC.Namespace,
 		"oldDevices", oldFSC.Spec.Devices,
@@ -91,36 +88,22 @@ func (v *FileSystemClaimValidator) ValidateUpdate(ctx context.Context, oldObj, n
 	// Check if spec.devices changed
 	if reflect.DeepEqual(oldFSC.Spec.Devices, newFSC.Spec.Devices) {
 		// No change to devices, allow the update
-		filesystemclaimlog.Info("devices unchanged, allowing update", "name", newFSC.Name)
+		logger.Info("devices unchanged, allowing update", "name", newFSC.Name)
 		return nil, nil
 	}
 
-	// Devices changed - need to check if LocalDisks are already created
-	// We need to fetch the current FSC from the API to get its status
-	currentFSC := &FileSystemClaim{}
-	err = v.Client.Get(ctx, types.NamespacedName{
-		Name:      newFSC.Name,
-		Namespace: newFSC.Namespace,
-	}, currentFSC)
-
-	if err != nil {
-		// If we can't fetch the FSC, be conservative and allow the update
-		// The controller will handle any issues
-		filesystemclaimlog.Error(err, "failed to fetch current FSC, allowing update", "name", newFSC.Name)
-		return nil, nil
-	}
-
+	// Devices changed - check if LocalDisks are already created by inspecting the current state
 	// Check if LocalDiskCreated condition is True
-	localDiskCreatedCond := meta.FindStatusCondition(currentFSC.Status.Conditions, "LocalDiskCreated")
+	localDiskCreatedCond := meta.FindStatusCondition(oldFSC.Status.Conditions, ConditionTypeLocalDiskCreated)
 	if localDiskCreatedCond == nil {
 		// No LocalDiskCreated condition yet, allow the update
-		filesystemclaimlog.Info("no LocalDiskCreated condition, allowing update", "name", newFSC.Name)
+		logger.Info("no LocalDiskCreated condition, allowing update", "name", newFSC.Name)
 		return nil, nil
 	}
 
 	if localDiskCreatedCond.Status != metav1.ConditionTrue {
 		// LocalDiskCreated is not True, allow the update
-		filesystemclaimlog.Info("LocalDiskCreated is not True, allowing update",
+		logger.Info("LocalDiskCreated is not True, allowing update",
 			"name", newFSC.Name,
 			"status", localDiskCreatedCond.Status,
 			"reason", localDiskCreatedCond.Reason)
@@ -138,7 +121,7 @@ func (v *FileSystemClaimValidator) ValidateUpdate(ctx context.Context, oldObj, n
 		timestamp,
 	)
 
-	filesystemclaimlog.Info("blocking device update", "name", newFSC.Name, "reason", "LocalDiskCreated=True")
+	logger.Info("blocking device update", "name", newFSC.Name, "reason", "LocalDiskCreated=True")
 	return nil, fmt.Errorf("%s", errMsg)
 }
 
@@ -146,11 +129,11 @@ func (v *FileSystemClaimValidator) ValidateUpdate(ctx context.Context, oldObj, n
 func (v *FileSystemClaimValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	fsc, err := convertToFileSystemClaim(obj)
 	if err != nil {
-		filesystemclaimlog.Error(err, "validate delete: failed to convert object")
+		logger.Error(err, "validate delete: failed to convert object")
 		return nil, err
 	}
 
-	filesystemclaimlog.Info("validate delete", "name", fsc.Name, "namespace", fsc.Namespace)
+	logger.Info("validate delete", "name", fsc.Name, "namespace", fsc.Namespace)
 
 	// Allow all deletes
 	return nil, nil

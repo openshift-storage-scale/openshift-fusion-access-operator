@@ -20,6 +20,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Condition types for FileSystemClaim status
+const (
+	ConditionTypeDeviceValidated     = "DeviceValidated"
+	ConditionTypeLocalDiskCreated    = "LocalDiskCreated"
+	ConditionTypeFileSystemCreated   = "FileSystemCreated"
+	ConditionTypeStorageClassCreated = "StorageClassCreated"
+	ConditionTypeDeletionBlocked     = "DeletionBlocked"
+	ConditionTypeReady               = "Ready"
+)
+
 // FileSystemClaimSpec defines the desired state of FileSystemClaim.
 type FileSystemClaimSpec struct {
 	// Devices is a list of device paths to be used for the file system. For example, ["/dev/sda", "/dev/sdb"]

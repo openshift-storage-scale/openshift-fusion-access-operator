@@ -60,7 +60,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -94,7 +94,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeStorageClassCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeStorageClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonStorageClassCreationSucceeded))
@@ -109,7 +109,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionFalse,
 							Reason: ReasonFileSystemCreationInProgress,
 						},
@@ -146,7 +146,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
@@ -177,7 +177,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeStorageClassCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeStorageClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 		})
@@ -193,22 +193,22 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
@@ -235,7 +235,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeReady)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonProvisioningSucceeded))
@@ -250,12 +250,12 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionFalse, // Not ready
 							Reason: ReasonFileSystemCreationInProgress,
 						},
@@ -282,7 +282,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeReady)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonProvisioningInProgress))
@@ -297,27 +297,27 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeFileSystemCreated,
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonFileSystemCreationSucceeded,
 						},
 						{
-							Type:   ConditionTypeStorageClassCreated,
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonStorageClassCreationSucceeded,
 						},
 						{
-							Type:    ConditionTypeReady,
+							Type:    fusionv1alpha1.ConditionTypeReady,
 							Status:  metav1.ConditionTrue,
 							Reason:  ReasonProvisioningSucceeded,
 							Message: "All resources created and ready",
@@ -368,7 +368,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationInProgress))
@@ -403,7 +403,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -464,7 +464,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationSucceeded))
@@ -479,7 +479,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -541,7 +541,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationFailed)) // Hard failure
@@ -556,12 +556,12 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
 						{
-							Type:    ConditionTypeLocalDiskCreated,
+							Type:    fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status:  metav1.ConditionTrue,
 							Reason:  ReasonLocalDiskCreationSucceeded,
 							Message: "All 1 LocalDisks are Ready; if used, they are used by this Filesystem.",
@@ -664,7 +664,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeFileSystemCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeFileSystemCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationInProgress))
@@ -679,7 +679,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -740,7 +740,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeFileSystemCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeFileSystemCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationSucceeded))
@@ -755,7 +755,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -811,7 +811,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeFileSystemCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeFileSystemCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationInProgress))
@@ -902,7 +902,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeDeviceValidated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).To(Equal(ReasonDeviceValidationSucceeded))
@@ -972,7 +972,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeDeviceValidated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonDeviceValidationFailed))
@@ -1021,7 +1021,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeDeviceValidated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonDeviceValidationFailed))
@@ -1043,7 +1043,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue, // Already validated
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -1114,7 +1114,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationInProgress))
@@ -1135,7 +1135,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -1221,7 +1221,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -1249,7 +1249,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationFailed))
@@ -1270,7 +1270,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -1324,7 +1324,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeLocalDiskCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonLocalDiskCreationFailed))
@@ -1345,7 +1345,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeDeviceValidated,
+							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonDeviceValidationSucceeded,
 						},
@@ -1433,7 +1433,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:    ConditionTypeDeviceValidated,
+							Type:    fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status:  metav1.ConditionTrue,
 							Reason:  ReasonDeviceValidationSucceeded,
 							Message: "Device/s validation succeeded",
@@ -1548,7 +1548,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -1604,7 +1604,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeFileSystemCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeFileSystemCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationInProgress))
@@ -1619,7 +1619,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -1691,7 +1691,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   ConditionTypeLocalDiskCreated,
+							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 							Status: metav1.ConditionTrue,
 							Reason: ReasonLocalDiskCreationSucceeded,
 						},
@@ -1771,7 +1771,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			updated := &fusionv1alpha1.FileSystemClaim{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-			cond := findCondition(updated.Status.Conditions, ConditionTypeFileSystemCreated)
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeFileSystemCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonFileSystemCreationFailed))
@@ -1793,7 +1793,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Status: fusionv1alpha1.FileSystemClaimStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:   ConditionTypeLocalDiskCreated,
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 								Status: metav1.ConditionTrue,
 								Reason: ReasonLocalDiskCreationSucceeded,
 							},
@@ -1824,7 +1824,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				updated := &fusionv1alpha1.FileSystemClaim{}
 				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-				cond := findCondition(updated.Status.Conditions, ConditionTypeReady)
+				cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 				Expect(cond).NotTo(BeNil())
 				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
@@ -1846,7 +1846,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Status: fusionv1alpha1.FileSystemClaimStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:   ConditionTypeLocalDiskCreated,
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
 								Status: metav1.ConditionTrue,
 								Reason: ReasonLocalDiskCreationSucceeded,
 							},
