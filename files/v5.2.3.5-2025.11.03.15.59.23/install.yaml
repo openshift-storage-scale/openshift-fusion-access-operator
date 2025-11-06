@@ -10700,18 +10700,18 @@ data:
     apiVersion: scale.spectrum.ibm.com/v1alpha1
     kind: ClusterManagerConfig
     images:
-      coreECE: quay.io/openshift-storage-scale/erasure-code/ibm-spectrum-scale-daemon:5.2.3.5_2025_10_27.17_02_33
-      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:5.2.3.5_2025_10_27.17_02_33
-      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:5.2.3.5_2025_10_27.17_02_33
-      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:5.2.3.5_2025_10_27.17_02_33
-      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:5.2.3.5_2025_10_27.17_02_33
-      postgres: quay.io/openshift-storage-scale/postgres:5.2.3.5_2025_10_27.17_02_33
-      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:5.2.3.5_2025_10_27.17_02_33
-      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:5.2.3.5_2025_10_27.17_02_33
-      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:5.2.3.5_2025_10_27.17_02_33
-      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:5.2.3.5_2025_10_27.17_02_33
-      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:5.2.3.5_2025_10_27.17_02_33
-      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:5.2.3.5_2025_10_27.17_02_33
+      coreECE: quay.io/openshift-storage-scale/erasure-code/ibm-spectrum-scale-daemon:5.2.3.5_2025_11_03.15_59_23
+      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:5.2.3.5_2025_11_03.15_59_23
+      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:5.2.3.5_2025_11_03.15_59_23
+      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:5.2.3.5_2025_11_03.15_59_23
+      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:5.2.3.5_2025_11_03.15_59_23
+      postgres: quay.io/openshift-storage-scale/postgres:5.2.3.5_2025_11_03.15_59_23
+      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:5.2.3.5_2025_11_03.15_59_23
+      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:5.2.3.5_2025_11_03.15_59_23
+      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:5.2.3.5_2025_11_03.15_59_23
+      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:5.2.3.5_2025_11_03.15_59_23
+      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:5.2.3.5_2025_11_03.15_59_23
+      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:5.2.3.5_2025_11_03.15_59_23
 kind: ConfigMap
 metadata:
   labels:
@@ -10813,26 +10813,26 @@ spec:
         - name: SHORTNAME_NODE_MAPPING
           value: "yes"
         - name: CSI_SNAPSHOTTER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-snapshotter:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/csi-snapshotter:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_ATTACHER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-attacher:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/csi-attacher:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_PROVISIONER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-provisioner:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/csi-provisioner:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_LIVENESSPROBE_IMAGE
-          value: quay.io/openshift-storage-scale/csi/livenessprobe:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/livenessprobe:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_NODE_REGISTRAR_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_RESIZER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/csi-resizer:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/csi-resizer:5.2.3.5_2025_11_03.15_59_23
         - name: CSI_DRIVER_IMAGE
-          value: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:5.2.3.5_2025_10_27.17_02_33
+          value: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:5.2.3.5_2025_11_03.15_59_23
         - name: METRICS_BIND_ADDRESS
           value: "8383"
         - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-csi-operator:5.2.3.5_2025_10_27.17_02_33
+        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-csi-operator:5.2.3.5_2025_11_03.15_59_23
         imagePullPolicy: IfNotPresent
         livenessProbe:
           exec:
@@ -10945,7 +10945,7 @@ spec:
               resource: limits.memory
         - name: MM_DISABLE_MODULE_MANAGEMENT
           value: "1"
-        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:5.2.3.5_2025_10_27.17_02_33
+        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:5.2.3.5_2025_11_03.15_59_23
         livenessProbe:
           httpGet:
             path: /healthz

@@ -22,7 +22,7 @@ import (
 
 // NOTE(bandini): If you change anything in the following two lines you need to update
 // ./scripts/update-cnsa-versions-metadata.sh
-// +kubebuilder:validation:Enum=v5.2.3.5-2025.10.27.17.02.33
+// +kubebuilder:validation:Enum=v5.2.3.5-2025.11.03.15.59.23
 type StorageScaleVersions string
 
 // FusionAccessSpec defines the desired state of FusionAccess
@@ -31,7 +31,7 @@ type FusionAccessSpec struct {
 	// ./scripts/update-cnsa-versions-metadata.sh
 
 	// Version of IBM Fusion installation manifest
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="IBM Storage Scale Version",order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.5-2025.10.27.17.02.33"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="IBM Storage Scale Version",order=2,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.5-2025.11.03.15.59.23"}
 	StorageScaleVersion StorageScaleVersions `json:"storageScaleVersion,omitempty"`
 
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}

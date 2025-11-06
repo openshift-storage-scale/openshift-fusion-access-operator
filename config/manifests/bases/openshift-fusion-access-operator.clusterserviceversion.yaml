@@ -26,7 +26,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    operatorframework.io/initialization-resource: '{"apiVersion":"fusion.storage.openshift.io/v1alpha1","kind":"FusionAccess","metadata":{"name":"fusionaccess-object"},"spec":{"storageScaleVersion":"v5.2.3.5-2025.10.27.17.02.33"}}'
+    operatorframework.io/initialization-resource: '{"apiVersion":"fusion.storage.openshift.io/v1alpha1","kind":"FusionAccess","metadata":{"name":"fusionaccess-object"},"spec":{"storageScaleVersion":"v5.2.3.5-2025.11.03.15.59.23"}}'
     operatorframework.io/suggested-namespace: ibm-fusion-access
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.openshift.io/valid-subscription: '["Openshift Container Platform","OpenShift
@@ -52,7 +52,7 @@ spec:
         displayName: IBM Storage Scale Version
         path: storageScaleVersion
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.5-2025.10.27.17.02.33
+        - urn:alm:descriptor:com.tectonic.ui:select:v5.2.3.5-2025.11.03.15.59.23
       - displayName: Local Volume Discovery
         path: storageDeviceDiscovery
         x-descriptors:
