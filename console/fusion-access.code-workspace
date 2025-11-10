@@ -2,31 +2,29 @@
   "folders": [
     {
       "name": "Fusion Access for SAN - Console Plugin",
-      "path": ".",
-    },
+      "path": "."
+    }
   ],
   "settings": {
-    "window.title": "${folderName}",
-    "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
-    "typescript.preferences.preferTypeOnlyAutoImports": true,
+    "biome.enabled": true,
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.biome": "explicit",
+      "source.fixAll.biome": "explicit"
+    },
     "editor.formatOnSave": true,
     "git.enableCommitSigning": true,
-    "eslint.options": {
-      "overrideConfigFile": "./config/eslint.config.mjs",
-    },
     "files.autoSave": "afterDelay",
-    "json.schemaDownload.enable": true,
-    "[json]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode",
-    },
+    "typescript.preferences.preferTypeOnlyAutoImports": true,
+    "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
+    "window.title": "${folderName}"
   },
   "extensions": {
     "recommendations": [
-      "dbaeumer.vscode-eslint",
-      "esbenp.prettier-vscode",
+      "biomejs.biome",
       "redhat.vscode-yaml",
-      "styled-components.vscode-styled-components",
-    ],
+      "styled-components.vscode-styled-components"
+    ]
   },
   "tasks": {
     "version": "2.0.0",
