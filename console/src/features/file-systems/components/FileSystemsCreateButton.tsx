@@ -43,7 +43,7 @@ export const FileSystemsCreateButton: React.FC<CreateFileSystemButtonProps> = (
       {!isDaemonHealthy && (
         <Tooltip
           id="create-file-system-tooltip"
-          content={t("CNSA infrastructure is not ready")}
+          content={t("Fusion Access for SAN infrastructure is not ready")}
           triggerRef={tooltipRef}
         />
       )}
