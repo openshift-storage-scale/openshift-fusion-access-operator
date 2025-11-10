@@ -34,8 +34,8 @@
         "type": "shell",
         "command": "oc login -w",
         "presentation": {
-          "close": true,
-        },
+          "close": true
+        }
       },
       {
         "label": "Start dev server",
@@ -47,7 +47,7 @@
         "presentation": {
           "panel": "new",
           "close": false,
-          "showReuseMessage": true,
+          "showReuseMessage": true
         },
         "problemMatcher": [
           {
@@ -55,15 +55,15 @@
             "pattern": {
               "regexp": "ERROR in (.*)\\n(.*)\\n(.*)\\n(.*)",
               "file": 1,
-              "message": 2,
+              "message": 2
             },
             "background": {
               "activeOnStart": true,
               "beginsPattern": ".*webpack serve --progress*",
-              "endsPattern": ".*webpack.*compiled.*successfully.*",
-            },
-          },
-        ],
+              "endsPattern": ".*webpack.*compiled.*successfully.*"
+            }
+          }
+        ]
       },
       {
         "label": "Stop dev server",
@@ -72,10 +72,10 @@
         "args": ["-f", "npm run start:console"],
         "presentation": {
           "reveal": "never",
-          "close": true,
-        },
-      },
-    ],
+          "close": true
+        }
+      }
+    ]
   },
   "launch": {
     "version": "0.2.0",
@@ -88,8 +88,8 @@
         "webRoot": "${workspaceFolder}/src",
         "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
         "preLaunchTask": "Start dev server",
-        "postDebugTask": "Stop dev server",
-      },
-    ],
-  },
+        "postDebugTask": "Stop dev server"
+      }
+    ]
+  }
 }

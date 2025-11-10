@@ -2,11 +2,11 @@
 
 import path from "node:path";
 import process from "node:process";
-import { type Configuration as WebpackConfiguration } from "webpack";
-import { type Configuration as WebpackDevServerConfiguration } from "webpack-dev-server";
 import { ConsoleRemotePlugin } from "@openshift-console/dynamic-plugin-sdk-webpack";
 import CopyWebpackPlugin from "copy-webpack-plugin";
 import TsconfigPathsPlugin from "tsconfig-paths-webpack-plugin";
+import { type Configuration as WebpackConfiguration } from "webpack";
+import { type Configuration as WebpackDevServerConfiguration } from "webpack-dev-server";
 import { extensions, pluginMetadata } from "./dynamic-plugin.config.ts";
 
 interface Configuration extends WebpackConfiguration {
@@ -87,7 +87,7 @@ const config: Configuration = {
     },
     devMiddleware: {
       writeToDisk: true,
-    }
+    },
   },
   plugins: [
     new ConsoleRemotePlugin({
