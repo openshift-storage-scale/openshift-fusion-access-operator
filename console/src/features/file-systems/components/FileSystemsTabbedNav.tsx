@@ -12,7 +12,7 @@ export const FileSystemsTabbedNav: React.FC = () => {
   const pages: NavPage[] = useMemo(
     () => [
       {
-        name: t("File systems"),
+        name: t("File system claims"),
         href: "",
         component: FileSystemsTab,
       },

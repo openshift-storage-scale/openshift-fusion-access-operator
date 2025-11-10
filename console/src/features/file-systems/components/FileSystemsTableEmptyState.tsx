@@ -19,7 +19,7 @@ export const FileSystemsTableEmptyState: React.FC = () => {
 
   return (
     <EmptyState
-      titleText={t("No file systems")}
+      titleText={t("No file system claims")}
       headingLevel="h4"
       icon={FolderIcon}
     >

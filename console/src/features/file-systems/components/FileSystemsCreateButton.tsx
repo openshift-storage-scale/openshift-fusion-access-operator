@@ -38,7 +38,7 @@ export const FileSystemsCreateButton: React.FC<CreateFileSystemButtonProps> = (
         variant="primary"
         ref={tooltipRef}
       >
-        {t("Create file system")}
+        {t("Create file system claim")}
       </Button>
       {!isDaemonHealthy && (
         <Tooltip
