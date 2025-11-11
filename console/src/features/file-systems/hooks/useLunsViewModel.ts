@@ -46,7 +46,7 @@ export const useLunsViewModel = () => {
         type: "global/addAlert",
         payload: {
           title: t(
-            "Failed to load LocaVolumeDiscoveryResults for storage nodes",
+            "Failed to load LocalVolumeDiscoveryResults for storage nodes",
           ),
           description: storageNodesLvdrs.error.message,
           variant: "danger",
