@@ -1,5 +1,4 @@
 import {
-  type K8sResourceCommon,
   ResourceLink,
   type RowProps,
   TableData,
@@ -10,7 +9,6 @@ import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowVi
 import { useRoutes } from "../hooks/useRoutes";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
 import { FileSystemsStatus } from "./FileSystemsStatus";
-import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
 
 export type RowData = Pick<FileSystemsTableViewModel, "columns">;
 
@@ -67,18 +65,6 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         activeColumnIDs={activeColumnIDs}
         id={columns[3].id}
         className={columns[3].props.className}
-      >
-        <FileSystemStorageClasses
-          isNotAvailable={vm.status !== "ready"}
-          fileSystem={fileSystem}
-          storageClasses={vm.storageClasses.data}
-        />
-      </TableData>
-
-      <TableData
-        activeColumnIDs={activeColumnIDs}
-        id={columns[4].id}
-        className={columns[4].props.className}
       >
         <FileSystemsDashboardLink
           isNotAvailable={vm.status !== "ready"}

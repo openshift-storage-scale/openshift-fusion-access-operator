@@ -1,12 +1,8 @@
-import {
-  type K8sResourceCommon,
-  type TableColumn,
-} from "@openshift-console/dynamic-plugin-sdk";
+import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
 import { useWatchFileSystemClaim } from "@/shared/hooks/useWatchFileSystemClaim";
-import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 
 export const useFileSystemsTableViewModel = () => {
@@ -27,11 +23,6 @@ export const useFileSystemsTableViewModel = () => {
       {
         id: "raw-capacity",
         title: t("Raw capacity"),
-        props: { className: "pf-v6-u-w-10" },
-      },
-      {
-        id: "storage-class",
-        title: t("StorageClass"),
         props: { className: "pf-v6-u-w-10" },
       },
       {
