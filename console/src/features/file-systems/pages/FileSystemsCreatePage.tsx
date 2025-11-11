@@ -1,12 +1,12 @@
-import { StoreProvider, useStore } from "@/shared/store/provider";
-import { reducer, initialState } from "@/shared/store/reducer";
+import { Button, FormContextProvider, Split } from "@patternfly/react-core";
 import { ListPage } from "@/shared/components/ListPage";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { Button, FormContextProvider, Split } from "@patternfly/react-core";
-import type { State, Actions } from "@/shared/store/types";
+import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import { StoreProvider, useStore } from "@/shared/store/provider";
+import { initialState, reducer } from "@/shared/store/reducer";
+import type { Actions, State } from "@/shared/store/types";
 import { FileSystemCreateForm } from "../components/FileSystemCreateForm";
 import { FileSystemsCreateButton } from "../components/FileSystemsCreateButton";
-import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
 
 const FileSystemsCreate: React.FC = () => {
   return (
@@ -29,7 +29,7 @@ const ConnectedCreateFileSystems: React.FC = () => {
   const { t } = useFusionAccessTranslations();
 
   const redirectToFilesystemsHome = useRedirectHandler(
-    "/fusion-access/file-systems"
+    "/fusion-access/file-systems",
   );
 
   return (
@@ -37,7 +37,7 @@ const ConnectedCreateFileSystems: React.FC = () => {
       documentTitle={t("Fusion Access for SAN")}
       title={t("Create file system claim")}
       description={t(
-        "Create a file system claim to represent your required storage (based on the selected nodes’ storage)."
+        "Create a file system claim to represent your required storage (based on the selected nodes' storage).",
       )}
       alerts={store.alerts}
       footer={

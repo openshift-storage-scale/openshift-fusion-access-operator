@@ -32,9 +32,7 @@ export const FileSystemsDashboardLink: React.FC<
       icon={<ExternalLinkAltIcon />}
       iconPosition="end"
       isInline
-    >
-      {fileSystemName}
-    </Button>
+    />
   );
 };
 FileSystemsDashboardLink.displayName = "GpfsDashboardLink";

@@ -37,6 +37,7 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
             version: "v1alpha1",
             kind: "FileSystemClaim",
           }}
+          truncate
           name={vm.name}
           namespace="ibm-spectrum-scale"
         />

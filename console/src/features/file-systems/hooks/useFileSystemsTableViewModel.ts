@@ -36,8 +36,8 @@ export const useFileSystemsTableViewModel = () => {
       },
       {
         id: "dashboard-link",
-        title: t("Link to file system dashboard"),
-        props: { className: "pf-v6-u-w-10" },
+        title: t("Dashboard link"),
+        props: { className: "pf-v6-u-w-10 pf-v6-u-text-align-center" },
       },
     ],
     [t],

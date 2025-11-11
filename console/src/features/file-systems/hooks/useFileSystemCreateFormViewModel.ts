@@ -9,7 +9,7 @@ import { type Lun, useLunsViewModel } from "./useLunsViewModel";
 
 type OnSelect = NonNullable<NonNullable<ThProps["select"]>["onSelect"]>;
 
-const NAME_FIELD_MAX_LENGTH = 128;
+const NAME_FIELD_MAX_LENGTH = 63;
 const NAME_FIELD_VALIDATION_REGEX =
   /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
 

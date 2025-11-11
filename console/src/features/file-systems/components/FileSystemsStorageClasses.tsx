@@ -3,9 +3,9 @@ import {
   type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Stack, StackItem } from "@patternfly/react-core";
-import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
-import { getFileSystemStorageClasses } from "@/features/file-systems/utils/FileSystems";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
+import { getFileSystemStorageClasses } from "@/features/file-systems/utils/FileSystems";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 
 type FileSystemStorageClassesProps = {
   fileSystem: Filesystem;
@@ -35,6 +35,7 @@ export const FileSystemStorageClasses: React.FC<
               version: "v1",
               kind: "StorageClass",
             }}
+            truncate
             name={sc.metadata?.name}
           />
         </StackItem>
