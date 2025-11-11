@@ -1,11 +1,11 @@
-import { useMemo, useCallback, useEffect } from "react";
 import { useFormContext } from "@patternfly/react-core";
 import type { ThProps } from "@patternfly/react-table/dist/esm/components/Table/Th.d.ts";
+import { useCallback, useEffect, useMemo } from "react";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
+import type { Actions, State } from "@/shared/store/types";
 import { useCreateFileSystemHandler } from "./useCreateFileSystemHandler";
-import { useLunsViewModel, type Lun } from "./useLunsViewModel";
+import { type Lun, useLunsViewModel } from "./useLunsViewModel";
 
 type OnSelect = NonNullable<NonNullable<ThProps["select"]>["onSelect"]>;
 
@@ -23,7 +23,7 @@ export const useFileSystemCreateFormViewModel = () => {
         WWN: "WWN",
         CAPACITY: t("Capacity"),
       }) as const,
-    [t]
+    [t],
   );
 
   const [, dispatch] = useStore<State, Actions>();
@@ -41,26 +41,26 @@ export const useFileSystemCreateFormViewModel = () => {
       form.setValue("name", newName);
       form.setTouched("name", true);
     },
-    [form]
+    [form],
   );
 
   const handleSelectLun = useCallback<(lun: Lun) => OnSelect>(
     (lun) => (_, isSelecting) => {
       luns.setSelected(lun, isSelecting);
     },
-    [luns]
+    [luns],
   );
 
   const handleSelectAllLuns = useCallback<OnSelect>(
     (_, isSelecting) => {
       luns.setAllSelected(isSelecting);
     },
-    [luns]
+    [luns],
   );
 
   const handleCreateFileSystem = useCreateFileSystemHandler(
     fileSystemName,
-    luns
+    luns,
   );
 
   const handleSubmitForm = useCallback(
@@ -68,7 +68,7 @@ export const useFileSystemCreateFormViewModel = () => {
       e.preventDefault();
       handleCreateFileSystem();
     },
-    [handleCreateFileSystem]
+    [handleCreateFileSystem],
   );
 
   useEffect(() => {
@@ -82,17 +82,17 @@ export const useFileSystemCreateFormViewModel = () => {
           "name",
           t("Must contain at most {{NAME_FIELD_MAX_LENGTH}} characters", {
             NAME_FIELD_MAX_LENGTH,
-          })
-        );   
+          }),
+        );
         break;
       case !NAME_FIELD_VALIDATION_REGEX.test(fileSystemName):
         form.setError(
           "name",
           t("Must match the expression: {{NAME_FIELD_VALIDATION_REGEX}}", {
             NAME_FIELD_VALIDATION_REGEX,
-          })
+          }),
         );
-        break;      
+        break;
       default:
         form.setError("name", undefined);
     }
@@ -132,7 +132,7 @@ export const useFileSystemCreateFormViewModel = () => {
       handleSelectAllLuns,
       handleFileSystemNameChange,
       handleSubmitForm,
-    ]
+    ],
   );
 };
 

@@ -1,17 +1,17 @@
+import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 import convert from "convert";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useWatchLocalDisk } from "@/shared/hooks/useWatchLocalDisk";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
-import { useWatchLocalDisk } from "@/shared/hooks/useWatchLocalDisk";
-import type {
-  LocalVolumeDiscoveryResult,
-} from "@/shared/types/fusion-storage-openshift-io/v1alpha1/LocalVolumeDiscoveryResult";
+import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/LocalVolumeDiscoveryResult";
 import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
-import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
+import { useStorageNodesLvdrs } from "./useStorageNodesLvdrs";
 
-type DiscoveredDevice = NonNullable<NonNullable<LocalVolumeDiscoveryResult['status']>['discoveredDevices']>[number];
+type DiscoveredDevice = NonNullable<
+  NonNullable<LocalVolumeDiscoveryResult["status"]>["discoveredDevices"]
+>[number];
 
 export const useLunsViewModel = () => {
   const { t } = useFusionAccessTranslations();
@@ -46,7 +46,7 @@ export const useLunsViewModel = () => {
         type: "global/addAlert",
         payload: {
           title: t(
-            "Failed to load LocaVolumeDiscoveryResults for storage nodes"
+            "Failed to load LocaVolumeDiscoveryResults for storage nodes",
           ),
           description: storageNodesLvdrs.error.message,
           variant: "danger",
@@ -72,7 +72,7 @@ export const useLunsViewModel = () => {
 
     setLuns((currentLuns) => {
       const currentlySelectedLunsWwns = new Set(
-        currentLuns.filter((l) => l.isSelected).map((l) => l.wwn)
+        currentLuns.filter((l) => l.isSelected).map((l) => l.wwn),
       );
 
       return newLuns.map((lun) => ({
@@ -89,7 +89,7 @@ export const useLunsViewModel = () => {
 
   const isSelected = useCallback(
     (lun: Lun) => luns.find((l) => l.path === lun.path)?.isSelected ?? false,
-    [luns]
+    [luns],
   );
 
   const setSelected = useCallback((lun: Lun, isSelected: boolean) => {
@@ -128,7 +128,7 @@ export const useLunsViewModel = () => {
         setSelected,
         setAllSelected,
       }) as const,
-    [data, isSelected, loaded, setAllSelected, setSelected]
+    [data, isSelected, loaded, setAllSelected, setSelected],
   );
 };
 
@@ -164,7 +164,10 @@ export interface Lun {
 const outDevicesUsedByLocalDisks =
   (localDisks: LocalDisk[]) =>
   (dd: WithNodeName<DiscoveredDevice>): boolean =>
-    !localDisks.some((localDisk) => (localDisk.metadata as K8sResourceCommon['metadata'])?.name === dd.WWN);
+    !localDisks.some(
+      (localDisk) =>
+        (localDisk.metadata as K8sResourceCommon["metadata"])?.name === dd.WWN,
+    );
 
 /**
  * Transforms a discovered device entry (with nodeName) into a Lun object suitable to be displayed by the UI.
@@ -208,17 +211,17 @@ const toDiscoveredDeviceWithNodeName =
  * @returns An array of discovered devices, each augmented with the corresponding nodeName.
  */
 const makeDiscoveredDevicesWithNodeName = (
-  storageNodesLvdrs: LocalVolumeDiscoveryResult[]
+  storageNodesLvdrs: LocalVolumeDiscoveryResult[],
 ): WithNodeName<DiscoveredDevice>[] =>
   storageNodesLvdrs.flatMap((lvdr) =>
     (lvdr.status?.discoveredDevices ?? []).map(
-      toDiscoveredDeviceWithNodeName(lvdr)
-    )
+      toDiscoveredDeviceWithNodeName(lvdr),
+    ),
   );
 
 const makeLuns = (
   storageNodesLvdrs: LocalVolumeDiscoveryResult[],
-  localDisks: LocalDisk[]
+  localDisks: LocalDisk[],
 ) => {
   const ddsSharedByAllStorageNodes =
     getSharedDiscoveredDevicesRepresentatives(storageNodesLvdrs);
@@ -239,7 +242,7 @@ const makeLuns = (
  * @returns An array of WithNodeName<DiscoveredDevice> objects, each representing a device (by WWN) that is shared by all storage nodes.
  */
 const getSharedDiscoveredDevicesRepresentatives = (
-  storageNodesLvdrs: LocalVolumeDiscoveryResult[]
+  storageNodesLvdrs: LocalVolumeDiscoveryResult[],
 ) => {
   const discoveredDevicesWithNodeName =
     makeDiscoveredDevicesWithNodeName(storageNodesLvdrs);
@@ -247,12 +250,12 @@ const getSharedDiscoveredDevicesRepresentatives = (
   // Divide them into groups by WWN
   const groupedByWwns = Object.groupBy(
     discoveredDevicesWithNodeName,
-    (dd) => dd.WWN
+    (dd) => dd.WWN,
   );
 
   // Filter out the groups that are not shared by all storage nodes
   const onlySharedByAllStorageNodes = Object.entries(groupedByWwns).filter(
-    ([_, dds]) => Array.isArray(dds) && dds.length === storageNodesLvdrs.length
+    ([_, dds]) => Array.isArray(dds) && dds.length === storageNodesLvdrs.length,
   ) as [string, WithNodeName<DiscoveredDevice>[]][];
 
   // Pick a representative discovered device from each group

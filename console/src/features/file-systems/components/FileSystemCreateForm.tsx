@@ -1,14 +1,14 @@
 import {
-  Stack,
-  StackItem,
+  EmptyState,
   Form,
   FormGroup,
-  TextInput,
   FormHelperText,
   HelperText,
   HelperTextItem,
-  EmptyState,
   Spinner,
+  Stack,
+  StackItem,
+  TextInput,
 } from "@patternfly/react-core";
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
@@ -18,7 +18,6 @@ import { useFileSystemCreateFormViewModel } from "../hooks/useFileSystemCreateFo
 
 export const FileSystemCreateForm: React.FC = () => {
   const vm = useFileSystemCreateFormViewModel();
-
   const { t } = useFusionAccessTranslations();
 
   return (
@@ -61,7 +60,7 @@ export const FileSystemCreateForm: React.FC = () => {
             labelHelp={
               <HelpLabelIcon
                 popoverContent={t(
-                  "Select LUNs to designate the storage devices used in the file system."
+                  "Select LUNs to designate the storage devices used in the file system.",
                 )}
               />
             }

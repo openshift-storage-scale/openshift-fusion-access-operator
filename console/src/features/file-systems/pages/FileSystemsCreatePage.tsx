@@ -34,10 +34,10 @@ const ConnectedCreateFileSystems: React.FC = () => {
 
   return (
     <ListPage
-      documentTitle={t("Create file system")}
-      title={t("Create file system")}
+      documentTitle={t("Fusion Access for SAN")}
+      title={t("Create file system claim")}
       description={t(
-        "Create a file system to represent your required storage (based on the selected nodes’ storage)."
+        "Create a file system claim to represent your required storage (based on the selected nodes’ storage)."
       )}
       alerts={store.alerts}
       footer={

@@ -1,8 +1,8 @@
-import { useMemo } from "react";
 import {
   HorizontalNav,
   type NavPage,
 } from "@openshift-console/dynamic-plugin-sdk";
+import { useMemo } from "react";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { FileSystemsTab } from "./FileSystemsTab";
 
@@ -17,7 +17,7 @@ export const FileSystemsTabbedNav: React.FC = () => {
         component: FileSystemsTab,
       },
     ],
-    [t]
+    [t],
   );
 
   return <HorizontalNav pages={pages} />;

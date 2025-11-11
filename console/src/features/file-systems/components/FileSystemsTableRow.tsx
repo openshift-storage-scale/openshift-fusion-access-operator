@@ -1,46 +1,28 @@
-import { useMemo } from "react";
 import {
+  type K8sResourceCommon,
+  ResourceLink,
   type RowProps,
   TableData,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { Skeleton } from "@patternfly/react-core";
-import { KebabMenu, type KebabMenuProps } from "@/shared/components/KebabMenu";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import type { FileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { useFileSystemTableRowViewModel } from "../hooks/useFileSystemTableRowViewModel";
+import { useRoutes } from "../hooks/useRoutes";
 import { FileSystemsDashboardLink } from "./FileSystemsDashboardLink";
-import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
 import { FileSystemsStatus } from "./FileSystemsStatus";
+import { FileSystemStorageClasses } from "./FileSystemsStorageClasses";
 
-export type RowData = Pick<FileSystemsTableViewModel, "columns" | "routes"> &
-  Pick<FileSystemsTableViewModel["deleteModal"], "handleDelete">;
+export type RowData = Pick<FileSystemsTableViewModel, "columns">;
 
 type FileSystemsTabTableRowProps = RowProps<Filesystem, RowData>;
 
 export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
-  props
+  props,
 ) => {
   const { activeColumnIDs, obj: fileSystem, rowData } = props;
-
-  const { columns, handleDelete, routes } = rowData;
-
-  const vm = useFileSystemTableRowViewModel(fileSystem);
-
-  const { t } = useFusionAccessTranslations();
-
-  // TODO: Add actions column when we have actions to show (see conversation in https://issues.redhat.com/browse/OCPNAS-217)
-  // const kebabMenuActions = useMemo<KebabMenuProps["items"]>(
-  //   () => [
-  //     {
-  //       key: "delete",
-  //       onClick: handleDelete(fileSystem),
-  //       description: vm.isInUse ? <div>{t("Filesystem is in use")}</div> : null,
-  //       children: t("Delete"),
-  //     },
-  //   ],
-  //   [fileSystem, handleDelete, t, vm.isInUse]
-  // );
+  const { columns } = rowData;
+  const vm = useFileSystemTableRowViewModel(fileSystem!);
+  const routes = useRoutes();
 
   return (
     <>
@@ -49,7 +31,15 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
         id={columns[0].id}
         className={columns[0].props.className}
       >
-        {vm.name}
+        <ResourceLink
+          groupVersionKind={{
+            group: "fusion.storage.openshift.io",
+            version: "v1alpha1",
+            kind: "FileSystemClaim",
+          }}
+          name={vm.name}
+          namespace="ibm-spectrum-scale"
+        />
       </TableData>
 
       <TableData
@@ -95,21 +85,6 @@ export const FileSystemsTabTableRow: React.FC<FileSystemsTabTableRowProps> = (
           routes={routes.data}
         />
       </TableData>
-
-      {/* <TableData
-        activeColumnIDs={activeColumnIDs}
-        id={columns[5].id}
-        className={columns[5].props.className}
-      >
-        {!vm.persistentVolumeClaims.loaded ? (
-          <Skeleton screenreaderText={t("Loading actions")} />
-        ) : (
-          <KebabMenu
-            isDisabled={["deleting", "creating"].includes(vm.status)}
-            items={kebabMenuActions}
-          />
-        )}
-      </TableData> */}
     </>
   );
 };

@@ -1,31 +1,25 @@
 import { VirtualizedTable } from "@openshift-console/dynamic-plugin-sdk";
+import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
-import { FileSystemsDeleteModal } from "./FileSystemsDeleteModal";
+import { useFileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 import { FileSystemsTableEmptyState } from "./FileSystemsTableEmptyState";
 import { FileSystemsTabTableRow, type RowData } from "./FileSystemsTableRow";
-import { useFileSystemsTableViewModel } from "../hooks/useFileSystemsTableViewModel";
 
 export const FileSystemsTable: React.FC = () => {
   const vm = useFileSystemsTableViewModel();
-
-  const { columns, deleteModal, routes } = vm;
-
-  const { handleDelete } = deleteModal;
+  const { columns } = vm;
 
   return (
-    <>
-      <VirtualizedTable<Filesystem, RowData>
-        columns={vm.columns}
-        data={vm.fileSystems.data ?? []}
-        unfilteredData={vm.fileSystems.data ?? []}
-        loaded={vm.fileSystems.loaded}
-        loadError={vm.fileSystems.error}
-        EmptyMsg={FileSystemsTableEmptyState}
-        Row={FileSystemsTabTableRow}
-        rowData={{ columns, handleDelete, routes }}
-      />
-      <FileSystemsDeleteModal vm={vm.deleteModal} />
-    </>
+    <VirtualizedTable<Filesystem, RowData>
+      columns={vm.columns}
+      data={vm.fileSystems}
+      unfilteredData={vm.fileSystems}
+      loaded={vm.loaded}
+      loadError={vm.error}
+      EmptyMsg={FileSystemsTableEmptyState}
+      Row={FileSystemsTabTableRow}
+      rowData={{ columns }}
+    />
   );
 };
 FileSystemsTable.displayName = "FileSystemsTable";

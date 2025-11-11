@@ -1,51 +1,33 @@
-import { useCallback } from "react";
 import {
+  type K8sModel,
   k8sCreate,
   useK8sModel,
-  type K8sModel,
-  type K8sResourceCommon,
-  type StorageClass,
 } from "@openshift-console/dynamic-plugin-sdk";
-import { SC_PROVISIONER } from "@/constants";
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
-import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
-import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
+import { useCallback } from "react";
+import { SPECTRUM_SCALE_NAMESPACE } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import { useStore } from "@/shared/store/provider";
+import type { Actions, State } from "@/shared/store/types";
+import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { LunsViewModel } from "./useLunsViewModel";
-
-// TODO(jkilzi): Hard-coded for now, but must handle namespaces dynamically
-const NAMESPACE = "ibm-spectrum-scale";
 
 export const useCreateFileSystemHandler = (
   fileSystemName: string,
-  luns: LunsViewModel
+  luns: LunsViewModel,
 ) => {
   const [, dispatch] = useStore<State, Actions>();
 
   const { t } = useFusionAccessTranslations();
 
   const redirectToFileSystemsHome = useRedirectHandler(
-    "/fusion-access/file-systems"
+    "/fusion-access/file-systems",
   );
 
-  const [localDiskModel] = useK8sModel({
-    group: "scale.spectrum.ibm.com",
-    version: "v1beta1",
-    kind: "LocalDisk",
-  });
-
-  const [fileSystemModel] = useK8sModel({
-    group: "scale.spectrum.ibm.com",
-    version: "v1beta1",
-    kind: "Filesystem",
-  });
-
-  const [storageClassModel] = useK8sModel({
-    group: "storage.k8s.io",
-    version: "v1",
-    kind: "StorageClass",
+  const [fileSystemClaimModel] = useK8sModel({
+    group: "fusion.storage.openshift.io",
+    version: "v1alpha1",
+    kind: "FileSystemClaim",
   });
 
   return useCallback(async () => {
@@ -55,20 +37,12 @@ export const useCreateFileSystemHandler = (
         payload: { isLoading: true },
       });
 
-      const localDisks = await createLocalDisks(
-        luns,
-        localDiskModel,
-        NAMESPACE
-      );
-
-      await createFileSystem(
+      await createFileSystemClaim(
+        fileSystemClaimModel,
         fileSystemName,
-        localDisks,
-        fileSystemModel,
-        NAMESPACE
+        luns.data.map((l) => l.path),
+        SPECTRUM_SCALE_NAMESPACE,
       );
-
-      await createStorageClass(storageClassModel, fileSystemName);
 
       redirectToFileSystemsHome();
     } catch (e) {
@@ -89,87 +63,29 @@ export const useCreateFileSystemHandler = (
     }
   }, [
     dispatch,
-    fileSystemModel,
+    fileSystemClaimModel,
     fileSystemName,
-    localDiskModel,
     luns,
     redirectToFileSystemsHome,
-    storageClassModel,
     t,
   ]);
 };
 
-function createFileSystem(
+function createFileSystemClaim(
+  model: K8sModel,
   fileSystemName: string,
-  localDisks: LocalDisk[],
-  fileSystemModel: K8sModel,
-  namespace: string
-): Promise<Filesystem> {
-  return k8sCreate<Filesystem>({
-    model: fileSystemModel,
+  devices: string[],
+  namespace?: string,
+): Promise<FileSystemClaim> {
+  return k8sCreate<FileSystemClaim>({
+    model,
     data: {
-      apiVersion: "scale.spectrum.ibm.com/v1beta1",
-      kind: "FileSystem",
+      apiVersion: "fusion.storage.openshift.io/v1alpha1",
+      kind: "FileSystemClaim",
       metadata: { name: fileSystemName, namespace },
       spec: {
-        local: {
-          pools: [
-            {
-              disks: Array.from(
-                new Set(
-                  localDisks.map((ld) => (ld.metadata as K8sResourceCommon['metadata'])?.name).filter(Boolean)
-                )
-              ) as string[],
-            },
-          ],
-          replication: "1-way",
-          type: "shared",
-        },
+        devices,
       },
     },
   });
 }
-
-function createLocalDisks(
-  luns: LunsViewModel,
-  localDiskModel: K8sModel,
-  namespace: string
-) {
-  const promises: Promise<LocalDisk>[] = [];
-  const selectedLuns = luns.data.filter((l) => l.isSelected);
-  for (const selectedLun of selectedLuns) {
-    const promise = k8sCreate<LocalDisk>({
-      model: localDiskModel,
-      data: {
-        apiVersion: "scale.spectrum.ibm.com/v1beta1",
-        kind: "LocalDisk",
-        metadata: { name: selectedLun.wwn, namespace },
-        spec: {
-          device: selectedLun.path,
-          node: selectedLun.nodeName,
-        },
-      },
-    });
-    promises.push(promise);
-  }
-
-  return Promise.all(promises);
-}
-
-const createStorageClass = (scModel: K8sModel, fileSystemName: string) => {
-  return k8sCreate<StorageClass>({
-    model: scModel,
-    data: {
-      apiVersion: `${scModel.apiGroup}/${scModel.apiVersion}`,
-      kind: scModel.kind,
-      metadata: { name: fileSystemName },
-      provisioner: SC_PROVISIONER,
-      parameters: {
-        volBackendFs: fileSystemName,
-      },
-      reclaimPolicy: "Delete",
-      allowVolumeExpansion: true,
-      volumeBindingMode: "Immediate",
-    },
-  });
-};

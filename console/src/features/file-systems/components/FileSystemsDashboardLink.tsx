@@ -1,9 +1,9 @@
+import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 import { Button } from "@patternfly/react-core";
 import { ExternalLinkAltIcon } from "@patternfly/react-icons";
 import { VALUE_NOT_AVAILABLE } from "@/constants";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import type { Route } from "../types/Route";
-import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 
 type FileSystemsDashboardLinkProps = {
   fileSystem: Filesystem;
@@ -18,7 +18,8 @@ export const FileSystemsDashboardLink: React.FC<
     return <span className="text-secondary">{VALUE_NOT_AVAILABLE}</span>;
   }
 
-  const fileSystemName = (fileSystem.metadata as K8sResourceCommon['metadata'])?.name ?? "";
+  const fileSystemName =
+    (fileSystem.metadata as K8sResourceCommon["metadata"])?.name ?? "";
   const { host } = routes[0].spec;
 
   return (

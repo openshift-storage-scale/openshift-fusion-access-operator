@@ -1,18 +1,18 @@
-import { useMemo } from "react";
 import {
+  type ColoredIconProps,
   GreenCheckCircleIcon,
-  YellowExclamationTriangleIcon,
   RedExclamationCircleIcon,
   type StorageClass,
-  type ColoredIconProps,
+  YellowExclamationTriangleIcon,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import type { SVGIconProps } from "@patternfly/react-icons/dist/esm/createIcon";
+import { useMemo } from "react";
+import { VALUE_NOT_AVAILABLE } from "@/constants";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { getName } from "@/shared/utils/console/K8sResourceCommon";
-import { VALUE_NOT_AVAILABLE } from "@/constants";
-import type { IoK8sApiCoreV1PersistentVolumeClaim } from "@/shared/types/kubernetes/1.30/types";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 import { getFileSystemStorageClasses } from "../utils/FileSystems";
 
@@ -46,7 +46,7 @@ export const useFileSystemTableRowViewModel = (fileSystem: Filesystem) => {
       rawCapacity:
         fileSystem.status?.pools?.[0].totalDiskSize ?? VALUE_NOT_AVAILABLE,
     }),
-    [fileSystem]
+    [fileSystem],
   );
 
   const isInUse = useMemo<boolean>(
@@ -54,19 +54,19 @@ export const useFileSystemTableRowViewModel = (fileSystem: Filesystem) => {
       isFilesystemInUse(
         fileSystem,
         storageClasses.data ?? [],
-        persistentVolumeClaims.data ?? []
+        persistentVolumeClaims.data ?? [],
       ),
-    [fileSystem, persistentVolumeClaims.data, storageClasses.data]
+    [fileSystem, persistentVolumeClaims.data, storageClasses.data],
   );
 
   const hasDeletionTimestamp = Object.hasOwn(
     fileSystem.metadata ?? {},
-    "deletionTimestamp"
+    "deletionTimestamp",
   );
 
   const conditions = useMemo(
     () => fileSystem.status?.conditions ?? [],
-    [fileSystem.status?.conditions]
+    [fileSystem.status?.conditions],
   );
 
   const { description, status, title, Icon } = useMemo<{
@@ -188,7 +188,7 @@ export const useFileSystemTableRowViewModel = (fileSystem: Filesystem) => {
       status,
       storageClasses,
       title,
-    ]
+    ],
   );
 };
 
@@ -199,13 +199,13 @@ export type FileSystemTableRowViewModel = ReturnType<
 export const isFilesystemInUse = (
   fileSystem: Filesystem,
   scs: StorageClass[],
-  pvcs: IoK8sApiCoreV1PersistentVolumeClaim[]
+  pvcs: IoK8sApiCoreV1PersistentVolumeClaim[],
 ) => {
   const fsScs = getFileSystemStorageClasses(fileSystem, scs).map(
-    (sc) => sc.metadata?.name
+    (sc) => sc.metadata?.name,
   );
   return pvcs.some(
     (pvc) =>
-      pvc.spec?.storageClassName && fsScs.includes(pvc.spec?.storageClassName)
+      pvc.spec?.storageClassName && fsScs.includes(pvc.spec?.storageClassName),
   );
 };

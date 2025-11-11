@@ -1,10 +1,13 @@
+import {
+  type K8sResourceCommon,
+  type TableColumn,
+} from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
-import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
-import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useWatchFileSystem } from "@/shared/hooks/useWatchFileSystem";
-import { useDeleteModal } from "./useDeleteModal";
-import { useRoutes } from "./useRoutes";
+import { useWatchFileSystemClaim } from "@/shared/hooks/useWatchFileSystemClaim";
+import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
+import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 
 export const useFileSystemsTableViewModel = () => {
   const { t } = useFusionAccessTranslations();
@@ -36,31 +39,23 @@ export const useFileSystemsTableViewModel = () => {
         title: t("Link to file system dashboard"),
         props: { className: "pf-v6-u-w-10" },
       },
-      // TODO: Add actions column when we have actions to show (see conversation in https://issues.redhat.com/browse/OCPNAS-217)
-      // {
-      //   id: "actions",
-      //   title: "",
-      //   props: { className: "pf-v6-c-table__action" },
-      // },
     ],
-    [t]
+    [t],
   );
 
-  const deleteModal = useDeleteModal();
-
-  const fileSystems = useWatchFileSystem();
-
-  const routes = useRoutes();
+  const fileSystemClaimsResult = useWatchFileSystemClaim();
+  const fileSystemsResult = useWatchFileSystem();
 
   return useMemo(
     () =>
       ({
         columns,
-        deleteModal,
-        fileSystems,
-        routes,
+        loaded: fileSystemClaimsResult.loaded && fileSystemsResult.loaded,
+        error: fileSystemClaimsResult.error || fileSystemsResult.error,
+        fileSystems: fileSystemsResult.data ?? [],
+        fileSystemClaims: fileSystemClaimsResult.data ?? [],
       }) as const,
-    [columns, deleteModal, fileSystems, routes]
+    [columns, fileSystemClaimsResult, fileSystemsResult],
   );
 };
 

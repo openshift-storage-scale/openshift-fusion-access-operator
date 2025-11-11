@@ -17,3 +17,5 @@ export const MASTER_NODE_ROLE_LABEL = "node-role.kubernetes.io/master=";
 export const CPLANE_NODE_ROLE_LABEL = "node-role.kubernetes.io/control-plane=";
 export const FS_ALLOW_DELETE_LABEL = "scale.spectrum.ibm.com/allowDelete";
 export const SC_PROVISIONER = "spectrumscale.csi.ibm.com";
+export const FUSION_ACCESS_NAMESPACE = "ibm-fusion-access";
+export const SPECTRUM_SCALE_NAMESPACE = "ibm-spectrum-scale";

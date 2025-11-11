@@ -1,18 +1,19 @@
 import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
-import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
+import { FUSION_ACCESS_NAMESPACE } from "@/constants";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
+import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 
-export const useWatchFusionAccess = (
+export const useWatchFileSystemClaim = (
   options: Omit<
     WatchK8sResource,
     "groupVersionKind" | "namespaced" | "namespace" | "limit" | "isList"
-  > = {}
+  > = {},
 ) =>
   useNormalizedK8sWatchResource<FileSystemClaim>({
     ...options,
-    isList: false,
+    isList: true,
     namespaced: true,
-    namespace: "ibm-fusion-access",
+    namespace: FUSION_ACCESS_NAMESPACE,
     groupVersionKind: {
       group: "fusion.storage.openshift.io",
       version: "v1alpha1",
