@@ -40,7 +40,7 @@ export const useCreateFileSystemHandler = (
       await createFileSystemClaim(
         fileSystemClaimModel,
         fileSystemName,
-        luns.data.map((l) => l.path),
+        luns.data.filter((l) => l.isSelected).map((l) => l.path),
         SPECTRUM_SCALE_NAMESPACE,
       );
 
