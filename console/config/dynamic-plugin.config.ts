@@ -1,10 +1,10 @@
 import { type EncodedExtension } from "@openshift/dynamic-plugin-sdk-webpack";
 import { type ConsolePluginBuildMetadata } from "@openshift-console/dynamic-plugin-sdk-webpack";
-import packageJson from "../package.json";
+import pkg from "../package.json" with { type: "json" };
 
 export const pluginMetadata: ConsolePluginBuildMetadata = {
-  name: packageJson.name,
-  version: packageJson.version,
+  name: pkg.name,
+  version: pkg.version,
   displayName: "Fusion Access Plugin",
   exposedModules: {
     FusionAccessHomeScreen:
@@ -28,7 +28,7 @@ export const extensions: EncodedExtension[] = [
     type: "console.navigation/href",
     properties: {
       id: "main",
-      name: `%plugin__${packageJson.name}~Fusion Access for SAN%`,
+      name: `%plugin__${pkg.name}~Fusion Access for SAN%`,
       href: "/fusion-access",
       perspective: "admin",
       section: "storage",
