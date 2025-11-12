@@ -20,14 +20,15 @@ export const FileSystemsStatus: React.FC<FileSystemStatusProps> = (props) => {
         bodyContent={
           message.startsWith("<bold>WARNING:</bold>") ? (
             <Trans
-              defaults={message}
               values={{ label: FS_ALLOW_DELETE_LABEL, fileSystemName }}
               components={{
                 bold: <strong />,
                 label: <strong />,
                 FileSystemNameLink: <FileSystemNameLink />,
               }}
-            />
+            >
+              {message}
+            </Trans>
           ) : (
             <span>{message}</span>
           )

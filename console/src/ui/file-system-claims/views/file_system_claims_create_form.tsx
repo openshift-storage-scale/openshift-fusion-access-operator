@@ -26,7 +26,7 @@ export const FileSystemClaimsCreateForm: React.FC<{ formId: string }> = ({
     <Stack hasGutter>
       <StackItem isFilled>
         <Form isWidthLimited id={formId} onSubmit={vm.handleSubmitForm}>
-          <FormGroup isRequired label={t("File system name")} fieldId="name">
+          <FormGroup isRequired label={t("File system claim name")} fieldId="name">
             <TextInput
               type="text"
               id="name"
