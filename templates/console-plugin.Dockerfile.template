@@ -6,7 +6,7 @@ WORKDIR /opt/app-root/src
 COPY console/ .
 # replace version in package.json
 RUN sed -r -i "s|\"version\": \"0.0.1\"|\"version\": \"${VERSION}\"|;" ./package.json
-RUN npm ci --ignore-scripts && npm run build
+RUN npm ci --ignore-scripts --loglevel=silly && npm run build
 RUN mkdir licenses
 COPY LICENSE licenses/
 
