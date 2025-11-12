@@ -2,11 +2,13 @@ import { useCallback } from "react";
 import { useHistory } from "react-router";
 
 export const UrlPaths = {
-  FusionAccessHome: "/fusion-access",
+  FusionAccessHomeScreen: "/fusion-access",
   StorageClusterHome: "/fusion-access/storage-cluster",
   StorageClusterCreate: "/fusion-access/storage-cluster/create",
   FileSystemsHome: "/fusion-access/file-systems",
   FileSystemsCreate: "/fusion-access/file-systems/create",
+  FileSystemClaimsHome: "/fusion-access/file-system-claims",
+  FileSystemClaimsCreate: "/fusion-access/file-system-claims/create",
 } as const;
 
 type UrlPathsKeys = keyof typeof UrlPaths;

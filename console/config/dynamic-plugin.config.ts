@@ -7,13 +7,16 @@ export const pluginMetadata: ConsolePluginBuildMetadata = {
   version: packageJson.version,
   displayName: "Fusion Access Plugin",
   exposedModules: {
-    FusionAccessHomePage: "./features/fusion-access/pages/FusionAccessHomePage.tsx",
+    FusionAccessHomeScreen:
+      "./ui/fusion-access/views/fusion_access_home_screen.tsx",
     StorageClusterHomePage:
       "./features/storage-clusters/pages/StorageClusterHomePage.tsx",
     StorageClusterCreatePage:
       "./features/storage-clusters/pages/StorageClusterCreatePage.tsx",
-    FileSystemsHomePage: "./features/file-systems/pages/FileSystemsHomePage.tsx",
-    FileSystemsCreatePage: "./features/file-systems/pages/FileSystemsCreatePage.tsx",
+    FileSystemClaimsHomeScreen:
+      "./ui/file-system-claims/views/file_system_claims_home_screen.tsx",
+    FileSystemClaimsCreateScreen:
+      "./ui/file-system-claims/views/file_system_claims_create_screen.tsx",
   },
   dependencies: {
     "@console/pluginAPI": ">=4.18.0-0",
@@ -37,7 +40,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access",
-      component: { $codeRef: "FusionAccessHomePage" },
+      component: { $codeRef: "FusionAccessHomeScreen" },
     },
   },
   {
@@ -60,16 +63,16 @@ export const extensions: EncodedExtension[] = [
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/file-systems/*",
-      component: { $codeRef: "FileSystemsHomePage" },
+      path: "/fusion-access/file-system-claims/*",
+      component: { $codeRef: "FileSystemClaimsHomeScreen" },
     },
   },
   {
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/file-systems/create",
-      component: { $codeRef: "FileSystemsCreatePage" },
+      path: "/fusion-access/file-system-claims/create",
+      component: { $codeRef: "FileSystemClaimsCreateScreen" },
     },
   },
 ];

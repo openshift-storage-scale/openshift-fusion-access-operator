@@ -55,7 +55,7 @@ const ConnectedStorageClusterHomePage: React.FC = () => {
             onCreateStorageCluster={redirectToCreateStorageCluster}
           />
         ) : (
-          <Redirect to={UrlPaths.FileSystemsHome} />
+          <Redirect to={UrlPaths.FileSystemClaimsHome} />
         )}
       </Async>
     </ListPage>

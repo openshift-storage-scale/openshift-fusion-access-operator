@@ -1,11 +1,11 @@
-import { useCallback } from "react";
 import { k8sCreate, useK8sModel } from "@openshift-console/dynamic-plugin-sdk";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import type { Cluster } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Cluster";
+import { useCallback } from "react";
 import { STORAGE_ROLE_LABEL } from "@/constants";
-import { useStore } from "@/shared/store/provider";
-import type { State, Actions } from "@/shared/store/types";
+import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
 import { useRedirectHandler } from "@/shared/hooks/useRedirectHandler";
+import { useStore } from "@/shared/store/provider";
+import type { Actions, State } from "@/shared/store/types";
+import type { Cluster } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Cluster";
 
 const [storageRoleLabelKey, storageRoleLabelValue] =
   STORAGE_ROLE_LABEL.split("=");
@@ -22,8 +22,8 @@ export const useCreateStorageClusterHandler = () => {
     kind: "Cluster",
   });
 
-  const redirectToFileSystemsHome = useRedirectHandler(
-    "/fusion-access/file-systems"
+  const redirectToFileSystemClaimsHome = useRedirectHandler(
+    "/fusion-access/file-system-claims",
   );
 
   return useCallback(async () => {
@@ -49,7 +49,7 @@ export const useCreateStorageClusterHandler = () => {
           },
         },
       });
-      redirectToFileSystemsHome();
+      redirectToFileSystemClaimsHome();
     } catch (e) {
       const description = e instanceof Error ? e.message : (e as string);
       dispatch({
@@ -65,5 +65,5 @@ export const useCreateStorageClusterHandler = () => {
       type: "global/updateCta",
       payload: { isLoading: false },
     });
-  }, [dispatch, redirectToFileSystemsHome, storageScaleClusterModel, t]);
+  }, [dispatch, redirectToFileSystemClaimsHome, storageScaleClusterModel, t]);
 };

@@ -1,4 +1,5 @@
 import { type WatchK8sResource } from "@openshift-console/dynamic-plugin-sdk";
+import { groupVersionKind } from "@/data/models/file_system_gvk";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
 
@@ -12,9 +13,5 @@ export const useWatchFileSystem = (
     ...options,
     isList: true,
     namespaced: true,
-    groupVersionKind: {
-      group: "scale.spectrum.ibm.com",
-      version: "v1beta1",
-      kind: "Filesystem",
-    },
+    groupVersionKind,
   });

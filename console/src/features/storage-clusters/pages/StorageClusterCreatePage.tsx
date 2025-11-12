@@ -24,7 +24,7 @@ const StorageClusterCreate: React.FC = () => {
       <ConnectedStorageClusterCreate />
     </StoreProvider>
   ) : (
-    <Redirect to={UrlPaths.FileSystemsHome} />
+    <Redirect to={UrlPaths.FileSystemClaimsHome} />
   );
 };
 StorageClusterCreate.displayName = "StorageClusterCreate";
