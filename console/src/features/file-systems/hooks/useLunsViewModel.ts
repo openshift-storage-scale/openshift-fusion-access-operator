@@ -31,8 +31,6 @@ export const useLunsViewModel = () => {
           dismiss: () => dispatch({ type: "global/dismissAlert" }),
         },
       });
-    } else {
-      // TODO: Handle auto-dismiss when error is gone.
     }
   }, [dispatch, localDisks.error, t]);
 
