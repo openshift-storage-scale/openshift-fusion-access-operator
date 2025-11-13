@@ -6,29 +6,22 @@ import {
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import { useMemo } from "react";
 import { SPECTRUM_SCALE_NAMESPACE, VALUE_NOT_AVAILABLE } from "@/constants";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useFileSystemsRepository } from "@/data/repositories/use_file_systems_repository";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
-import { getName } from "@/shared/utils/console/K8sResourceCommon";
-import { useNormalizedK8sWatchResource } from "@/shared/utils/console/UseK8sWatchResource";
+import { getName } from "@/shared/utils/k8s_resource_common";
+import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsTableRowViewModel = (
   fileSystemClaim: FileSystemClaim,
 ) => {
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
   const fileSystemName = getName(fileSystemClaim)!;
-  const fileSystems = useNormalizedK8sWatchResource<Filesystem>({
-    isList: true,
+  const fileSystemsRepository = useFileSystemsRepository({
     name: fileSystemName,
-    namespaced: true,
     namespace: SPECTRUM_SCALE_NAMESPACE,
-    groupVersionKind: {
-      group: "scale.spectrum.ibm.com",
-      version: "v1beta1",
-      kind: "Filesystem",
-    },
   });
-  const fileSystem = fileSystems.data?.[0];
+  const fileSystem = fileSystemsRepository.fileSystems[0];
   const rawCapacity =
     fileSystem?.status?.pools?.[0].totalDiskSize ?? VALUE_NOT_AVAILABLE;
   const fileSystemClaimConditions = fileSystemClaim.status?.conditions ?? [];

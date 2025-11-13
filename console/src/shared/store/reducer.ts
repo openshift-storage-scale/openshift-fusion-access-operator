@@ -1,6 +1,6 @@
 import { enableMapSet } from "immer";
 import type { ImmerReducer } from "use-immer";
-import { t } from "@/shared/hooks/useFusionAccessTranslations";
+import { t } from "@/ui/services/use_localization_service";
 import type { Actions, State } from "./types";
 
 enableMapSet(); // Enables Map and Set support in immer
@@ -16,7 +16,7 @@ export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
         // If the alert for minimum shared disks and nodes already exists,
         // we don't add it again, but we update the existing one.
         const existingAlertIndex = draft.alerts.findIndex(
-          (a) => a.key === "minimum-shared-disks-and-nodes"
+          (a) => a.key === "minimum-shared-disks-and-nodes",
         );
 
         if (existingAlertIndex === -1) {
@@ -45,7 +45,7 @@ export const reducer: ImmerReducer<State, Actions> = (draft, action) => {
       break;
     default:
       throw new Error(
-        `Unhandled action type: ${(action as { type: string }).type}. Please check the reducer.`
+        `Unhandled action type: ${(action as { type: string }).type}. Please check the reducer.`,
       );
   }
 };

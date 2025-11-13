@@ -1,4 +1,3 @@
-import { useState, useCallback } from "react";
 import {
   Dropdown,
   DropdownItem,
@@ -12,6 +11,7 @@ import type {
   MenuToggleProps,
 } from "@patternfly/react-core/dist/esm/components/MenuToggle/MenuToggle.d.ts";
 import { EllipsisVIcon } from "@patternfly/react-icons";
+import { useCallback, useState } from "react";
 
 export interface KebabMenuProps {
   isDisabled?: boolean;
@@ -51,7 +51,7 @@ export const KebabMenu: React.FC<KebabMenuProps> = (props) => {
         icon={<EllipsisVIcon />}
       />
     ),
-    [handleClickMenuToggle, isDisabled, isOpen]
+    [handleClickMenuToggle, isDisabled, isOpen],
   );
 
   return (

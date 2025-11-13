@@ -1,13 +1,12 @@
 import { EmptyState, EmptyStateBody, Spinner } from "@patternfly/react-core";
-import { useFusionAccessTranslations } from "../hooks/useFusionAccessTranslations";
-
+import { useLocalizationService } from "../../ui/services/use_localization_service";
 
 export const DefaultLoadingFallback: React.FC = () => {
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
 
   const title = t("Loading resources...");
   const description = t(
-    "You will be able to continue once the resources are loaded"
+    "You will be able to continue once the resources are loaded",
   );
 
   return (

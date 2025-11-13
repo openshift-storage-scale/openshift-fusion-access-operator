@@ -1,32 +1,35 @@
-import { useEffect, useRef, useState } from "react";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchDaemon } from "@/shared/hooks/useWatchDaemon";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useDaemonsRepository } from "@/data/repositories/use_daemons_repository";
+import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsCreateButtonViewModel = () => {
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
   const tooltipRef = useRef<HTMLButtonElement>(null);
   const [isDaemonHealthy, setIsDaemonHealthy] = useState(false);
-  const daemon = useWatchDaemon();
+  const daemonsRepository = useDaemonsRepository();
 
   useEffect(() => {
-    if (daemon.loaded && Array.isArray(daemon.data) && daemon.data.length > 0) {
-      const [daemonData] = daemon.data;
-      const daemonStatus = daemonData.status?.conditions?.find(
+    if (daemonsRepository.loaded && daemonsRepository.daemons.length > 0) {
+      const [daemon] = daemonsRepository.daemons;
+      const daemonStatus = daemon.status?.conditions?.find(
         (condition) =>
           condition.type == "Healthy" && condition.status === "True",
       );
 
       setIsDaemonHealthy(typeof daemonStatus !== "undefined");
     }
-  }, [daemon.loaded, daemon.data]);
+  }, [daemonsRepository.daemons, daemonsRepository.loaded]);
 
-  return {
-    text: t("Create file system claim"),
-    tooltip: {
-      id: "create-file-system-claim-tooltip",
-      content: t("Fusion Access for SAN infrastructure is not ready"),
-      ref: tooltipRef,
-    },
-    isDaemonHealthy,
-  };
+  return useMemo(
+    () => ({
+      text: t("Create file system claim"),
+      tooltip: {
+        id: "create-file-system-claim-tooltip",
+        content: t("Fusion Access for SAN infrastructure is not ready"),
+        ref: tooltipRef,
+      },
+      isDaemonHealthy,
+    }),
+    [t, isDaemonHealthy],
+  );
 };

@@ -9,10 +9,10 @@ export const pluginMetadata: ConsolePluginBuildMetadata = {
   exposedModules: {
     FusionAccessHomeScreen:
       "./ui/fusion-access/views/fusion_access_home_screen.tsx",
-    StorageClusterHomePage:
-      "./features/storage-clusters/pages/StorageClusterHomePage.tsx",
-    StorageClusterCreatePage:
-      "./features/storage-clusters/pages/StorageClusterCreatePage.tsx",
+    StorageClustersHomeScreen:
+      "./ui/storage-clusters/views/storage_clusters_home_screen.tsx",
+    StorageClustersCreateScreen:
+      "./ui/storage-clusters/views/storage_clusters_create_screen.tsx",
     FileSystemClaimsHomeScreen:
       "./ui/file-system-claims/views/file_system_claims_home_screen.tsx",
     FileSystemClaimsCreateScreen:
@@ -48,7 +48,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/storage-cluster/*",
-      component: { $codeRef: "StorageClusterHomePage" },
+      component: { $codeRef: "StorageClustersHomeScreen" },
     },
   },
   {
@@ -56,7 +56,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/storage-cluster/create",
-      component: { $codeRef: "StorageClusterCreatePage" },
+      component: { $codeRef: "StorageClustersCreateScreen" },
     },
   },
   {

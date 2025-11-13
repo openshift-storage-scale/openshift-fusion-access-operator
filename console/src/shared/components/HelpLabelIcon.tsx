@@ -1,7 +1,7 @@
-import { memo } from "react";
-import { HelpIcon } from "@patternfly/react-icons";
 import { Popover } from "@patternfly/react-core";
 import type { PopoverProps } from "@patternfly/react-core/dist/js/components/Popover";
+import { HelpIcon } from "@patternfly/react-icons";
+import { memo } from "react";
 
 interface HelpLabelIconProps {
   popoverContent: PopoverProps["bodyContent"];

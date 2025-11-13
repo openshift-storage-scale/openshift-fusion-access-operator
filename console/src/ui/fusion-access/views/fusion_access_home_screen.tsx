@@ -1,40 +1,15 @@
-import { useMemo } from "react";
 import { Redirect } from "react-router";
 import { Async } from "@/shared/components/Async";
 import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
 import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 import { ListPage } from "@/shared/components/ListPage";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
-import { useWatchFusionAccess } from "@/shared/hooks/useWatchFusionAccess";
-import { useWatchStorageCluster } from "@/shared/hooks/useWatchStorageCluster";
+import { UrlPaths } from "@/shared/utils/use_redirect_handler";
+import { useLocalizationService } from "@/ui/services/use_localization_service";
+import { useFusionAccessHomeScreenViewModel } from "../view-models/use_fusion_access_home_screen_view_model";
 
 const FusionAccessHomeScreen: React.FC = () => {
-  const { t } = useFusionAccessTranslations();
-
-  const fusionAccess = useWatchFusionAccess();
-
-  const storageClusters = useWatchStorageCluster({
-    limit: 1,
-  });
-
-  const fusionAccessStatus = useMemo(
-    () => fusionAccess.data?.status?.status,
-    [fusionAccess.data?.status?.status],
-  );
-
-  const loaded = useMemo(
-    () =>
-      fusionAccess.loaded &&
-      storageClusters.loaded &&
-      fusionAccessStatus === "Ready",
-    [fusionAccess.loaded, fusionAccessStatus, storageClusters.loaded],
-  );
-
-  const error = useMemo(
-    () => fusionAccess.error || storageClusters.error,
-    [fusionAccess.error, storageClusters.error],
-  );
+  const { t } = useLocalizationService();
+  const vm = useFusionAccessHomeScreenViewModel();
 
   return (
     <ListPage
@@ -42,13 +17,13 @@ const FusionAccessHomeScreen: React.FC = () => {
       title={t("Fusion Access for SAN")}
     >
       <Async
-        loaded={loaded}
-        error={error}
+        loaded={vm.loaded}
+        error={vm.error}
         renderErrorFallback={DefaultErrorFallback}
         renderLoadingFallback={DefaultLoadingFallback}
       >
-        {(storageClusters.data ?? []).length === 0 ? (
-          <Redirect to={UrlPaths.StorageClusterHome} />
+        {vm.hasStorageClusterNotBeenCreated ? (
+          <Redirect to={UrlPaths.StorageClustersHome} />
         ) : (
           <Redirect to={UrlPaths.FileSystemClaimsHome} />
         )}

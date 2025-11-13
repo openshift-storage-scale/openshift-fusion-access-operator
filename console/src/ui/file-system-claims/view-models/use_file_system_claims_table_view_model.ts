@@ -1,11 +1,11 @@
 import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
-import { useWatchFileSystemClaim } from "@/shared/hooks/useWatchFileSystemClaim";
+import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
+import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsTableViewModel = () => {
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
 
   const columns: TableColumn<FileSystemClaim>[] = useMemo(
     () => [
@@ -30,16 +30,16 @@ export const useFileSystemClaimsTableViewModel = () => {
     [t],
   );
 
-  const fileSystemClaimsResult = useWatchFileSystemClaim();
+  const fileSystemClaimsRepository = useFileSystemClaimsRepository();
 
   return useMemo(
     () =>
       ({
         columns,
-        loaded: fileSystemClaimsResult.loaded,
-        error: fileSystemClaimsResult.error,
-        fileSystemClaims: fileSystemClaimsResult.data ?? [],
+        loaded: fileSystemClaimsRepository.loaded,
+        error: fileSystemClaimsRepository.error,
+        fileSystemClaims: fileSystemClaimsRepository.fileSystemClaims,
       }) as const,
-    [columns, fileSystemClaimsResult],
+    [columns, fileSystemClaimsRepository],
   );
 };

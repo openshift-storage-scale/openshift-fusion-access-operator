@@ -1,10 +1,9 @@
 import { HorizontalNav } from "@openshift-console/dynamic-plugin-sdk";
-import { Redirect } from "react-router";
+import { useEffect } from "react";
 import { Async } from "@/shared/components/Async";
 import { DefaultErrorFallback } from "@/shared/components/DefaultErrorFallback";
 import { DefaultLoadingFallback } from "@/shared/components/DefaultLoadingFallback";
 import { ListPage } from "@/shared/components/ListPage";
-import { UrlPaths } from "@/shared/hooks/useRedirectHandler";
 import { StoreProvider } from "@/shared/store/provider";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { Actions, State } from "@/shared/store/types";
@@ -13,10 +12,6 @@ import { FileSystemClaimsCreateButton } from "./file_system_claims_create_button
 
 const ConnectedFileSystemClaimsHomeScreen: React.FC = () => {
   const vm = useFileSystemClaimsHomeScreenViewModel();
-
-  if (vm.storageClusterHasNotBeenCreated) {
-    return <Redirect to={UrlPaths.StorageClusterHome} />;
-  }
 
   return (
     <ListPage

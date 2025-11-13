@@ -13,20 +13,24 @@ import {
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
-import { useFusionAccessTranslations } from "@/shared/hooks/useFusionAccessTranslations";
+import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { useFileSystemClaimsCreateFormViewModel } from "../view-models/use_file_system_claims_create_form_view_model";
 
 export const FileSystemClaimsCreateForm: React.FC<{ formId: string }> = ({
   formId,
 }) => {
   const vm = useFileSystemClaimsCreateFormViewModel();
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
 
   return (
     <Stack hasGutter>
       <StackItem isFilled>
         <Form isWidthLimited id={formId} onSubmit={vm.handleSubmitForm}>
-          <FormGroup isRequired label={t("File system claim name")} fieldId="name">
+          <FormGroup
+            isRequired
+            label={t("File system claim name")}
+            fieldId="name"
+          >
             <TextInput
               type="text"
               id="name"

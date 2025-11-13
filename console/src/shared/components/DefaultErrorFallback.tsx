@@ -1,20 +1,20 @@
 import {
   Button,
   EmptyState,
+  EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
-  EmptyStateActions,
 } from "@patternfly/react-core";
 import { type ButtonProps } from "@patternfly/react-core/dist/js/components/Button/Button";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { useFusionAccessTranslations } from "../hooks/useFusionAccessTranslations";
+import { useLocalizationService } from "../../ui/services/use_localization_service";
 
 interface DefaultErrorFallback {
   error: Error | null;
 }
 
 export const DefaultErrorFallback: React.FC<DefaultErrorFallback> = (props) => {
-  const { t } = useFusionAccessTranslations();
+  const { t } = useLocalizationService();
 
   const { error } = props;
 
@@ -23,7 +23,11 @@ export const DefaultErrorFallback: React.FC<DefaultErrorFallback> = (props) => {
   const actions: Array<
     Pick<ButtonProps, "onClick" | "variant"> & { text: string }
   > = [
-    { variant: "link", onClick: () => window.location.reload(), text: t("Refresh") },
+    {
+      variant: "link",
+      onClick: () => window.location.reload(),
+      text: t("Refresh"),
+    },
   ];
 
   return (

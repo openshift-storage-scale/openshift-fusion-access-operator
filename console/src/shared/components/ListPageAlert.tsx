@@ -1,11 +1,11 @@
-import type { AlertProps } from "@patternfly/react-core/dist/esm/components/Alert/Alert";
 import {
-  AlertGroup,
   Alert,
   AlertActionCloseButton,
+  AlertGroup,
   List,
   ListItem,
 } from "@patternfly/react-core";
+import type { AlertProps } from "@patternfly/react-core/dist/esm/components/Alert/Alert";
 
 export interface Alert extends Pick<AlertProps, "key" | "variant" | "title"> {
   description?: string | string[];
