@@ -2,52 +2,11 @@ FROM registry.access.redhat.com/ubi9/nodejs-22:9.6 AS builder
 
 USER root
 
-# Set Node.js memory options to prevent crashes
-# Using Node.js 22 to match Konflux build environment
-ENV NODE_OPTIONS="--max-old-space-size=6144"
-ENV NPM_CONFIG_CACHE=/tmp/.npm
-
 WORKDIR /opt/app-root/src
-
-# Copy package files first for better layer caching
-# This allows npm install to be cached if dependencies haven't changed
-COPY console/package.json console/package-lock.json* ./
-
-# Clear any existing npm cache and install dependencies
-# Using --prefer-offline to avoid network issues, --no-audit to speed up
-RUN rm -rf /tmp/.npm ~/.npm && \
-    npm ci --prefer-offline --no-audit && \
-    npm cache clean --force
-
-# Now copy the rest of the console code
 COPY console/ .
-
-# Replace version in package.json
+# replace version in package.json
 RUN sed -r -i "s|\"version\": \"0.0.1\"|\"version\": \"${VERSION}\"|;" ./package.json
-
-# Clear all caches and build artifacts before building
-# This prevents corrupted cache from causing segfaults
-RUN rm -rf dist .ts-node node_modules/.cache && \
-    find . -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
-    find node_modules -name ".cache" -type d -exec rm -rf {} + 2>/dev/null || true
-
-# Create a wrapper script that disables ts-node cache and uses transpile-only
-# This avoids the V8 deserializer issues by preventing bytecode caching
-RUN echo '#!/bin/bash' > /tmp/build-webpack.sh && \
-    echo 'set -e' >> /tmp/build-webpack.sh && \
-    echo 'export TS_NODE_CACHE=false' >> /tmp/build-webpack.sh && \
-    echo 'export TS_NODE_TRANSPILE_ONLY=true' >> /tmp/build-webpack.sh && \
-    echo 'export TS_NODE_COMPILER_OPTIONS='"'"'{"module":"commonjs","moduleResolution":"node"}'"'"'' >> /tmp/build-webpack.sh && \
-    echo 'node -r ts-node/register ./node_modules/.bin/webpack -c config/webpack.config.ts' >> /tmp/build-webpack.sh && \
-    chmod +x /tmp/build-webpack.sh
-
-# Run build with explicit memory settings and production mode
-# Using wrapper script to ensure ts-node cache is disabled
-RUN NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=6144" \
-    npm run clean && \
-    /tmp/build-webpack.sh
-
+RUN npm ci --ignore-scripts && npm run build
 RUN mkdir licenses
 COPY LICENSE licenses/
 
