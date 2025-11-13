@@ -128,27 +128,4 @@ generate_openshift_types() {
   echo "[info] Done"
 }
 
-generate_kubernetes_types() {
-  local version
-  version="${1:-$(get_cluster_versions | jq -r '.kubernetes' | awk -F '.' '{print $1"."$2}')}"
-
-  local config_temp_file
-  config_temp_file="$(mktemp -t "openapitools-kubernetes.json")"
-  # shellcheck disable=SC2064
-  trap "rm -f $config_temp_file" EXIT
-  
-  sed 's/%VERSION%/'"$version"'/g' config/openapitools.json > "$config_temp_file"
-
-  local output_dir
-  output_dir="$(jq -r '.["generator-cli"].generators.kubernetes.output' "$config_temp_file")"
-
-  mkdir -p "$output_dir"
-  npx openapi-generator-cli generate \
-    --generator-key kubernetes \
-    --openapitools "$config_temp_file"
-
-  cp "$output_dir/models/index.ts" "$output_dir/types.ts"
-  find "$output_dir" -mindepth 1 -not -name 'types.ts' -exec rm -rf {} +
-}
-
 "$@"
