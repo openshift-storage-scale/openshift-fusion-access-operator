@@ -78,7 +78,7 @@ Views → View Models → Use-cases (optional) → Repositories → Services →
 - Follow the [Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) style for commit messages.
 - Always sign-off commits using `git commit -s` flag.
 - Always run `npm run i18n` to verify localized strings are up-to-date.
-- Lint and format code before commiting using `npm run lint` and `npm run format` respectively.
+- Lint and format code before committing using `npm run lint` and `npm run format` respectively.
 
 ## Branch naming
 - Create branches from `main` using `bugs/<issue-id>` (for example, `bugs/OCPNAS-297`).
