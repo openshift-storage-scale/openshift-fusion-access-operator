@@ -41,16 +41,17 @@ export const StorageClusterEmptyState: React.FC<
           <StorageClustersCreateButton onClick={onCreateStorageCluster} />
         </EmptyStateActions>
         <EmptyStateActions>
-          <Button
+          {learnMoreHref && (<Button
             component="a"
             variant="link"
             target="_blank"
             rel="noopener noreferrer"
             href={learnMoreHref}
-          >
-            {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
-            <ExternalLinkAltIcon />
-          </Button>
+            >
+              {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
+              <ExternalLinkAltIcon />
+            </Button>
+          )}
         </EmptyStateActions>
       </EmptyStateFooter>
     </EmptyState>

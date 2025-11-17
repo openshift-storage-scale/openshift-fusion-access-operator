@@ -30,16 +30,18 @@ export const FileSystemClaimsTableEmptyState: React.FC = () => {
           />
         </EmptyStateActions>
         <EmptyStateActions>
-          <Button
-            component="a"
-            variant="link"
-            target="_blank"
-            rel="noopener noreferrer"
-            href={learnMoreHref}
-          >
-            {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
-            <ExternalLinkAltIcon />
-          </Button>
+          {learnMoreHref && (
+            <Button
+              component="a"
+              variant="link"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={learnMoreHref}
+            >
+              {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
+              <ExternalLinkAltIcon />
+            </Button>
+          )}
         </EmptyStateActions>
       </EmptyStateFooter>
     </EmptyState>
