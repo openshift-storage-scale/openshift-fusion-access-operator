@@ -6,12 +6,12 @@ import { useLocalDisksRepository } from "@/data/repositories/use_local_disks_rep
 import { useLocalVolumeDiscoveryResultRepository } from "@/data/repositories/use_local_volume_discovery_result_respository";
 import { useNodesRepository } from "@/data/repositories/use_nodes_repository";
 import type { Lun } from "@/domain/models/lun";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/LocalVolumeDiscoveryResult";
 import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/use_k8s_watch_resource";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 type DiscoveredDevice = NonNullable<
   NonNullable<LocalVolumeDiscoveryResult["status"]>["discoveredDevices"]

@@ -14,6 +14,7 @@ import {
   WORKER_NODE_ROLE_LABEL,
 } from "@/constants";
 import { groupVersionKind } from "@/data/models/node_gvk";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/openshift/4.19/types";
@@ -23,7 +24,6 @@ import {
   getUid,
   hasLabel,
 } from "@/shared/utils/k8s_resource_common";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useStorageClusterNodesSelectionTableRowViewModel = (
   node: IoK8sApiCoreV1Node,

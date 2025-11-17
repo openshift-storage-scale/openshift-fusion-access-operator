@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { useStorageClustersRepository } from "@/data/repositories/use_storage_clusters_repository";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useStorageClustersCreateUseCase = () => {
   const [, dispatch] = useStore<State, Actions>();

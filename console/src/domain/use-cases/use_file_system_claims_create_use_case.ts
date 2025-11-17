@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
 import type { Lun } from "@/domain/models/lun";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsCreateUseCase = (
   fileSystemName: string,

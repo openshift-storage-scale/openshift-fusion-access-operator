@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDaemonsRepository } from "@/data/repositories/use_daemons_repository";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 
 export const useFileSystemClaimsCreateButtonViewModel = () => {
   const { t } = useLocalizationService();

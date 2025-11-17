@@ -1,11 +1,11 @@
 import { Button, Split } from "@patternfly/react-core";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStorageClustersCreateUseCase } from "@/domain/use-cases/use_storage_clusters_create_use_case";
 import { ListPage } from "@/shared/components/ListPage";
 import { StoreProvider, useStore } from "@/shared/store/provider";
 import { initialState, reducer } from "@/shared/store/reducer";
 import type { Actions, State } from "@/shared/store/types";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { StorageClustersCreateButton } from "@/ui/storage-clusters/views/storage_clusters_create_button";
 import { StorageClustersNodesSelectionTable } from "@/ui/storage-clusters/views/storage_clusters_nodes_selection_table";
 

@@ -11,7 +11,7 @@ import {
 } from "@patternfly/react-icons";
 import React from "react";
 import { LEARN_MORE_LINK } from "@/constants";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { StorageClustersCreateButton } from "@/ui/storage-clusters/views/storage_clusters_create_button";
 
 interface StorageClusterEmptyStateProps {

@@ -2,10 +2,10 @@ import type { NavPage } from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
 import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
 import { useStorageClustersRepository } from "@/data/repositories/use_storage_clusters_repository";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { FileSystemClaimsTable } from "../views/file_system_claims_table";
 
 export const useFileSystemClaimsHomeScreenViewModel = () => {

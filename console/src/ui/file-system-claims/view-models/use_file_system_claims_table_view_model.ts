@@ -1,8 +1,8 @@
 import { type TableColumn } from "@openshift-console/dynamic-plugin-sdk";
 import { useMemo } from "react";
 import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsTableViewModel = () => {
   const { t } = useLocalizationService();

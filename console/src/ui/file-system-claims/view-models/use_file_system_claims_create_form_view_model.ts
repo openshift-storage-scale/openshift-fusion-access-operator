@@ -2,11 +2,11 @@ import { useFormContext } from "@patternfly/react-core";
 import type { ThProps } from "@patternfly/react-table/dist/esm/components/Table/Th.d.ts";
 import { useCallback, useEffect, useMemo } from "react";
 import type { Lun } from "@/domain/models/lun";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useFileSystemClaimsCreateUseCase } from "@/domain/use-cases/use_file_system_claims_create_use_case";
 import { useLunsUseCase } from "@/domain/use-cases/use_luns_use_case";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 type OnSelect = NonNullable<NonNullable<ThProps["select"]>["onSelect"]>;
 

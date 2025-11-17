@@ -12,8 +12,8 @@ import {
 } from "@patternfly/react-core";
 import { ExclamationCircleIcon, FolderIcon } from "@patternfly/react-icons";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { HelpLabelIcon } from "@/shared/components/HelpLabelIcon";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { useFileSystemClaimsCreateFormViewModel } from "../view-models/use_file_system_claims_create_form_view_model";
 
 export const FileSystemClaimsCreateForm: React.FC<{ formId: string }> = ({

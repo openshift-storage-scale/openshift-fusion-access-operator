@@ -6,8 +6,8 @@ import {
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Checkbox, Icon, Tooltip } from "@patternfly/react-core";
 import { ExclamationTriangleIcon } from "@patternfly/react-icons";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/openshift/4.19/types";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { useStorageClusterNodesSelectionTableRowViewModel } from "../view-models/use_storage_clusters_nodes_selection_table_row_view_model";
 
 export const styles = {

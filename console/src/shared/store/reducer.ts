@@ -1,6 +1,6 @@
 import { enableMapSet } from "immer";
 import type { ImmerReducer } from "use-immer";
-import { t } from "@/ui/services/use_localization_service";
+import { t } from "@/domain/services/use_localization_service";
 import type { Actions, State } from "./types";
 
 enableMapSet(); // Enables Map and Set support in immer

@@ -1,4 +1,4 @@
-import { t } from "@/ui/services/use_localization_service";
+import { t } from "@/domain/services/use_localization_service";
 
 // This link will need to be updated in-between versions
 export const LEARN_MORE_LINK =

@@ -7,10 +7,10 @@ import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
 import { useMemo } from "react";
 import { SPECTRUM_SCALE_NAMESPACE, VALUE_NOT_AVAILABLE } from "@/constants";
 import { useFileSystemsRepository } from "@/data/repositories/use_file_systems_repository";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { getName } from "@/shared/utils/k8s_resource_common";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useFileSystemClaimsTableRowViewModel = (
   fileSystemClaim: FileSystemClaim,

@@ -13,11 +13,11 @@ import {
 } from "@/constants";
 import { useLocalVolumeDiscoveryResultRepository } from "@/data/repositories/use_local_volume_discovery_result_respository";
 import { useNodesRepository } from "@/data/repositories/use_nodes_repository";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/openshift/4.19/types";
 import { hasLabel } from "@/shared/utils/k8s_resource_common";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 
 export const useStorageClusterNodesSelectionTableViewModel = () => {
   const [, dispatch] = useStore<State, Actions>();

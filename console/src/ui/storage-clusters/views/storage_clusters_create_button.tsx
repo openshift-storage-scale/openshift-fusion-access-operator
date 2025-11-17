@@ -1,6 +1,6 @@
 import { Button } from "@patternfly/react-core";
 import type { ButtonProps } from "@patternfly/react-core/dist/js/components/Button";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 
 type CreateStorageClusterButtonProps = Omit<ButtonProps, "variant">;
 

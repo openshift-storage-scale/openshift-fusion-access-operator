@@ -9,8 +9,8 @@ import {
   Stack,
   StackItem,
 } from "@patternfly/react-core";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import type { IoK8sApiCoreV1Node } from "@/shared/types/openshift/4.19/types";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { useStorageClusterNodesSelectionTableViewModel } from "../view-models/use_storage_clusters_nodes_selection_table_view_model";
 import { StorageClustersNodesSelectionEmptyState } from "./storage_clusters_nodes_selection_empty_state";
 import { StorageClustersNodesSelectionTableRow } from "./storage_clusters_nodes_selection_table_row";

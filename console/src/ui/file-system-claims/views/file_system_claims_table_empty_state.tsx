@@ -6,8 +6,8 @@ import {
 } from "@patternfly/react-core";
 import { ExternalLinkAltIcon, FolderIcon } from "@patternfly/react-icons";
 import { LEARN_MORE_LINK } from "@/constants";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
-import { useLocalizationService } from "@/ui/services/use_localization_service";
 import { FileSystemClaimsCreateButton } from "./file_system_claims_create_button";
 
 export const FileSystemClaimsTableEmptyState: React.FC = () => {

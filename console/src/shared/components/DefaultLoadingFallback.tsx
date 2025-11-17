@@ -1,5 +1,5 @@
 import { EmptyState, EmptyStateBody, Spinner } from "@patternfly/react-core";
-import { useLocalizationService } from "../../ui/services/use_localization_service";
+import { useLocalizationService } from "@/domain/services/use_localization_service";
 
 export const DefaultLoadingFallback: React.FC = () => {
   const { t } = useLocalizationService();
