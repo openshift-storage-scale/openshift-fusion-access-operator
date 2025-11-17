@@ -79,3 +79,13 @@ Views → View Models → Use-cases (optional) → Repositories → Services →
 - Always sign-off commits using `git commit -s` flag.
 - Always run `npm run i18n` to verify localized strings are up-to-date.
 - Lint and format code before commiting using `npm run lint` and `npm run format` respectively.
+
+## Branch naming
+- Create branches from `main` using `bugs/<issue-id>` (for example, `bugs/OCPNAS-297`).
+
+## Naming conventions
+- Directories use kebab-case (e.g., `domain/services`).
+- Files use snake_case (e.g., `use_docs_build_use_case.ts`).
+- Object properties and local (or exported) variables use camelCase (`clusterVersion`).
+- Constants (numbers or string) use SNAKE_CASE in capital letters.
+- React components, types, interfaces, and classes use PascalCase (`StorageClustersEmptyState`).
