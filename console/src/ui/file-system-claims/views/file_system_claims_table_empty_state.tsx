@@ -5,9 +5,9 @@ import {
   EmptyStateFooter,
 } from "@patternfly/react-core";
 import { ExternalLinkAltIcon, FolderIcon } from "@patternfly/react-icons";
-import { LEARN_MORE_LINK } from "@/constants";
 import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
+import { useDocLinksViewModel } from "@/ui/view-models/use_docs_link_view_model";
 import { FileSystemClaimsCreateButton } from "./file_system_claims_create_button";
 
 export const FileSystemClaimsTableEmptyState: React.FC = () => {
@@ -15,6 +15,7 @@ export const FileSystemClaimsTableEmptyState: React.FC = () => {
   const goToFileSystemClaimsCreateScreen = useRedirectHandler(
     "/fusion-access/file-system-claims/create",
   );
+  const { learnMoreHref } = useDocLinksViewModel();
 
   return (
     <EmptyState
@@ -34,7 +35,7 @@ export const FileSystemClaimsTableEmptyState: React.FC = () => {
             variant="link"
             target="_blank"
             rel="noopener noreferrer"
-            href={LEARN_MORE_LINK}
+            href={learnMoreHref}
           >
             {t("Learn more about Fusion Access for SAN storage clusters")}{" "}
             <ExternalLinkAltIcon />
