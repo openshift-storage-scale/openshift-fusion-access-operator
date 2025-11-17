@@ -11,8 +11,13 @@ export const useDocLinksViewModel = () => {
     useDocLinksBuildUseCase();
 
   const learnMoreHref = useMemo(
-    () => buildDocsUrlFromClusterVersion(),
-    [buildDocsUrlFromClusterVersion],
+    () => {
+      if (!loaded || error) {
+        return null;
+      }
+      return buildDocsUrlFromClusterVersion();
+    },
+    [buildDocsUrlFromClusterVersion, loaded, error],
   );
 
   return {
