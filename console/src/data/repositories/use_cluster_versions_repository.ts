@@ -5,6 +5,11 @@ import { groupVersionKind } from "../models/cluster_version_gvk";
 
 type Options = Omit<WatchK8sResource, "groupVersionKind" | "isList">;
 
+/**
+ * Repository hook that watches the singleton `clusterversions/version` resource.
+ * Mirrors the shape of other repositories by returning loaded/error flags together
+ * with the `clusterVersion` payload for downstream domain logic.
+ */
 export const useClusterVersionsRepository = (options: Options = {}) => {
   const result = useWatchClusterVersion(options);
   return {

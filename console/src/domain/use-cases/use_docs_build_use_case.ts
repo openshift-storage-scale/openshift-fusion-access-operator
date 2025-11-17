@@ -6,6 +6,10 @@ const DEFAULT_DOCS_VERSION = "4.20";
 const DOCS_URL_TEMPLATE =
   "https://docs.redhat.com/en/documentation/openshift_container_platform/{version}/html/virtualization/storage#install-configure-fusion-access-san";
 
+/**
+ * Domain use-case that transforms the raw ClusterVersion resource into
+ * a docs-link builder consumable directly by view-models and UI components.
+ */
 export const useDocLinksBuildUseCase = () => {
   const { clusterVersion, loaded, error } = useClusterVersionsRepository();
 
