@@ -41,7 +41,7 @@
   "devDependencies": {
     "@babel/core": "^7.0.1",
     "@babel/preset-env": "^7.0.0",
-    "@biomejs/biome": "2.3.4",
+    "@biomejs/biome": "2.3.6",
     "@cypress/webpack-preprocessor": "^5.15.5",
     "@openapitools/openapi-generator-cli": "~2.23.0",
     "@openshift-console/dynamic-plugin-sdk": "~4.19.0",
