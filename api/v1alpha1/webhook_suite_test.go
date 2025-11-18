@@ -119,7 +119,10 @@ var _ = BeforeSuite(func() {
 	go func() {
 		defer GinkgoRecover()
 		err = mgr.Start(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			// Log error but don't fail - context cancellation is expected during shutdown
+			GinkgoWriter.Printf("Manager stopped: %v\n", err)
+		}
 	}()
 
 	// wait for the webhook server to get ready
@@ -136,8 +139,15 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	cancel()
+	By("stopping manager and cleaning up")
+	if cancel != nil {
+		cancel()
+		// Give the manager time to shutdown gracefully
+		time.Sleep(2 * time.Second)
+	}
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 })

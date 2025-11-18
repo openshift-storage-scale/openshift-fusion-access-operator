@@ -55,3 +55,6 @@ artifacts/
 preflight.log
 # Temp files
 Temp/*
+# Ignore e2e VolumeSnapshotClass tests suite and logs this are e2e tests agaisnt real cluster
+test/e2e/volumesnapshotclass
+test/logs/

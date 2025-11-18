@@ -22,12 +22,13 @@ import (
 
 // Condition types for FileSystemClaim status
 const (
-	ConditionTypeDeviceValidated     = "DeviceValidated"
-	ConditionTypeLocalDiskCreated    = "LocalDiskCreated"
-	ConditionTypeFileSystemCreated   = "FileSystemCreated"
-	ConditionTypeStorageClassCreated = "StorageClassCreated"
-	ConditionTypeDeletionBlocked     = "DeletionBlocked"
-	ConditionTypeReady               = "Ready"
+	ConditionTypeDeviceValidated            = "DeviceValidated"
+	ConditionTypeLocalDiskCreated           = "LocalDiskCreated"
+	ConditionTypeFileSystemCreated          = "FileSystemCreated"
+	ConditionTypeStorageClassCreated        = "StorageClassCreated"
+	ConditionTypeVolumeSnapshotClassCreated = "VolumeSnapshotClassCreated"
+	ConditionTypeDeletionBlocked            = "DeletionBlocked"
+	ConditionTypeReady                      = "Ready"
 )
 
 // FileSystemClaimSpec defines the desired state of FileSystemClaim.

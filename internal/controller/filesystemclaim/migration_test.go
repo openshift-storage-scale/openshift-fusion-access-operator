@@ -338,6 +338,7 @@ var _ = Describe("Migration Helper Functions", func() {
 			for _, cond := range fsc.Status.Conditions {
 				Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 				Expect(cond.Reason).To(Equal(MigrationReasonComplete))
+				Expect(cond.ObservedGeneration).To(Equal(InitialObservedGeneration))
 			}
 
 			// Verify LocalDisk was updated
