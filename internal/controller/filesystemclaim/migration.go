@@ -50,6 +50,7 @@ const (
 	MigrationLabelValueTrue      = "true"
 	MigrationDryRunEnvVar        = "MIGRATION_DRY_RUN"
 	MigrationReasonComplete      = "MigrationComplete"
+	InitialObservedGeneration    = int64(1) // Initial observed generation for status conditions
 )
 
 // LegacyResourceGroup represents a group of v1.0 resources that belong together
@@ -449,6 +450,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			LastTransitionTime: metav1.Now(),
 			Reason:             MigrationReasonComplete,
 			Message:            "Devices validated during v1.0 to v1.1 migration",
+			ObservedGeneration: InitialObservedGeneration,
 		},
 		{
 			Type:               "LocalDiskCreated",
@@ -456,6 +458,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			LastTransitionTime: metav1.Now(),
 			Reason:             MigrationReasonComplete,
 			Message:            fmt.Sprintf("LocalDisks already exist from v1.0 (%d disks)", len(group.LocalDisks)),
+			ObservedGeneration: InitialObservedGeneration,
 		},
 		{
 			Type:               "FileSystemCreated",
@@ -463,6 +466,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			LastTransitionTime: metav1.Now(),
 			Reason:             MigrationReasonComplete,
 			Message:            "Filesystem already exists from v1.0",
+			ObservedGeneration: InitialObservedGeneration,
 		},
 	}
 
@@ -474,8 +478,15 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			LastTransitionTime: metav1.Now(),
 			Reason:             MigrationReasonComplete,
 			Message:            "StorageClass already exists from v1.0",
+			ObservedGeneration: InitialObservedGeneration,
 		})
+		logger.Info("StorageClass found during migration - VolumeSnapshotClass will be created by reconcile loop",
+			"storageClass", group.StorageClass.Name)
 	}
+
+	// Note: VolumeSnapshotClass was introduced in v1.2 and will be created automatically
+	// by the reconcile loop for all FileSystemClaims
+	logger.Info("VolumeSnapshotClass will be created automatically by the FileSystemClaim reconciler")
 
 	// Add Ready condition
 	fsc.Status.Conditions = append(fsc.Status.Conditions, metav1.Condition{
@@ -484,6 +495,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 		LastTransitionTime: metav1.Now(),
 		Reason:             MigrationReasonComplete,
 		Message:            "All resources migrated successfully from v1.0",
+		ObservedGeneration: InitialObservedGeneration,
 	})
 
 	// Update status

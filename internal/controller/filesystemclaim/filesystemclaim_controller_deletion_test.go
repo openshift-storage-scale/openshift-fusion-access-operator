@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
@@ -49,6 +50,7 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 		scheme = runtime.NewScheme()
 		Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 		Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+		Expect(snapshotv1.AddToScheme(scheme)).To(Succeed())
 	})
 
 	Describe("markDeletionRequested", func() {
@@ -447,6 +449,78 @@ var _ = Describe("FileSystemClaim Deletion Flow", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("multiple Filesystems found"))
 			Expect(requeueAfter).To(Equal(time.Duration(0)))
+			Expect(changed).To(BeFalse())
+		})
+	})
+
+	// Tests for deletion of VolumeSnapshotClass
+	Describe("deleteVolumeSnapshotClass", func() {
+		It("should delete VolumeSnapshotClass when it exists", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonVolumeSnapshotClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			vsc := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, vsc).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.deleteVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue())
+
+			// Verify VSC is deleted
+			deleted := &unstructured.Unstructured{}
+			deleted.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   VolumeSnapshotClassGroup,
+				Version: VolumeSnapshotClassVersion,
+				Kind:    VolumeSnapshotClassKind,
+			})
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, deleted)
+			Expect(err).To(HaveOccurred()) // Should be gone
+		})
+
+		It("should skip when VolumeSnapshotClassCreated already False", func() {
+			fsc := createTestFSC("test-fsc", namespace, nil, []metav1.Condition{
+				{
+					Type:   fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated,
+					Status: metav1.ConditionFalse,
+					Reason: ReasonVolumeSnapshotClassDeleted,
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.deleteVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(changed).To(BeFalse())
 		})
 	})

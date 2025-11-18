@@ -19,6 +19,7 @@ package filesystemclaim
 import (
 	"context"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
@@ -48,6 +49,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 		scheme = runtime.NewScheme()
 		Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 		Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+		Expect(snapshotv1.AddToScheme(scheme)).To(Succeed())
 	})
 
 	Describe("ensureStorageClass", func() {
@@ -68,9 +70,19 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				},
 			}
 
+			// Create actual Filesystem resource (controller now checks resource existence, not just conditions)
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc).
+				WithObjects(fsc, fs).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -154,12 +166,22 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				},
 			}
 
+			// Create actual Filesystem resource (controller now checks resource existence, not just conditions)
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+
 			// SC already exists with correct spec
 			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc, sc).
+				WithObjects(fsc, fs, sc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -183,6 +205,169 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 		})
 	})
 
+	// VolumeSnapshotClass tests: Creation and
+	Describe("ensureVolumeSnapshotClass", func() {
+		It("should create VolumeSnapshotClass when StorageClass is ready", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual StorageClass resource (controller now checks resource existence, not just conditions)
+			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, sc).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue())
+
+			// Verify VSC was created
+			vsc := &unstructured.Unstructured{}
+			vsc.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   VolumeSnapshotClassGroup,
+				Version: VolumeSnapshotClassVersion,
+				Kind:    VolumeSnapshotClassKind,
+			})
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, vsc)).To(Succeed())
+
+			// Verify driver
+			driver, found, err := unstructured.NestedString(vsc.Object, "driver")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
+			Expect(driver).To(Equal("spectrumscale.csi.ibm.com"))
+
+			// Verify deletionPolicy
+			policy, found, err := unstructured.NestedString(vsc.Object, "deletionPolicy")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
+			Expect(policy).To(Equal("Delete"))
+
+			// Verify labels
+			Expect(vsc.GetLabels()[FileSystemClaimOwnedByNameLabel]).To(Equal(fsc.Name))
+			Expect(vsc.GetLabels()[FileSystemClaimOwnedByNamespaceLabel]).To(Equal(fsc.Namespace))
+
+			// Verify condition was set
+			updated := &fusionv1alpha1.FileSystemClaim{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).To(Equal(ReasonVolumeSnapshotClassCreationSucceeded))
+		})
+
+		It("should skip when StorageClass not ready", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionFalse,
+							Reason: ReasonStorageClassCreationInProgress,
+						},
+					},
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeFalse())
+
+			// Verify no VSC was created
+			vsc := &unstructured.Unstructured{}
+			vsc.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   VolumeSnapshotClassGroup,
+				Version: VolumeSnapshotClassVersion,
+				Kind:    VolumeSnapshotClassKind,
+			})
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, vsc)
+			Expect(err).To(HaveOccurred()) // Should not exist
+		})
+
+		It("should be idempotent when VSC already exists with correct spec", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual StorageClass resource (controller now checks resource existence, not just conditions)
+			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
+
+			// VSC already exists with correct spec
+			vsc := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, sc, vsc).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			// Should still mark condition if not already marked
+			Expect(changed).To(BeTrue())
+
+			// Verify condition is set
+			updated := &fusionv1alpha1.FileSystemClaim{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+		})
+	})
+
 	Describe("syncFSCReady", func() {
 		It("should set Ready=True when all components ready", func() {
 			fsc := &fusionv1alpha1.FileSystemClaim{
@@ -193,32 +378,81 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonDeviceValidationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeDeviceValidated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonDeviceValidationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonLocalDiskCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeLocalDiskCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonLocalDiskCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonFileSystemCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonFileSystemCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonStorageClassCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonStorageClassCreationSucceeded,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonVolumeSnapshotClassCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 					},
 				},
 			}
 
+			// Create actual resources (controller now checks resource existence, not just conditions)
+			// LocalDisk
+			ld := &unstructured.Unstructured{}
+			ld.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   LocalDiskGroup,
+				Version: LocalDiskVersion,
+				Kind:    LocalDiskKind,
+			})
+			ld.SetName("test-ld")
+			ld.SetNamespace(namespace)
+			ld.SetLabels(map[string]string{
+				FileSystemClaimOwnedByNameLabel:      fsc.Name,
+				FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
+			})
+			ld.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       fsc.Name,
+					UID:        fsc.UID,
+				},
+			})
+
+			// Filesystem
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+
+			// StorageClass
+			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
+
+			// VolumeSnapshotClass
+			vsc := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc).
+				WithObjects(fsc, ld, fs, sc, vsc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -297,38 +531,88 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonDeviceValidationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeDeviceValidated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonDeviceValidationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonLocalDiskCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeLocalDiskCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonLocalDiskCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonFileSystemCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonFileSystemCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonStorageClassCreationSucceeded,
+							Type:               fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonStorageClassCreationSucceeded,
+							ObservedGeneration: 1,
 						},
 						{
-							Type:    fusionv1alpha1.ConditionTypeReady,
-							Status:  metav1.ConditionTrue,
-							Reason:  ReasonProvisioningSucceeded,
-							Message: "All resources created and ready",
+							Type:               fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonVolumeSnapshotClassCreationSucceeded,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               fusionv1alpha1.ConditionTypeReady,
+							Status:             metav1.ConditionTrue,
+							Reason:             ReasonProvisioningSucceeded,
+							Message:            "All resources created and ready",
+							ObservedGeneration: 1,
 						},
 					},
 				},
 			}
 
+			// Create actual resources (controller now checks resource existence, not just conditions)
+			// LocalDisk
+			ld := &unstructured.Unstructured{}
+			ld.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   LocalDiskGroup,
+				Version: LocalDiskVersion,
+				Kind:    LocalDiskKind,
+			})
+			ld.SetName("test-ld")
+			ld.SetNamespace(namespace)
+			ld.SetLabels(map[string]string{
+				FileSystemClaimOwnedByNameLabel:      fsc.Name,
+				FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
+			})
+			ld.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       fsc.Name,
+					UID:        fsc.UID,
+				},
+			})
+
+			// Filesystem
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+
+			// StorageClass
+			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
+
+			// VolumeSnapshotClass
+			vsc := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc).
+				WithObjects(fsc, ld, fs, sc, vsc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
