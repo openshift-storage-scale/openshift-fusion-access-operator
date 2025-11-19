@@ -309,11 +309,8 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 	// Delete resources in order with polling-based deletion (deletion watches disabled):
 	// 1. VolumeSnapshotClass - instant deletion, no backend resources
 	// 2. StorageClass - instant deletion, no backend resources
-	// 3. Filesystem - wait 45s for Scale backend cleanup (polling approach)
-	// 4. LocalDisks - wait 30s for Scale backend NSD cleanup (polling approach)
-	// Total cleanup time: ~75s (45s + 30s) due to disabled deletion watches
-	// Note: Deletion watches are intentionally disabled in didResourceStatusChange()
-	// to avoid reconciliation storms during resource cleanup
+	// 3. Filesystem - wait 45s for Scale backend cleanup
+	// 4. LocalDisks - wait 30s for Scale backend NSD cleanup
 	if changed, err := r.deleteVolumeSnapshotClass(ctx, fsc); changed || err != nil {
 		return 0, changed, err
 	}
@@ -745,27 +742,25 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 	logger := log.FromContext(ctx)
 
 	// Check if Filesystem actually exists (don't rely on conditions as gates)
-	fsName := fsc.Name // the Filesystem name we created
-	fs := &unstructured.Unstructured{}
-	fs.SetGroupVersionKind(schema.GroupVersionKind{
+	ownedFS, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
 		Group:   FileSystemGroup,
 		Version: FileSystemVersion,
 		Kind:    FileSystemKind,
-	})
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      fsName,
-		Namespace: fsc.Namespace,
-	}, fs)
+	}, FileSystemList)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("Filesystem not found yet; skipping StorageClass creation",
-				"fsName", fsName)
-			return false, nil
-		}
-		return false, fmt.Errorf("get Filesystem %q: %w", fsName, err)
+		return false, fmt.Errorf("list Filesystems: %w", err)
 	}
 
-	scName := fsc.Name // Use FSC name directly
+	if len(ownedFS) == 0 {
+		logger.Info("Filesystem not found yet; skipping StorageClass creation")
+		return false, nil
+	}
+
+	// Use FSC name for both Filesystem and StorageClass names
+	// This creates a 1:1 deterministic mapping: FSC → Filesystem → StorageClass
+	// All three resources share the same name for easy lookup and ownership clarity
+	fsName := fsc.Name // the Filesystem name we created
+	scName := fsc.Name // the StorageClass name (matches FSC and Filesystem)
 
 	desired := buildStorageClass(fsc, scName, fsName)
 
@@ -922,19 +917,15 @@ func (r *FileSystemClaimReconciler) syncFSCReady(ctx context.Context, fsc *fusio
 	localDisksExist := len(ownedLDs) > 0
 
 	// 3. Check if Filesystem exists
-	fsName := fsc.Name
-	fs := &unstructured.Unstructured{}
-	fs.SetGroupVersionKind(schema.GroupVersionKind{
+	ownedFS, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
 		Group:   FileSystemGroup,
 		Version: FileSystemVersion,
 		Kind:    FileSystemKind,
-	})
-	fsExists := false
-	if err := r.Get(ctx, types.NamespacedName{Name: fsName, Namespace: fsc.Namespace}, fs); err == nil {
-		fsExists = true
-	} else if !errors.IsNotFound(err) {
-		return false, fmt.Errorf("check Filesystem for ready status: %w", err)
+	}, FileSystemList)
+	if err != nil {
+		return false, fmt.Errorf("check Filesystems for ready status: %w", err)
 	}
+	fsExists := len(ownedFS) > 0
 
 	// 4. Check if StorageClass exists
 	scName := fsc.Name
@@ -2161,7 +2152,16 @@ func enqueueFSCByOwner() handler.EventHandler {
 	})
 }
 
-func didStorageClassChange() builder.WatchesOption {
+// hasOwnershipLabels checks if an object has FSC ownership labels
+func hasOwnershipLabels(labels map[string]string) bool {
+	if labels == nil {
+		return false
+	}
+	return labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
+}
+
+// buildOwnedResourcePredicate creates a predicate that watches for owned resource changes
+func buildOwnedResourcePredicate() builder.WatchesOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
@@ -2170,26 +2170,22 @@ func didStorageClassChange() builder.WatchesOption {
 			if e.ObjectNew == nil {
 				return false
 			}
-			labels := e.ObjectNew.GetLabels()
-			if labels == nil {
-				return false
-			}
-			return labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
+			return hasOwnershipLabels(e.ObjectNew.GetLabels())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			if e.Object == nil {
 				return false
 			}
-			labels := e.Object.GetLabels()
-			if labels == nil {
-				return false
-			}
-			return labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
+			return hasOwnershipLabels(e.Object.GetLabels())
 		},
 		GenericFunc: func(_ event.GenericEvent) bool {
 			return false
 		},
 	})
+}
+
+func didStorageClassChange() builder.WatchesOption {
+	return buildOwnedResourcePredicate()
 }
 
 func enqueueFSCByStorageClass() handler.EventHandler {
@@ -2213,15 +2209,9 @@ func enqueueFSCByStorageClass() handler.EventHandler {
 // Add VolumeSnapshotClass handlers
 // enqueueFSCByVolumeSnapshotClass maps VolumeSnapshotClass events to owning FSC
 func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		logger := log.FromContext(ctx)
-		logger.Info("VolumeSnapshotClass event received",
-			"vscName", obj.GetName(),
-			"kind", obj.GetObjectKind().GroupVersionKind().Kind)
-
+	return handler.EnqueueRequestsFromMapFunc(func(_ context.Context, obj client.Object) []reconcile.Request {
 		labels := obj.GetLabels()
 		if labels == nil {
-			logger.Info("VolumeSnapshotClass has no labels, skipping reconciliation", "vscName", obj.GetName())
 			return nil
 		}
 
@@ -2229,16 +2219,8 @@ func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 		fscNamespace := labels[FileSystemClaimOwnedByNamespaceLabel]
 
 		if fscName == "" || fscNamespace == "" {
-			logger.Info("VolumeSnapshotClass missing ownership labels, skipping reconciliation",
-				"vscName", obj.GetName(),
-				"labels", labels)
 			return nil
 		}
-
-		logger.Info("Enqueueing FileSystemClaim for VolumeSnapshotClass event",
-			"vscName", obj.GetName(),
-			"fscName", fscName,
-			"fscNamespace", fscNamespace)
 
 		return []reconcile.Request{
 			{
@@ -2253,53 +2235,7 @@ func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 
 // didVolumeSnapshotClassChange returns a predicate that filters VolumeSnapshotClass events
 func didVolumeSnapshotClassChange() builder.WatchesOption {
-	return builder.WithPredicates(predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			// Don't trigger on create - we create it ourselves
-			log.Log.V(1).Info("VolumeSnapshotClass create event (ignoring)",
-				"vscName", e.Object.GetName())
-			return false
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			if e.ObjectNew == nil {
-				return false
-			}
-			labels := e.ObjectNew.GetLabels()
-			if labels == nil {
-				return false
-			}
-			shouldReconcile := labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
-			if shouldReconcile {
-				log.Log.Info("VolumeSnapshotClass update event detected",
-					"vscName", e.ObjectNew.GetName(),
-					"fscName", labels[FileSystemClaimOwnedByNameLabel],
-					"fscNamespace", labels[FileSystemClaimOwnedByNamespaceLabel])
-			}
-			return shouldReconcile
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			if e.Object == nil {
-				return false
-			}
-			labels := e.Object.GetLabels()
-			if labels == nil {
-				return false
-			}
-			shouldReconcile := labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
-			if shouldReconcile {
-				log.Log.Info("VolumeSnapshotClass delete event detected",
-					"vscName", e.Object.GetName(),
-					"fscName", labels[FileSystemClaimOwnedByNameLabel],
-					"fscNamespace", labels[FileSystemClaimOwnedByNamespaceLabel])
-			}
-			return shouldReconcile
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			log.Log.V(1).Info("VolumeSnapshotClass generic event (ignoring)",
-				"vscName", e.Object.GetName())
-			return false
-		},
-	})
+	return buildOwnedResourcePredicate()
 }
 
 // isInTargetNamespace checks if the resource is in the ibm-spectrum-scale namespace
