@@ -25,6 +25,7 @@ import (
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,6 +59,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
+					UID:       "test-fsc-uid",
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -79,6 +81,15 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			})
 			fs.SetName("test-fsc")
 			fs.SetNamespace(namespace)
+			// Set ownership to ensure listOwnedResources finds it
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
@@ -154,6 +165,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
+					UID:       "test-fsc-uid",
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -175,6 +187,15 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			})
 			fs.SetName("test-fsc")
 			fs.SetNamespace(namespace)
+			// Set ownership to ensure listOwnedResources finds it
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
 
 			// SC already exists with correct spec
 			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
@@ -202,6 +223,65 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeStorageClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+		})
+
+		It("should skip StorageClass creation when Filesystem is not owned by this FSC", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "fsc-uid-123",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create Filesystem with SAME NAME but DIFFERENT OWNER (owned by another FSC)
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc") // Same name as FSC
+			fs.SetNamespace(namespace)
+			// Set owner to a DIFFERENT FSC
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "different-fsc", // Different owner!
+					UID:        "different-uid",
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			// ensureStorageClass should skip because Filesystem is not owned by this FSC
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeFalse(), "should not make changes when Filesystem is not owned by this FSC")
+
+			// Verify StorageClass was NOT created
+			sc := &storagev1.StorageClass{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)
+			Expect(errors.IsNotFound(err)).To(BeTrue(), "StorageClass should not be created for non-owned Filesystem")
 		})
 	})
 
@@ -374,6 +454,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
+					UID:       "test-fsc-uid",
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -443,6 +524,15 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			})
 			fs.SetName("test-fsc")
 			fs.SetNamespace(namespace)
+			// Set ownership to ensure listOwnedResources finds it
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
 
 			// StorageClass
 			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
@@ -527,6 +617,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
+					UID:       "test-fsc-uid",
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -603,6 +694,15 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			})
 			fs.SetName("test-fsc")
 			fs.SetNamespace(namespace)
+			// Set ownership to ensure listOwnedResources finds it
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
 
 			// StorageClass
 			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
