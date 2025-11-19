@@ -166,7 +166,7 @@ func (r *FileSystemClaimReconciler) Reconcile(
 
 	if err := r.Get(ctx, req.NamespacedName, fsc); errors.IsNotFound(err) {
 		// This is normal - object might have been deleted or not yet in cache
-		logger.V(1).Info("FileSystemClaim not found, likely deleted or cache lag", "name", req.Name)
+		logger.Info("FileSystemClaim not found, likely deleted or cache lag", "name", req.Name)
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		logger.Error(err, "Failed to get FileSystemClaim", "name", req.Name)
@@ -306,14 +306,18 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 		return requeueAfter, changed, err
 	}
 
-	// Before deleting StorageClass, delete VolumeSnapshotClass if it exists
-	if changed, err := r.deleteVolumeSnapshotClass(ctx, fsc); err != nil {
-		return 0, false, err
-	} else if changed {
-		return 0, changed, nil
+	// Delete resources in order with polling-based deletion (deletion watches disabled):
+	// 1. VolumeSnapshotClass - instant deletion, no backend resources
+	// 2. StorageClass - instant deletion, no backend resources
+	// 3. Filesystem - wait 45s for Scale backend cleanup (polling approach)
+	// 4. LocalDisks - wait 30s for Scale backend NSD cleanup (polling approach)
+	// Total cleanup time: ~75s (45s + 30s) due to disabled deletion watches
+	// Note: Deletion watches are intentionally disabled in didResourceStatusChange()
+	// to avoid reconciliation storms during resource cleanup
+	if changed, err := r.deleteVolumeSnapshotClass(ctx, fsc); changed || err != nil {
+		return 0, changed, err
 	}
 
-	// Delete resources in order: SC -> FS -> LD
 	if changed, err := r.deleteStorageClass(ctx, fsc); changed || err != nil {
 		return 0, changed, err
 	}
@@ -610,7 +614,7 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 		ldNames = append(ldNames, ld.GetName())
 	}
 	if len(ldNames) == 0 {
-		logger.V(1).Info("No owned LocalDisks found yet; skipping Filesystem creation")
+		logger.Info("No owned LocalDisks found yet; skipping Filesystem creation")
 		return false, nil
 	}
 
@@ -754,7 +758,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 	}, fs)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.V(1).Info("Filesystem not found yet; skipping StorageClass creation",
+			logger.Info("Filesystem not found yet; skipping StorageClass creation",
 				"fsName", fsName)
 			return false, nil
 		}
@@ -814,7 +818,7 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 	err := r.Get(ctx, types.NamespacedName{Name: scName}, sc)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.V(1).Info("StorageClass not found yet; skipping VolumeSnapshotClass creation",
+			logger.Info("StorageClass not found yet; skipping VolumeSnapshotClass creation",
 				"scName", scName,
 				"fscName", fsc.Name,
 				"fscNamespace", fsc.Namespace)
@@ -880,10 +884,8 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 		if changed {
 			logger.Info("VolumeSnapshotClass drift detected and corrected", "vscName", vscName)
 		} else {
-			logger.V(1).Info("VolumeSnapshotClass has no drift", "vscName", vscName)
-		}
-
-		// Ensure condition is True (idempotent)
+			logger.Info("VolumeSnapshotClass has no drift", "vscName", vscName)
+		} // Ensure condition is True (idempotent)
 		conditionChanged, err := r.updateConditionIfChanged(ctx, fsc,
 			fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated,
 			metav1.ConditionTrue,
@@ -1892,6 +1894,14 @@ func (r *FileSystemClaimReconciler) checkFilesystemDeletionLabel(ctx context.Con
 }
 
 // deleteStorageClass deletes the StorageClass and marks progress
+// Returns (changed bool, error):
+//   - changed: true if SC was deleted or condition updated, false if already deleted
+//   - error: non-nil if deletion failed
+//
+// Note: Returns (bool, error) not (time.Duration, bool, error) because:
+//   - StorageClass is a Kubernetes-native resource with instant deletion
+//   - No backend cleanup wait time needed
+//   - Pre-deletion blocking (PV usage check) is handled separately in checkStorageClassUsage()
 func (r *FileSystemClaimReconciler) deleteStorageClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
@@ -1928,14 +1938,29 @@ func (r *FileSystemClaimReconciler) deleteStorageClass(ctx context.Context, fsc 
 }
 
 // deleteVolumeSnapshotClass deletes the VolumeSnapshotClass and marks progress
+// Returns (changed bool, error):
+//   - (false, nil): VolumeSnapshotClass was never created or already deleted; safe to proceed to next deletion step
+//   - (true, nil): VolumeSnapshotClass was deleted or condition updated; requeue to let cache/watches settle
+//   - (false, err): Deletion failed; error needs to be handled by caller
+//
+// Note: Returns (bool, error) not (time.Duration, bool, error) because:
+//   - VolumeSnapshotClass is a Kubernetes-native resource with instant deletion
+//   - No backend cleanup wait time needed after deletion
+//   - Deletion happens immediately when no VolumeSnapshots reference it
+//
+// The return logic ensures proper ordering:
+//   - Return false when VSC doesn't exist → allows deletion flow to proceed to StorageClass
+//   - Return true when VSC is deleted or status updated → triggers requeue to confirm deletion before proceeding
 func (r *FileSystemClaimReconciler) deleteVolumeSnapshotClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
+	// Case 1: VSC was never created or already marked as deleted
+	// Return false (no change) to allow deletion flow to proceed to next resource (StorageClass)
 	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated) {
-		logger.V(1).Info("VolumeSnapshotClass already deleted or never created",
+		logger.Info("VolumeSnapshotClass already deleted or never created",
 			"fscName", fsc.Name,
 			"fscNamespace", fsc.Namespace)
-		return false, nil // Already deleted
+		return false, nil // No change needed; safe to proceed to next deletion step
 	}
 
 	vscName := fsc.Name
@@ -1944,6 +1969,7 @@ func (r *FileSystemClaimReconciler) deleteVolumeSnapshotClass(ctx context.Contex
 		"fscName", fsc.Name,
 		"fscNamespace", fsc.Namespace)
 
+	// Case 2: VSC resource exists in cluster - delete it
 	vsc := &snapshotv1.VolumeSnapshotClass{}
 	if err := r.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err == nil {
 		logger.Info("Deleting VolumeSnapshotClass resource",
@@ -1954,15 +1980,18 @@ func (r *FileSystemClaimReconciler) deleteVolumeSnapshotClass(ctx context.Contex
 			logger.Error(err, "Failed to delete VolumeSnapshotClass",
 				"vscName", vscName,
 				"error", err.Error())
-			return false, err
+			return false, err // Deletion failed; caller should handle error
 		}
 		logger.Info("Successfully deleted VolumeSnapshotClass", "vscName", vscName)
-		return true, nil
+		return true, nil // VSC deleted; return true to requeue and let cache settle before proceeding
 	} else if !errors.IsNotFound(err) {
+		// Case 3: Error getting VSC (not NotFound) - unexpected error
 		logger.Error(err, "Error getting VolumeSnapshotClass for deletion", "vscName", vscName)
-		return false, err
+		return false, err // Unexpected error; caller should handle
 	}
 
+	// Case 4: VSC not found in cluster but condition still shows as created
+	// Update condition to mark as deleted, then allow flow to proceed
 	logger.Info("VolumeSnapshotClass not found, marking as deleted", "vscName", vscName)
 
 	// Mark as deleted
@@ -1972,18 +2001,28 @@ func (r *FileSystemClaimReconciler) deleteVolumeSnapshotClass(ctx context.Contex
 		ReasonVolumeSnapshotClassDeleted,
 		"VolumeSnapshotClass deleted, proceeding with StorageClass deletion")
 	if err != nil {
-		return false, err
+		return false, err // Failed to update condition; caller should handle error
 	}
 	if changed {
 		logger.Info("VolumeSnapshotClass deletion complete, condition updated to False")
+		return true, nil // Condition updated; return true to requeue before proceeding
 	}
-	return changed, nil
+	// Condition was already False (idempotent case); return false to proceed
+	return false, nil
 }
 
 // deleteFilesystem deletes the Filesystem and marks progress
+// Returns (requeueAfter time.Duration, changed bool, error):
+//   - requeueAfter: 45s if FS was deleted (to allow backend cleanup), 0 if already deleted
+//   - changed: true if FS was deleted or condition updated, false if already deleted
+//   - error: non-nil if deletion failed
+//
+// Note: We return 45s wait time because:
+//   - Deletion watches are intentionally disabled (didResourceStatusChange returns false for DeleteFunc)
+//   - IBM Spectrum Scale backend needs time to clean up filesystem resources
+//   - Without watch-based triggers, we must poll with a fixed delay
+//   - 45s is a conservative estimate for backend cleanup to complete
 func (r *FileSystemClaimReconciler) deleteFilesystem(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
-	const filesystemDeletionWait = 45 * time.Second
-
 	logger := log.FromContext(ctx)
 
 	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
@@ -2005,11 +2044,13 @@ func (r *FileSystemClaimReconciler) deleteFilesystem(ctx context.Context, fsc *f
 			logger.Error(err, "Failed to delete Filesystem")
 			return 0, false, err
 		}
-		logger.Info("Deleted Filesystem", "name", fs.GetName())
-		return filesystemDeletionWait, true, nil
+		logger.Info("Deleted Filesystem, waiting for backend cleanup",
+			"name", fs.GetName())
+		const filesystemDeletionWait = 45 * time.Second
+		return filesystemDeletionWait, true, nil // Return 45s to allow backend cleanup before checking again
 	}
 
-	// Mark as deleted
+	// Filesystem is gone, mark as deleted
 	changed, err := r.updateConditionIfChanged(ctx, fsc,
 		fusionv1alpha1.ConditionTypeFileSystemCreated,
 		metav1.ConditionFalse,
@@ -2026,9 +2067,17 @@ func (r *FileSystemClaimReconciler) deleteFilesystem(ctx context.Context, fsc *f
 }
 
 // deleteLocalDisks deletes all LocalDisks and marks progress
+// Returns (requeueAfter time.Duration, changed bool, error):
+//   - requeueAfter: 30s if LDs were deleted (to allow backend cleanup), 0 if already deleted
+//   - changed: true if any LD was deleted or condition updated, false if already deleted
+//   - error: non-nil if deletion failed
+//
+// Note: We return 30s wait time because:
+//   - Deletion watches are intentionally disabled (didResourceStatusChange returns false for DeleteFunc)
+//   - IBM Spectrum Scale backend needs time to clean up NSD resources
+//   - Without watch-based triggers, we must poll with a fixed delay
+//   - 30s is a conservative estimate for NSD cleanup to complete
 func (r *FileSystemClaimReconciler) deleteLocalDisks(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (time.Duration, bool, error) {
-	const localDiskDeletionWait = 30 * time.Second
-
 	logger := log.FromContext(ctx)
 
 	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
@@ -2053,10 +2102,13 @@ func (r *FileSystemClaimReconciler) deleteLocalDisks(ctx context.Context, fsc *f
 			}
 			logger.Info("Deleted LocalDisk", "name", ld.GetName())
 		}
-		return localDiskDeletionWait, true, nil
+		logger.Info("Deleted all LocalDisks, waiting for backend cleanup",
+			"count", len(ldList))
+		const localDiskDeletionWait = 30 * time.Second
+		return localDiskDeletionWait, true, nil // Return 30s to allow NSD cleanup before checking again
 	}
 
-	// Mark as deleted
+	// All LocalDisks are gone, mark as deleted
 	changed, err := r.updateConditionIfChanged(ctx, fsc,
 		fusionv1alpha1.ConditionTypeLocalDiskCreated,
 		metav1.ConditionFalse,
@@ -2163,13 +2215,13 @@ func enqueueFSCByStorageClass() handler.EventHandler {
 func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		logger := log.FromContext(ctx)
-		logger.V(1).Info("VolumeSnapshotClass event received",
+		logger.Info("VolumeSnapshotClass event received",
 			"vscName", obj.GetName(),
 			"kind", obj.GetObjectKind().GroupVersionKind().Kind)
 
 		labels := obj.GetLabels()
 		if labels == nil {
-			logger.V(1).Info("VolumeSnapshotClass has no labels, skipping reconciliation", "vscName", obj.GetName())
+			logger.Info("VolumeSnapshotClass has no labels, skipping reconciliation", "vscName", obj.GetName())
 			return nil
 		}
 
@@ -2177,7 +2229,7 @@ func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 		fscNamespace := labels[FileSystemClaimOwnedByNamespaceLabel]
 
 		if fscName == "" || fscNamespace == "" {
-			logger.V(1).Info("VolumeSnapshotClass missing ownership labels, skipping reconciliation",
+			logger.Info("VolumeSnapshotClass missing ownership labels, skipping reconciliation",
 				"vscName", obj.GetName(),
 				"labels", labels)
 			return nil
