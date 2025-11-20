@@ -83,6 +83,7 @@ First the images in the drop must be uploaded to `quay.io` and a Spectrum Scale 
 
 Next the release is built.
 
+1. Login to `registry.redhat.com` [^3] and `registry.connect.redhat.com` [^4]
 1. Change directory to the top of your Fusion Access repo which should be at the tip of main.
 1. Edit VERSION.txt to set the desired release version.
 1. Edit CNSA_VERSION.txt to set the version of Spectrum Scale.
@@ -135,3 +136,7 @@ Next the release is built.
 [^1]: `oc login --web --server=https://api.stone-prd-rh01.pg1f.p1.openshiftapps.com:6443`
 
 [^2]: `podman login quay.io/openshift-storage-scale`
+
+[^3]: `podman login registry.redhat.com`
+
+[^4]: `podman login registry.connect.redhat.com`

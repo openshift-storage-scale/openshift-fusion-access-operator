@@ -518,15 +518,12 @@ fetchyaml: ## Fetches install yaml files
 tool-versions: opm
 	$(OPM) version
 
-.PHONY: release fbc-push
+.PHONY: release
 ifeq "$(origin VERSION)" "command line"
 release: manifests generate docker-build docker-push console-build console-push devicefinder-docker-build devicefinder-docker-push \
          bundle bundle-build bundle-push
-fbc-push:
-	podman tag openshift-fusion-access-catalog:latest ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
-	podman push ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
 else
-release fbc-push:
+release:
 	@echo "VERSION must be specified on the command line" && false
 endif
 
@@ -542,6 +539,16 @@ fbc:
 	opm alpha render-template basic catalog-template.yaml -o yaml > catalog/catalog.yaml
 	opm validate catalog
 	podman build . -f catalog.Dockerfile -t openshift-fusion-access-catalog:latest
+
+.PHONY: fbc-push
+ifeq "$(origin REGISTRY)" "command line"
+fbc-push:
+	podman tag openshift-fusion-access-catalog:latest ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
+	podman push ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
+else
+fbc-push:
+	@echo "REGISTRY must be specified on the command line" && false
+endif
 
 .PHONY: fbc-graph
 fbc-graph:
