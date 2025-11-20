@@ -46,6 +46,8 @@ import (
 	imageregistryv1 "github.com/openshift/api/imageregistry/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+
 	fsccontroller "github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/filesystemclaim"
 	lvdcontroller "github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 
@@ -75,7 +77,9 @@ func init() {
 
 	utilruntime.Must(kmmv1beta1.AddToScheme(scheme))
 
-	utilruntime.Must(fusionv1alpha.AddToScheme(scheme))
+	// Register VolumeSnapshotClass types for typed API usage
+	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 
