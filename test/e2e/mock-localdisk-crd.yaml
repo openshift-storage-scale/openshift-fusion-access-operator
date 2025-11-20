@@ -1,0 +1,58 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: localdisks.scale.spectrum.ibm.com
+spec:
+  group: scale.spectrum.ibm.com
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              device:
+                type: string
+              node:
+                type: string
+              thinDiskType:
+                type: string
+              existingDataSkipVerify:
+                type: boolean
+            required:
+            - device
+            - node
+          status:
+            type: object
+            properties:
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+              phase:
+                type: string
+              filesystem:
+                type: string
+              pool:
+                type: string
+              size:
+                type: string
+  scope: Namespaced
+  names:
+    plural: localdisks
+    kind: LocalDisk
