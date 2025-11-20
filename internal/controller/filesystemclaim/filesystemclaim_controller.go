@@ -896,59 +896,17 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 	}
 }
 
-// syncFSCReady aggregates the overall Ready condition by checking actual resource existence.
-// This ensures we base readiness on reality rather than our own bookkeeping.
+// syncFSCReady aggregates the overall Ready condition by checking component conditions.
+// Uses FSC conditions as the single source of truth since ensureXXX functions already
+// validate actual resource existence before setting conditions to True.
 func (r *FileSystemClaimReconciler) syncFSCReady(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
-	// Check actual resource existence instead of relying solely on conditions
-	// This is the source of truth - the cluster state, not our status field
-
-	// 1. Check if devices are validated (this is the only one that doesn't have a resource to check)
-	devicesValidated := r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated)
-
-	// 2. Check if LocalDisks exist
-	ownedLDs, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   LocalDiskGroup,
-		Version: LocalDiskVersion,
-		Kind:    LocalDiskKind,
-	}, LocalDiskList)
-	if err != nil {
-		return false, fmt.Errorf("check LocalDisks for ready status: %w", err)
-	}
-	localDisksExist := len(ownedLDs) > 0
-
-	// 3. Check if Filesystem exists
-	ownedFS, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   FileSystemGroup,
-		Version: FileSystemVersion,
-		Kind:    FileSystemKind,
-	}, FileSystemList)
-	if err != nil {
-		return false, fmt.Errorf("check Filesystems for ready status: %w", err)
-	}
-	fsExists := len(ownedFS) > 0
-
-	// 4. Check if StorageClass exists
-	scName := fsc.Name
-	sc := &storagev1.StorageClass{}
-	scExists := false
-	if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err == nil {
-		scExists = true
-	} else if !errors.IsNotFound(err) {
-		return false, fmt.Errorf("check StorageClass for ready status: %w", err)
-	}
-
-	// 5. Check if VolumeSnapshotClass exists
-	vscName := fsc.Name
-	vsc := &snapshotv1.VolumeSnapshotClass{}
-	vscExists := false
-	if err := r.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err == nil {
-		vscExists = true
-	} else if !errors.IsNotFound(err) {
-		return false, fmt.Errorf("check VolumeSnapshotClass for ready status: %w", err)
-	}
-
-	// All resources must exist for FSC to be ready
-	readyNow := devicesValidated && localDisksExist && fsExists && scExists && vscExists
+	// Check all component conditions - these are already validated against cluster state
+	// by their respective ensureXXX functions before being set to True
+	readyNow := r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated) &&
+		r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated)
 
 	var status metav1.ConditionStatus
 	var reason, msg string
