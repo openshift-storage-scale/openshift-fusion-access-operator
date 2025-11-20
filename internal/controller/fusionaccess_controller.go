@@ -419,7 +419,6 @@ func (r *FusionAccessReconciler) Reconcile(
 			}
 			return ctrl.Result{}, err
 		}
-		fusionaccess.Status.Status = ""
 		meta.SetStatusCondition(&fusionaccess.Status.Conditions,
 			v1.Condition{Type: "ImagePull", Status: v1.ConditionTrue, Reason: "ImagePullDone", Message: "Protected images pulled successfully"})
 		serr := r.Status().Update(ctx, fusionaccess)

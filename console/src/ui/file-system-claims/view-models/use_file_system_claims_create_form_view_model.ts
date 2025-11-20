@@ -53,17 +53,18 @@ export const useFileSystemClaimsCreateFormViewModel = () => {
     [luns],
   );
 
-  const createFileSystemClaim = useFileSystemClaimsCreateUseCase(
-    fileSystemName,
-    luns.data,
-  );
+  const createFileSystemClaim = useFileSystemClaimsCreateUseCase();
+
+  const selectedDevices = useMemo(() => {
+    return luns.data.filter((l) => l.isSelected).map((l) => l.path);
+  }, [luns.data]);
 
   const handleSubmitForm = useCallback(
     (e) => {
       e.preventDefault();
-      createFileSystemClaim();
+      createFileSystemClaim(fileSystemName, selectedDevices);
     },
-    [createFileSystemClaim],
+    [createFileSystemClaim, fileSystemName, selectedDevices],
   );
 
   useEffect(() => {

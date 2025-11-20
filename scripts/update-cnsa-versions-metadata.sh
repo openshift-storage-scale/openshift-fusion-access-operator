@@ -68,7 +68,7 @@ END {
 }' "${TMP_FILE}" > "${API_GO_FILE}"
 
 # Update the hard-coded version numbers in the console files
-for f in "console/src/shared/types/fusion-access/FusionAccess.ts console/src/shared/types/fusion-storage-openshift-io/v1alpha1/FusionAccess.ts"; do
+for f in "console/src/shared/types/fusion-storage-openshift-io/v1alpha1/FusionAccess.ts"; do
     sed -i -E "s/(storageScaleVersion\?:.*)\".*\"/\1\"$CNSA_VERSION\"/" $f
 done
 

@@ -2,15 +2,15 @@ import type { K8sResourceCommon } from "@openshift-console/dynamic-plugin-sdk";
 import convert from "convert";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { STORAGE_ROLE_LABEL, WORKER_NODE_ROLE_LABEL } from "@/constants";
-import { useLocalDisksRepository } from "@/data/repositories/use_local_disks_repository";
+import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
 import { useLocalVolumeDiscoveryResultRepository } from "@/data/repositories/use_local_volume_discovery_result_respository";
 import { useNodesRepository } from "@/data/repositories/use_nodes_repository";
 import type { Lun } from "@/domain/models/lun";
 import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
+import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
 import type { LocalVolumeDiscoveryResult } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/LocalVolumeDiscoveryResult";
-import type { LocalDisk } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/LocalDisk";
 import type { NormalizedWatchK8sResult } from "@/shared/utils/use_k8s_watch_resource";
 
 type DiscoveredDevice = NonNullable<
@@ -21,16 +21,16 @@ export const useLunsUseCase = () => {
   const { t } = useLocalizationService();
   const [luns, setLuns] = useState<Lun[]>([]);
   const [, dispatch] = useStore<State, Actions>();
-  const localDisksRepository = useLocalDisksRepository();
+  const fileSystemClaimsRepository = useFileSystemClaimsRepository();
   const storageNodesLvdrs = useStorageNodesLvdrs();
 
   useEffect(() => {
-    if (localDisksRepository.error) {
+    if (fileSystemClaimsRepository.error) {
       dispatch({
         type: "global/addAlert",
         payload: {
-          title: t("Failed to load LocalDisks"),
-          description: localDisksRepository.error.message,
+          title: t("Failed to load FileSystemClaims"),
+          description: fileSystemClaimsRepository.error.message,
           variant: "danger",
           dismiss: () => dispatch({ type: "global/dismissAlert" }),
         },
@@ -38,7 +38,7 @@ export const useLunsUseCase = () => {
     } else {
       dispatch({ type: "global/dismissAlert" });
     }
-  }, [dispatch, localDisksRepository.error, t]);
+  }, [dispatch, fileSystemClaimsRepository.error, t]);
 
   useEffect(() => {
     if (storageNodesLvdrs.error) {
@@ -60,8 +60,8 @@ export const useLunsUseCase = () => {
 
   useEffect(() => {
     if (
-      !localDisksRepository.loaded ||
-      localDisksRepository.localDisks === null ||
+      !fileSystemClaimsRepository.loaded ||
+      fileSystemClaimsRepository.fileSystemClaims === null ||
       !storageNodesLvdrs.loaded ||
       storageNodesLvdrs.data === null
     ) {
@@ -70,7 +70,7 @@ export const useLunsUseCase = () => {
 
     const newLuns = makeLuns(
       storageNodesLvdrs.data,
-      localDisksRepository.localDisks,
+      fileSystemClaimsRepository.fileSystemClaims,
     );
 
     setLuns((currentLuns) => {
@@ -84,8 +84,8 @@ export const useLunsUseCase = () => {
       }));
     });
   }, [
-    localDisksRepository.localDisks,
-    localDisksRepository.loaded,
+    fileSystemClaimsRepository.fileSystemClaims,
+    fileSystemClaimsRepository.loaded,
     storageNodesLvdrs.data,
     storageNodesLvdrs.loaded,
   ]);
@@ -120,7 +120,7 @@ export const useLunsUseCase = () => {
   }, []);
 
   const data = luns;
-  const loaded = storageNodesLvdrs.loaded && localDisksRepository.loaded;
+  const loaded = storageNodesLvdrs.loaded && fileSystemClaimsRepository.loaded;
 
   return useMemo(
     () =>
@@ -140,25 +140,30 @@ export type LunsRepository = ReturnType<typeof useLunsUseCase>;
 export type WithNodeName<T> = T & { nodeName: string };
 
 /**
- * Returns a predicate function to filter out discovered devices that are already used by any of the provided local disks.
+ * Returns a predicate function to filter out discovered devices that are already used by any of the provided file system claims.
  *
- * The returned function is intended for use with Array.prototype.filter on entries of discovered devices grouped by WWN.
+ * The returned function is intended for use with Array.prototype.filter on discovered devices.
  * It returns true for a discovered device if:
- *   - The localDisks array is empty (i.e., no disks to check against), or
- *   - There is at least one local disk whose metadata.name does NOT match the device's WWN.
+ *   - The fileSystemClaims array is empty (i.e., no claims to check against), or
+ *   - The device's path does NOT match any device path specified in any file system claim's spec.devices array.
  *
- * Note: This logic is used to exclude devices that are already associated with a local disk, based on a suffix match of the WWN.
+ * Note: This logic is used to exclude devices that are already associated with a file system claim, preventing
+ * the same LUN from being selected for multiple claims (including those in provisioning status).
  *
- * @param localDisks - Array of LocalDisk objects to check for existing usage.
- * @returns A predicate function that takes a tuple [WWN, WithNodeName<DiscoveredDevice>[]] and returns a boolean indicating if the device is not used.
+ * @param fileSystemClaims - Array of FileSystemClaim objects to check for existing usage.
+ * @returns A predicate function that takes a WithNodeName<DiscoveredDevice> and returns a boolean indicating if the device is not used.
  */
-const outDevicesUsedByLocalDisks =
-  (localDisks: LocalDisk[]) =>
-  (dd: WithNodeName<DiscoveredDevice>): boolean =>
-    !localDisks.some(
-      (localDisk) =>
-        (localDisk.metadata as K8sResourceCommon["metadata"])?.name === dd.WWN,
-    );
+const outDevicesUsedByFileSystemClaims =
+  (fileSystemClaims: FileSystemClaim[]) =>
+  (dd: WithNodeName<DiscoveredDevice>): boolean => {
+    const usedDevicePaths = new Set<string>();
+    fileSystemClaims.forEach((claim) => {
+      claim.spec?.devices?.forEach((devicePath) => {
+        usedDevicePaths.add(devicePath);
+      });
+    });
+    return !usedDevicePaths.has(dd.path);
+  };
 
 /**
  * Transforms a discovered device entry (with nodeName) into a Lun object suitable to be displayed by the UI.
@@ -212,12 +217,12 @@ const makeDiscoveredDevicesWithNodeName = (
 
 const makeLuns = (
   storageNodesLvdrs: LocalVolumeDiscoveryResult[],
-  localDisks: LocalDisk[],
+  fileSystemClaims: FileSystemClaim[],
 ) => {
   const ddsSharedByAllStorageNodes =
     getSharedDiscoveredDevicesRepresentatives(storageNodesLvdrs);
   return ddsSharedByAllStorageNodes
-    .filter(outDevicesUsedByLocalDisks(localDisks))
+    .filter(outDevicesUsedByFileSystemClaims(fileSystemClaims))
     .map(toLun);
 };
 
