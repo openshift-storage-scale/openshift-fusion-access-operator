@@ -1,0 +1,84 @@
+# ServiceAccount and Job with privileged SCC access
+# Requires cluster-admin to create ServiceAccount with privileged SCC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: device-cleanup-sa
+  namespace: ibm-fusion-access
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: device-cleanup-privileged
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: device-cleanup-sa
+  namespace: ibm-fusion-access
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clean-device-partitions-privileged
+  namespace: ibm-fusion-access
+spec:
+  template:
+    metadata:
+      labels:
+        app: device-cleanup-privileged
+    spec:
+      serviceAccountName: device-cleanup-sa
+      hostNetwork: true
+      hostPID: true
+      restartPolicy: Never
+      nodeSelector:
+        scale.spectrum.ibm.com/role: storage
+        node-role.kubernetes.io/worker: ""
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: cleanup
+        image: quay.io/openshift/origin-tools:latest
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - MKNOD
+        volumeMounts:
+        - name: dev
+          mountPath: /dev
+        - name: sys
+          mountPath: /sys
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "=== Cleaning partitions on /dev/nvme2n1 ==="
+          echo "Node: $(hostname)"
+          echo "Current device state:"
+          lsblk /dev/nvme2n1 || echo "Device not found"
+          echo ""
+          echo "Removing partition table..."
+          sgdisk --zap-all /dev/nvme2n1 2>&1
+          EXIT_CODE=$?
+          echo ""
+          echo "Verifying cleanup:"
+          lsblk /dev/nvme2n1 || echo "Device check failed"
+          echo ""
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✓ Cleanup completed successfully on $(hostname)"
+          else
+            echo "⚠️  Cleanup may have failed (exit code: $EXIT_CODE)"
+          fi
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: sys
+        hostPath:
+          path: /sys
+

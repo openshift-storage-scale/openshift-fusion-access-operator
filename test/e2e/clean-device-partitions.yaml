@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clean-device-partitions
+  namespace: ibm-fusion-access
+spec:
+  template:
+    metadata:
+      labels:
+        app: device-cleanup
+    spec:
+      hostNetwork: true
+      hostPID: true
+      restartPolicy: Never
+      nodeSelector:
+        scale.spectrum.ibm.com/role: storage
+        node-role.kubernetes.io/worker: ""
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: cleanup
+        image: quay.io/openshift/origin-tools:latest
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - MKNOD
+        volumeMounts:
+        - name: dev
+          mountPath: /dev
+        - name: sys
+          mountPath: /sys
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "=== Cleaning partitions on /dev/nvme2n1 ==="
+          echo "Current device state:"
+          lsblk /dev/nvme2n1 || echo "Device not found"
+          echo ""
+          echo "Removing partition table..."
+          sgdisk --zap-all /dev/nvme2n1 2>&1
+          echo ""
+          echo "Verifying cleanup:"
+          lsblk /dev/nvme2n1 || echo "Device check failed"
+          echo ""
+          echo "Cleanup complete!"
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: sys
+        hostPath:
+          path: /sys
+
