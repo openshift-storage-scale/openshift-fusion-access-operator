@@ -2118,8 +2118,24 @@ func hasOwnershipLabels(labels map[string]string) bool {
 	return labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
 }
 
-// buildOwnedResourcePredicate creates a predicate that watches for owned resource changes
-func buildOwnedResourcePredicate() builder.WatchesOption {
+// didWatchedResourceChange creates a predicate that watches for owned resource changes
+// (StorageClass, VolumeSnapshotClass) based on FSC ownership labels.
+// Triggers reconciliation on Update and Delete events for resources owned by FSC.
+//
+// ⚠️  DISTINCTION: This predicate is for KUBERNETES-NATIVE RESOURCES (StorageClass, VolumeSnapshotClass)
+//   - Uses ownership LABELS for filtering (fusion.storage.openshift.io/owned-by-fsc-*)
+//   - Triggers on ANY update (not just status changes)
+//   - DELETE watches are ENABLED (to detect external deletion)
+//   - Use didResourceStatusChange() instead for IBM Spectrum Scale CRs (LocalDisk, Filesystem)
+//
+// Watch behavior:
+// - CreateFunc: false - StorageClass/VolumeSnapshotClass creation is managed by controller, no need to watch
+// - UpdateFunc: true if owned - detects drift/external modifications to these resources
+// - DeleteFunc: true if owned - detects when StorageClass/VolumeSnapshotClass is deleted externally
+// - GenericFunc: false - no generic events expected
+//
+// Used for: StorageClass, VolumeSnapshotClass (Kubernetes-native resources with ownership labels)
+func didWatchedResourceChange() builder.WatchesOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
@@ -2140,10 +2156,6 @@ func buildOwnedResourcePredicate() builder.WatchesOption {
 			return false
 		},
 	})
-}
-
-func didStorageClassChange() builder.WatchesOption {
-	return buildOwnedResourcePredicate()
 }
 
 func enqueueFSCByStorageClass() handler.EventHandler {
@@ -2191,11 +2203,6 @@ func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 	})
 }
 
-// didVolumeSnapshotClassChange returns a predicate that filters VolumeSnapshotClass events
-func didVolumeSnapshotClassChange() builder.WatchesOption {
-	return buildOwnedResourcePredicate()
-}
-
 // isInTargetNamespace checks if the resource is in the ibm-spectrum-scale namespace
 func isInTargetNamespace(obj client.Object) bool {
 	return obj.GetNamespace() == "ibm-spectrum-scale"
@@ -2213,7 +2220,32 @@ func isOwnedByFileSystemClaim(obj client.Object) bool {
 	return false
 }
 
-// didResourceStatusChange returns true if the LocalDisk or FileSystem status has changed
+// didResourceStatusChange creates a predicate that watches for status changes in IBM Spectrum Scale
+// resources (LocalDisk, Filesystem) to trigger FSC condition updates.
+//
+// ⚠️  DISTINCTION: This predicate is for IBM SPECTRUM SCALE CRs (LocalDisk, Filesystem)
+//   - Uses OwnerReferences for filtering (not labels)
+//   - Triggers ONLY on status field changes (ignores metadata/spec updates)
+//   - DELETE watches are DISABLED (uses polling with 45s/30s timeouts instead)
+//   - Use didWatchedResourceChange() instead for Kubernetes-native resources (StorageClass, VolumeSnapshotClass)
+//
+// Watch behavior:
+// - CreateFunc: false - resource creation is managed by controller, initial status not needed
+// - UpdateFunc: true if status changed - monitors backend state changes (Ready, Health, etc.)
+// - DeleteFunc: false - deletion watches intentionally disabled (see handleDeletion timeout comments)
+// - GenericFunc: false - no generic events expected
+//
+// Logic flow:
+// 1. Filter by namespace (ibm-spectrum-scale) and ownership (OwnerReferences)
+// 2. Compare old vs new status fields using DeepEqual
+// 3. Only trigger reconciliation if status actually changed (not metadata/spec changes)
+//
+// Used for: LocalDisk, Filesystem (IBM Spectrum Scale CRs with status conditions)
+// Why different from didWatchedResourceChange:
+// - Watches unstructured.Unstructured (Scale CRs) vs typed resources (K8s StorageClass/VSC)
+// - Filters by OwnerReferences vs ownership labels
+// - Only watches status changes vs any Update/Delete
+// - DeleteFunc=false because deletion watches are disabled for Scale resources
 func didResourceStatusChange() builder.WatchesOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
@@ -2280,12 +2312,12 @@ func (r *FileSystemClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&storagev1.StorageClass{},
 			enqueueFSCByStorageClass(),
-			didStorageClassChange(),
+			didWatchedResourceChange(),
 		).
 		Watches(
 			&snapshotv1.VolumeSnapshotClass{},
 			enqueueFSCByVolumeSnapshotClass(),
-			didVolumeSnapshotClassChange(),
+			didWatchedResourceChange(),
 		).
 		Named("filesystemclaim").
 		Complete(r)
