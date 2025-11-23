@@ -334,8 +334,6 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Needto revert to previous condition if FS is not ready
-
 	// Check if LocalDisks already exist and verify spec.devices hasn't changed
 	// This is a safety check in case the webhook is disabled or bypassed
 	// Query LocalDisks directly instead of relying on conditions
@@ -600,9 +598,15 @@ func (r *FileSystemClaimReconciler) syncLocalDiskConditions(ctx context.Context,
 func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Needto revert to previous condition if FS is not ready
+	// Check LocalDiskCreated condition instead of querying cluster
+	// The condition is already validated by syncLocalDiskConditions before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
+		logger.Info("LocalDiskCreated condition not True yet; skipping Filesystem creation")
+		return false, nil
+	}
 
-	// Check if LocalDisks exist and are healthy (don't rely on conditions as gates)
+	// List LocalDisks to get their names for the Filesystem spec
+	// This is still needed because we need the actual LD names to build the spec
 	ownedLDs, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
 		Group:   LocalDiskGroup,
 		Version: LocalDiskVersion,
@@ -627,6 +631,11 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 	var ldNames []string
 	for _, ld := range ownedLDs {
 		ldNames = append(ldNames, ld.GetName())
+	}
+	if len(ldNames) == 0 {
+		// This shouldn't happen if LocalDiskCreated=True, but handle defensively
+		logger.Info("LocalDiskCreated=True but no LocalDisks found; unexpected state")
+		return false, nil
 	}
 
 	desiredSpec := buildFilesystemSpec(ldNames)
@@ -772,26 +781,11 @@ func (r *FileSystemClaimReconciler) syncFilesystemConditions(ctx context.Context
 // ensureStorageClass creates StorageClass if it doesn't exist and returns its ready status
 func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
-	// Needto revert to previous condition if FS is not ready
-	// Query Filesystem objects directly to check existence and health
-	ownedFS, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   FileSystemGroup,
-		Version: FileSystemVersion,
-		Kind:    FileSystemKind,
-	}, FileSystemList)
-	if err != nil {
-		return false, fmt.Errorf("list Filesystems: %w", err)
-	}
 
-	if len(ownedFS) == 0 {
-		logger.V(1).Info("No Filesystem resources found yet; skipping StorageClass creation")
-		return false, nil
-	}
-
-	// Check if the Filesystem is actually healthy by examining its Ready condition directly
-	if !r.isFilesystemHealthy(ctx, &ownedFS[0]) {
-		logger.V(1).Info("Filesystem exists but not healthy yet; skipping StorageClass creation",
-			"filesystem", ownedFS[0].GetName())
+	// Check FileSystemCreated condition instead of querying cluster
+	// The condition is already validated by syncFilesystemConditions before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
+		logger.Info("FileSystemCreated condition not True yet; skipping StorageClass creation")
 		return false, nil
 	}
 
@@ -804,7 +798,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 	desired := buildStorageClass(fsc, scName, fsName)
 
 	current := &storagev1.StorageClass{}
-	err = r.Get(ctx, types.NamespacedName{Name: scName}, current)
+	err := r.Get(ctx, types.NamespacedName{Name: scName}, current)
 	switch {
 	case errors.IsNotFound(err):
 		logger.Info("Creating StorageClass", "name", scName, "filesystem", fsName)
@@ -845,18 +839,14 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 // Only runs after StorageClass is successfully created
 func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
-	// Need to revert to previous condition if SC is not ready
-	// Check if StorageClass actually exists by querying it directly
-	scName := fsc.Name
-	sc := &storagev1.StorageClass{}
-	err := r.Get(ctx, types.NamespacedName{Name: scName}, sc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.V(1).Info("StorageClass not found yet; skipping VolumeSnapshotClass creation",
-				"scName", scName)
-			return false, nil
-		}
-		return false, fmt.Errorf("get StorageClass %q: %w", scName, err)
+
+	// Check StorageClassCreated condition instead of querying cluster
+	// The condition is already validated by ensureStorageClass before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated) {
+		logger.Info("StorageClassCreated condition not True yet; skipping VolumeSnapshotClass creation",
+			"fscName", fsc.Name,
+			"fscNamespace", fsc.Namespace)
+		return false, nil
 	}
 
 	// Note: StorageClass doesn't have health conditions like Filesystem,
@@ -871,7 +861,7 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 	desired := buildVolumeSnapshotClass(ctx, fsc, vscName)
 
 	current := &snapshotv1.VolumeSnapshotClass{}
-	err = r.Get(ctx, types.NamespacedName{Name: vscName}, current)
+	err := r.Get(ctx, types.NamespacedName{Name: vscName}, current)
 	switch {
 	case errors.IsNotFound(err):
 		logger.Info("VolumeSnapshotClass not found, creating new one",
@@ -2227,8 +2217,24 @@ func hasOwnershipLabels(labels map[string]string) bool {
 	return labels[FileSystemClaimOwnedByNameLabel] != "" && labels[FileSystemClaimOwnedByNamespaceLabel] != ""
 }
 
-// buildOwnedResourcePredicate creates a predicate that watches for owned resource changes
-func buildOwnedResourcePredicate() builder.WatchesOption {
+// didWatchedResourceChange creates a predicate that watches for owned resource changes
+// (StorageClass, VolumeSnapshotClass) based on FSC ownership labels.
+// Triggers reconciliation on Update and Delete events for resources owned by FSC.
+//
+// ⚠️  DISTINCTION: This predicate is for KUBERNETES-NATIVE RESOURCES (StorageClass, VolumeSnapshotClass)
+//   - Uses ownership LABELS for filtering (fusion.storage.openshift.io/owned-by-fsc-*)
+//   - Triggers on ANY update (not just status changes)
+//   - DELETE watches are ENABLED (to detect external deletion)
+//   - Use didResourceStatusChange() instead for IBM Spectrum Scale CRs (LocalDisk, Filesystem)
+//
+// Watch behavior:
+// - CreateFunc: false - StorageClass/VolumeSnapshotClass creation is managed by controller, no need to watch
+// - UpdateFunc: true if owned - detects drift/external modifications to these resources
+// - DeleteFunc: true if owned - detects when StorageClass/VolumeSnapshotClass is deleted externally
+// - GenericFunc: false - no generic events expected
+//
+// Used for: StorageClass, VolumeSnapshotClass (Kubernetes-native resources with ownership labels)
+func didWatchedResourceChange() builder.WatchesOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
@@ -2249,12 +2255,6 @@ func buildOwnedResourcePredicate() builder.WatchesOption {
 			return false
 		},
 	})
-}
-
-// didStorageClassChange returns a predicate that filters StorageClass events
-// do we really need this method or can we use buildOwnedResourcePredicate directly in SetupWithManager?
-func didStorageClassChange() builder.WatchesOption {
-	return buildOwnedResourcePredicate()
 }
 
 func enqueueFSCByStorageClass() handler.EventHandler {
@@ -2302,12 +2302,6 @@ func enqueueFSCByVolumeSnapshotClass() handler.EventHandler {
 	})
 }
 
-// Check if this method is needed or if we can reuse buildOwnedResourcePredicate directly in SetupWithManager
-// didVolumeSnapshotClassChange returns a predicate that filters VolumeSnapshotClass events
-func didVolumeSnapshotClassChange() builder.WatchesOption {
-	return buildOwnedResourcePredicate()
-}
-
 // isInTargetNamespace checks if the resource is in the ibm-spectrum-scale namespace
 func isInTargetNamespace(obj client.Object) bool {
 	return obj.GetNamespace() == "ibm-spectrum-scale"
@@ -2325,7 +2319,32 @@ func isOwnedByFileSystemClaim(obj client.Object) bool {
 	return false
 }
 
-// didResourceStatusChange returns true if the LocalDisk or FileSystem status has changed
+// didResourceStatusChange creates a predicate that watches for status changes in IBM Spectrum Scale
+// resources (LocalDisk, Filesystem) to trigger FSC condition updates.
+//
+// ⚠️  DISTINCTION: This predicate is for IBM SPECTRUM SCALE CRs (LocalDisk, Filesystem)
+//   - Uses OwnerReferences for filtering (not labels)
+//   - Triggers ONLY on status field changes (ignores metadata/spec updates)
+//   - DELETE watches are DISABLED (uses polling with 45s/30s timeouts instead)
+//   - Use didWatchedResourceChange() instead for Kubernetes-native resources (StorageClass, VolumeSnapshotClass)
+//
+// Watch behavior:
+// - CreateFunc: false - resource creation is managed by controller, initial status not needed
+// - UpdateFunc: true if status changed - monitors backend state changes (Ready, Health, etc.)
+// - DeleteFunc: false - deletion watches intentionally disabled (see handleDeletion timeout comments)
+// - GenericFunc: false - no generic events expected
+//
+// Logic flow:
+// 1. Filter by namespace (ibm-spectrum-scale) and ownership (OwnerReferences)
+// 2. Compare old vs new status fields using DeepEqual
+// 3. Only trigger reconciliation if status actually changed (not metadata/spec changes)
+//
+// Used for: LocalDisk, Filesystem (IBM Spectrum Scale CRs with status conditions)
+// Why different from didWatchedResourceChange:
+// - Watches unstructured.Unstructured (Scale CRs) vs typed resources (K8s StorageClass/VSC)
+// - Filters by OwnerReferences vs ownership labels
+// - Only watches status changes vs any Update/Delete
+// - DeleteFunc=false because deletion watches are disabled for Scale resources
 func didResourceStatusChange() builder.WatchesOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
@@ -2392,14 +2411,12 @@ func (r *FileSystemClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&storagev1.StorageClass{},
 			enqueueFSCByStorageClass(),
-			// Check if this method is needed or if we can reuse buildOwnedResourcePredicate directly in SetupWithManager
-			didStorageClassChange(),
+			didWatchedResourceChange(),
 		).
 		Watches(
 			&snapshotv1.VolumeSnapshotClass{},
 			enqueueFSCByVolumeSnapshotClass(),
-			// Check if this method is needed or if we can reuse buildOwnedResourcePredicate directly in SetupWithManager
-			didVolumeSnapshotClassChange(),
+			didWatchedResourceChange(),
 		).
 		Named("filesystemclaim").
 		Complete(r)
