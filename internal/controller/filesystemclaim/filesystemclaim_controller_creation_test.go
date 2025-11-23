@@ -72,28 +72,12 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				},
 			}
 
-			// Create actual Filesystem resource (controller now checks resource existence, not just conditions)
-			fs := &unstructured.Unstructured{}
-			fs.SetGroupVersionKind(schema.GroupVersionKind{
-				Group:   FileSystemGroup,
-				Version: FileSystemVersion,
-				Kind:    FileSystemKind,
-			})
-			fs.SetName("test-fsc")
-			fs.SetNamespace(namespace)
-			// Set ownership to ensure listOwnedResources finds it
-			fs.SetOwnerReferences([]metav1.OwnerReference{
-				{
-					APIVersion: "fusion.storage.openshift.io/v1alpha1",
-					Kind:       "FileSystemClaim",
-					Name:       "test-fsc",
-					UID:        "test-fsc-uid",
-				},
-			})
+			// No need to create actual Filesystem - controller now trusts the condition
+			// The condition is only set to True after syncFilesystemConditions validates the actual resource exists
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc, fs).
+				WithObjects(fsc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -236,35 +220,20 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Conditions: []metav1.Condition{
 						{
 							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
-							Status: metav1.ConditionTrue,
-							Reason: ReasonFileSystemCreationSucceeded,
+							Status: metav1.ConditionFalse, // Condition is False because we don't own a Filesystem
+							Reason: ReasonFileSystemCreationInProgress,
 						},
 					},
 				},
 			}
 
-			// Create Filesystem with SAME NAME but DIFFERENT OWNER (owned by another FSC)
-			fs := &unstructured.Unstructured{}
-			fs.SetGroupVersionKind(schema.GroupVersionKind{
-				Group:   FileSystemGroup,
-				Version: FileSystemVersion,
-				Kind:    FileSystemKind,
-			})
-			fs.SetName("test-fsc") // Same name as FSC
-			fs.SetNamespace(namespace)
-			// Set owner to a DIFFERENT FSC
-			fs.SetOwnerReferences([]metav1.OwnerReference{
-				{
-					APIVersion: "fusion.storage.openshift.io/v1alpha1",
-					Kind:       "FileSystemClaim",
-					Name:       "different-fsc", // Different owner!
-					UID:        "different-uid",
-				},
-			})
+			// No need to create the Filesystem object here - the condition-based approach means
+			// if FileSystemCreated=False, ensureStorageClass will skip regardless of what's in the cluster
+			// The test validates the behavior: when condition is not True, creation is skipped
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc, fs).
+				WithObjects(fsc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -273,15 +242,15 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Scheme: scheme,
 			}
 
-			// ensureStorageClass should skip because Filesystem is not owned by this FSC
+			// ensureStorageClass should skip because FileSystemCreated condition is not True
 			changed, err := reconciler.ensureStorageClass(ctx, fsc)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(changed).To(BeFalse(), "should not make changes when Filesystem is not owned by this FSC")
+			Expect(changed).To(BeFalse(), "should not make changes when FileSystemCreated condition is False")
 
 			// Verify StorageClass was NOT created
 			sc := &storagev1.StorageClass{}
 			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)
-			Expect(errors.IsNotFound(err)).To(BeTrue(), "StorageClass should not be created for non-owned Filesystem")
+			Expect(errors.IsNotFound(err)).To(BeTrue(), "StorageClass should not be created when condition is False")
 		})
 	})
 
@@ -304,12 +273,12 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				},
 			}
 
-			// Create actual StorageClass resource (controller now checks resource existence, not just conditions)
-			sc := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			// No need to create actual StorageClass - controller now trusts the condition
+			// The condition is only set to True after ensureStorageClass validates the actual resource exists
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(fsc, sc).
+				WithObjects(fsc).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -1940,7 +1909,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				},
 			}
 
-			// Create LocalDisks
+			// Create LocalDisks - these ARE needed because ensureFilesystem still queries
+			// for owned LocalDisks to extract their names and build the Filesystem spec
+			// The condition check just gates whether we proceed; the names are still required
 			ld1 := &unstructured.Unstructured{}
 			ld1.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   LocalDiskGroup,

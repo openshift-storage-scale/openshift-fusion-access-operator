@@ -596,7 +596,15 @@ func (r *FileSystemClaimReconciler) syncLocalDiskConditions(ctx context.Context,
 func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Check if LocalDisks actually exist (don't rely on conditions as gates)
+	// Check LocalDiskCreated condition instead of querying cluster
+	// The condition is already validated by syncLocalDiskConditions before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
+		logger.Info("LocalDiskCreated condition not True yet; skipping Filesystem creation")
+		return false, nil
+	}
+
+	// List LocalDisks to get their names for the Filesystem spec
+	// This is still needed because we need the actual LD names to build the spec
 	ownedLDs, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
 		Group:   LocalDiskGroup,
 		Version: LocalDiskVersion,
@@ -611,7 +619,8 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 		ldNames = append(ldNames, ld.GetName())
 	}
 	if len(ldNames) == 0 {
-		logger.Info("No owned LocalDisks found yet; skipping Filesystem creation")
+		// This shouldn't happen if LocalDiskCreated=True, but handle defensively
+		logger.Info("LocalDiskCreated=True but no LocalDisks found; unexpected state")
 		return false, nil
 	}
 
@@ -741,18 +750,10 @@ func (r *FileSystemClaimReconciler) syncFilesystemConditions(ctx context.Context
 func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Check if Filesystem actually exists (don't rely on conditions as gates)
-	ownedFS, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   FileSystemGroup,
-		Version: FileSystemVersion,
-		Kind:    FileSystemKind,
-	}, FileSystemList)
-	if err != nil {
-		return false, fmt.Errorf("list Filesystems: %w", err)
-	}
-
-	if len(ownedFS) == 0 {
-		logger.Info("Filesystem not found yet; skipping StorageClass creation")
+	// Check FileSystemCreated condition instead of querying cluster
+	// The condition is already validated by syncFilesystemConditions before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeFileSystemCreated) {
+		logger.Info("FileSystemCreated condition not True yet; skipping StorageClass creation")
 		return false, nil
 	}
 
@@ -765,7 +766,7 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 	desired := buildStorageClass(fsc, scName, fsName)
 
 	current := &storagev1.StorageClass{}
-	err = r.Get(ctx, types.NamespacedName{Name: scName}, current)
+	err := r.Get(ctx, types.NamespacedName{Name: scName}, current)
 	switch {
 	case errors.IsNotFound(err):
 		logger.Info("Creating StorageClass", "name", scName, "filesystem", fsName)
@@ -807,19 +808,13 @@ func (r *FileSystemClaimReconciler) ensureStorageClass(ctx context.Context, fsc 
 func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Check if StorageClass actually exists (don't rely on conditions as gates)
-	scName := fsc.Name
-	sc := &storagev1.StorageClass{}
-	err := r.Get(ctx, types.NamespacedName{Name: scName}, sc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("StorageClass not found yet; skipping VolumeSnapshotClass creation",
-				"scName", scName,
-				"fscName", fsc.Name,
-				"fscNamespace", fsc.Namespace)
-			return false, nil
-		}
-		return false, fmt.Errorf("get StorageClass %q: %w", scName, err)
+	// Check StorageClassCreated condition instead of querying cluster
+	// The condition is already validated by ensureStorageClass before being set to True
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeStorageClassCreated) {
+		logger.Info("StorageClassCreated condition not True yet; skipping VolumeSnapshotClass creation",
+			"fscName", fsc.Name,
+			"fscNamespace", fsc.Namespace)
+		return false, nil
 	}
 
 	vscName := fsc.Name // Use FSC name for consistency with StorageClass
@@ -831,7 +826,7 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 	desired := buildVolumeSnapshotClass(ctx, fsc, vscName)
 
 	current := &snapshotv1.VolumeSnapshotClass{}
-	err = r.Get(ctx, types.NamespacedName{Name: vscName}, current)
+	err := r.Get(ctx, types.NamespacedName{Name: vscName}, current)
 	switch {
 	case errors.IsNotFound(err):
 		logger.Info("VolumeSnapshotClass not found, creating new one",
