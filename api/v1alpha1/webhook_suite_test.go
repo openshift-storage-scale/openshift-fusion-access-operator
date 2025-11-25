@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -44,6 +45,12 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	// KubeTestVersion is the default Kubernetes version for testing.
+	// Can be overridden via KUBEBUILDER_ASSETS or TEST_K8S_ASSETS environment variables.
+	KubeTestVersion = "1.32.0"
+)
+
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -62,6 +69,18 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
+	// Determine binary assets directory: check KUBEBUILDER_ASSETS first (standard kubebuilder env var),
+	// then TEST_K8S_ASSETS (custom env var), or fall back to default path with KubeTestVersion constant.
+	var binaryAssetsDir string
+	if assetsDir := os.Getenv("KUBEBUILDER_ASSETS"); assetsDir != "" {
+		binaryAssetsDir = assetsDir
+	} else if assetsDir := os.Getenv("TEST_K8S_ASSETS"); assetsDir != "" {
+		binaryAssetsDir = assetsDir
+	} else {
+		binaryAssetsDir = filepath.Join("..", "..", "bin", "k8s",
+			fmt.Sprintf("%s-%s-%s", KubeTestVersion, runtime.GOOS, runtime.GOARCH))
+	}
+
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
@@ -71,8 +90,7 @@ var _ = BeforeSuite(func() {
 		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.30.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+		BinaryAssetsDirectory: binaryAssetsDir,
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "config", "webhook")},

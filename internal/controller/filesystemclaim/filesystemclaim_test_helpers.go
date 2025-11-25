@@ -25,6 +25,8 @@ import (
 )
 
 // createStorageNode creates a Node with worker and storage labels for testing
+//
+//nolint:unparam // name parameter is intentionally flexible for different test scenarios
 func createStorageNode(name string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -38,6 +40,8 @@ func createStorageNode(name string) *corev1.Node {
 }
 
 // createLVDR creates a LocalVolumeDiscoveryResult for testing
+//
+//nolint:unparam // nodeName parameter is intentionally flexible for different test scenarios
 func createLVDR(nodeName, namespace string, devices []fusionv1alpha1.DiscoveredDevice) *fusionv1alpha1.LocalVolumeDiscoveryResult {
 	return &fusionv1alpha1.LocalVolumeDiscoveryResult{
 		ObjectMeta: metav1.ObjectMeta{
@@ -216,6 +220,53 @@ func createLocalDiskWithOwner(name, namespace, devicePath, nodeName string, fsc 
 				},
 			},
 			"resourceVersion": "999",
+		},
+		"spec": map[string]any{
+			"device": devicePath,
+			"node":   nodeName,
+		},
+	}
+
+	return ld
+}
+
+// createLocalDiskWithoutFSCOwner creates a LocalDisk without FSC ownerReferences
+// (or with non-FSC ownerReferences). This is useful for testing ownership conflict scenarios
+// where getOwnerFSCName returns "unknown".
+func createLocalDiskWithoutFSCOwner(name, namespace, devicePath, nodeName string, nonFSCOwnerRefs []metav1.OwnerReference) *unstructured.Unstructured {
+	ld := &unstructured.Unstructured{}
+	ld.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   LocalDiskGroup,
+		Version: LocalDiskVersion,
+		Kind:    LocalDiskKind,
+	})
+	ld.SetName(name)
+	ld.SetNamespace(namespace)
+
+	// Set non-FSC owner references (or empty if none provided)
+	if len(nonFSCOwnerRefs) > 0 {
+		ld.SetOwnerReferences(nonFSCOwnerRefs)
+	}
+
+	// Build owner references for the Object map
+	ownerRefsAny := []any{}
+	for _, or := range nonFSCOwnerRefs {
+		ownerRefsAny = append(ownerRefsAny, map[string]any{
+			"apiVersion": or.APIVersion,
+			"kind":       or.Kind,
+			"name":       or.Name,
+			"uid":        string(or.UID),
+		})
+	}
+
+	// Set spec - need to include apiVersion and kind in the object
+	ld.Object = map[string]any{
+		"apiVersion": LocalDiskGroup + "/" + LocalDiskVersion,
+		"kind":       LocalDiskKind,
+		"metadata": map[string]any{
+			"name":            name,
+			"namespace":       namespace,
+			"ownerReferences": ownerRefsAny,
 		},
 		"spec": map[string]any{
 			"device": devicePath,

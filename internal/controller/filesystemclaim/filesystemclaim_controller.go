@@ -117,7 +117,8 @@ const (
 	FileSystemKind    = "Filesystem"
 	FileSystemList    = "FilesystemList"
 
-	FileSystemClaimKind = "FileSystemClaim"
+	FileSystemClaimKind       = "FileSystemClaim"
+	FileSystemClaimAPIVersion = "fusion.storage.openshift.io/v1alpha1"
 
 	// VolumeSnapshotClass constants
 	VolumeSnapshotClassGroup   = "snapshot.storage.k8s.io"
@@ -331,6 +332,8 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 }
 
 // ensureLocalDisk creates LocalDisk/s
+//
+//nolint:funlen // Complex function with atomic validation+creation to prevent TOCTOU race condition
 func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
@@ -395,22 +398,21 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		return false, nil
 	}
 
-	// Phase 1: validate once
-	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) {
-		if err := r.validateDevices(ctx, fsc); err != nil {
-			logger.Error(err, "Device validation failed")
-			if e := r.handleValidationError(ctx, fsc, err); e != nil {
-				logger.Error(e, "Failed to update status after disk validation failure")
-				return false, e
-			}
-			return true, nil
-		}
-
-		if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device(s) validation succeeded"); e != nil {
-			logger.Error(e, "Failed to update status after device validation success")
+	logger.Info("Validating devices before LocalDisk creation", "devices", fsc.Spec.Devices)
+	if err := r.validateDevices(ctx, fsc); err != nil {
+		logger.Error(err, "Device validation failed")
+		if e := r.handleValidationError(ctx, fsc, err); e != nil {
+			logger.Error(e, "Failed to update status after disk validation failure")
 			return false, e
 		}
 		return true, nil
+	}
+	logger.Info("Device validation successful, proceeding to create LocalDisks")
+
+	// Set DeviceValidated=True after successful validation
+	if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device(s) validation succeeded"); e != nil {
+		logger.Error(e, "Failed to update DeviceValidated condition after successful validation")
+		return false, e
 	}
 
 	// Get node name first - the same node will be used for all LocalDisks
@@ -493,12 +495,22 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			return false, fmt.Errorf("failed to get LocalDisk %s: %w", localDiskName, err)
 
 		default:
-			// Check for drift and patch if needed
-			// There is a admission webhook that prevents the update of spec.device, spec.node and spec.thinDiskType after the LocalDisk is created.
-			// example error:
-			// ... cannot be edited because a related NSD is already created in Storage Scale
-			logger.Info("localDisk already exists, skipping drift detection and patching", "name", localDiskName)
-			return false, nil
+			// LocalDisk already exists - check if it's owned by this FSC or another one
+			if !isOwnedByThisFSC(ld, fsc.Name) {
+				// LocalDisk is owned by a different FSC - get the actual owner name
+				actualOwnerName := getOwnerFSCName(ld)
+				errMsg := fmt.Sprintf("Device %s is already in use by FileSystemClaim: %s",
+					devicePath, actualOwnerName)
+				logger.Error(fmt.Errorf("device already in use"), errMsg, "device", devicePath, "localDisk", localDiskName, "owner", actualOwnerName)
+
+				if e := r.handleValidationError(ctx, fsc, fmt.Errorf("%s", errMsg)); e != nil {
+					return false, e
+				}
+				return true, nil
+			}
+
+			logger.Info("localDisk already exists and is owned by this FSC, skipping drift detection", "name", localDiskName)
+			continue
 		}
 	}
 
@@ -1041,12 +1053,23 @@ func (r *FileSystemClaimReconciler) patchFSCSpec(ctx context.Context, fsc *fusio
 func isOwnedByThisFSC(obj client.Object, fscName string) bool {
 	for _, or := range obj.GetOwnerReferences() {
 		if or.Kind == FileSystemClaimKind &&
-			or.APIVersion == "fusion.storage.openshift.io/v1alpha1" &&
+			or.APIVersion == FileSystemClaimAPIVersion &&
 			or.Name == fscName {
 			return true
 		}
 	}
 	return false
+}
+
+// getOwnerFSCName returns the name of the FileSystemClaim that owns this resource
+func getOwnerFSCName(obj client.Object) string {
+	for _, or := range obj.GetOwnerReferences() {
+		if or.Kind == FileSystemClaimKind &&
+			or.APIVersion == FileSystemClaimAPIVersion {
+			return or.Name
+		}
+	}
+	return "unknown"
 }
 
 // isConditionTrue checks if a condition is true in the FileSystemClaim status
@@ -1518,7 +1541,9 @@ func (r *FileSystemClaimReconciler) detectAndPatchDrift(
 	return true, nil
 }
 
-// handleValidationError updates both Ready and DeviceValidated conditions for validation errors
+// handleValidationError updates both DeviceValidated and Ready conditions
+// to False when device validation fails. This ensures consistent error reporting
+// across all validation failure paths (initial validation, ownership conflicts, etc.)
 func (r *FileSystemClaimReconciler) handleValidationError(
 	ctx context.Context,
 	fsc *fusionv1alpha1.FileSystemClaim,
@@ -1526,12 +1551,20 @@ func (r *FileSystemClaimReconciler) handleValidationError(
 ) error {
 	return r.patchFSCStatus(ctx, fsc, func(cur *fusionv1alpha1.FileSystemClaim) {
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, fusionv1alpha1.ConditionTypeReady,
-			metav1.ConditionFalse, ReasonValidationFailed, err.Error(), cur.Generation,
+			cur.Status.Conditions,
+			fusionv1alpha1.ConditionTypeDeviceValidated,
+			metav1.ConditionFalse,
+			ReasonDeviceValidationFailed,
+			err.Error(),
+			cur.Generation,
 		)
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated,
-			metav1.ConditionFalse, ReasonDeviceValidationFailed, err.Error(), cur.Generation,
+			cur.Status.Conditions,
+			fusionv1alpha1.ConditionTypeReady,
+			metav1.ConditionFalse,
+			ReasonValidationFailed,
+			err.Error(),
+			cur.Generation,
 		)
 	})
 }
@@ -2207,8 +2240,8 @@ func isInTargetNamespace(obj client.Object) bool {
 func isOwnedByFileSystemClaim(obj client.Object) bool {
 	ownerRefs := obj.GetOwnerReferences()
 	for _, ownerRef := range ownerRefs {
-		if ownerRef.Kind == "FileSystemClaim" &&
-			ownerRef.APIVersion == "fusion.storage.openshift.io/v1alpha1" {
+		if ownerRef.Kind == FileSystemClaimKind &&
+			ownerRef.APIVersion == FileSystemClaimAPIVersion {
 			return true
 		}
 	}
