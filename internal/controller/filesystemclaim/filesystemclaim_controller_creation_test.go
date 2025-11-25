@@ -1789,7 +1789,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 							Type:    fusionv1alpha1.ConditionTypeDeviceValidated,
 							Status:  metav1.ConditionTrue,
 							Reason:  ReasonDeviceValidationSucceeded,
-							Message: "Device/s validation succeeded",
+							Message: "Device(s) validation succeeded",
 						},
 					},
 				},
