@@ -334,20 +334,18 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Check if LocalDisks already exist and verify spec.devices hasn't changed
+	// If LocalDisks are already created, verify spec.devices hasn't changed
 	// This is a safety check in case the webhook is disabled or bypassed
-	// Query LocalDisks directly instead of relying on conditions
-	owned, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   LocalDiskGroup,
-		Version: LocalDiskVersion,
-		Kind:    LocalDiskKind,
-	}, LocalDiskList)
-	if err != nil {
-		return false, fmt.Errorf("failed to list owned LocalDisks: %w", err)
-	}
-
-	// If LocalDisks already exist, verify they match current spec.devices
-	if len(owned) > 0 {
+	if r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
+		// Get owned LocalDisks and verify they match current spec.devices
+		owned, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
+			Group:   LocalDiskGroup,
+			Version: LocalDiskVersion,
+			Kind:    LocalDiskKind,
+		}, LocalDiskList)
+		if err != nil {
+			return false, fmt.Errorf("failed to list owned LocalDisks: %w", err)
+		}
 
 		// Extract device paths from owned LocalDisks
 		ownedDevices := make(map[string]struct{})
@@ -616,18 +614,6 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 		return false, fmt.Errorf("list LocalDisks: %w", err)
 	}
 
-	if len(ownedLDs) == 0 {
-		logger.V(1).Info("No owned LocalDisks found yet; skipping Filesystem creation")
-		return false, nil
-	}
-
-	// Check if all LocalDisks are healthy before creating Filesystem
-	if !r.areAllLocalDisksHealthy(ctx, ownedLDs) {
-		logger.V(1).Info("LocalDisks exist but not all are healthy yet; skipping Filesystem creation")
-		return false, nil
-	}
-
-	// Extract LocalDisk names for Filesystem spec
 	var ldNames []string
 	for _, ld := range ownedLDs {
 		ldNames = append(ldNames, ld.GetName())
@@ -709,26 +695,8 @@ func (r *FileSystemClaimReconciler) ensureFileSystem(ctx context.Context, fsc *f
 func (r *FileSystemClaimReconciler) syncFilesystemConditions(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	// Do not surface FilesystemCreated at all until LocalDisks actually exist and are healthy.
-	// Check LocalDisk objects directly instead of relying on conditions.
-	ownedLDs, err := r.listOwnedResources(ctx, fsc, schema.GroupVersionKind{
-		Group:   LocalDiskGroup,
-		Version: LocalDiskVersion,
-		Kind:    LocalDiskKind,
-	}, LocalDiskList)
-	if err != nil {
-		logger.Error(err, "Failed to list LocalDisks for Filesystem condition sync")
-		return false, err
-	}
-
-	if len(ownedLDs) == 0 {
-		logger.V(1).Info("No LocalDisks found yet; skipping Filesystem condition sync")
-		return false, nil
-	}
-
-	// Check if all LocalDisks are healthy
-	if !r.areAllLocalDisksHealthy(ctx, ownedLDs) {
-		logger.V(1).Info("LocalDisks exist but not all are healthy yet; skipping Filesystem condition sync")
+	// Do not surface FilesystemCreated at all until LocalDiskCreated is True.
+	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeLocalDiskCreated) {
 		return false, nil
 	}
 
@@ -848,9 +816,6 @@ func (r *FileSystemClaimReconciler) ensureVolumeSnapshotClass(ctx context.Contex
 			"fscNamespace", fsc.Namespace)
 		return false, nil
 	}
-
-	// Note: StorageClass doesn't have health conditions like Filesystem,
-	// so existence check is sufficient - if it exists, it's ready to use
 
 	vscName := fsc.Name // Use FSC name for consistency with StorageClass
 	logger.Info("Ensuring VolumeSnapshotClass exists",
@@ -1092,75 +1057,6 @@ func (r *FileSystemClaimReconciler) isConditionTrue(fsc *fusionv1alpha1.FileSyst
 		}
 	}
 	return false
-}
-
-// isFilesystemHealthy checks if a Filesystem resource is healthy by examining its Ready condition directly
-func (r *FileSystemClaimReconciler) isFilesystemHealthy(ctx context.Context, fs *unstructured.Unstructured) bool {
-	logger := log.FromContext(ctx)
-
-	// Extract conditions from the Filesystem status
-	conds, err := extractResourceConditions(fs)
-	if err != nil {
-		logger.V(1).Info("Failed to extract Filesystem conditions",
-			"filesystem", fs.GetName(),
-			"error", err)
-		return false
-	}
-
-	// Check if Ready condition exists and is True
-	readyCondition := apimeta.FindStatusCondition(conds, "Ready")
-	if readyCondition == nil {
-		logger.V(1).Info("Filesystem Ready condition not found",
-			"filesystem", fs.GetName())
-		return false
-	}
-
-	isHealthy := readyCondition.Status == metav1.ConditionTrue
-	if !isHealthy {
-		logger.V(1).Info("Filesystem not ready",
-			"filesystem", fs.GetName(),
-			"readyStatus", readyCondition.Status,
-			"reason", readyCondition.Reason,
-			"message", readyCondition.Message)
-	}
-
-	return isHealthy
-}
-
-// areAllLocalDisksHealthy checks if all LocalDisks are healthy by examining their Ready conditions directly
-func (r *FileSystemClaimReconciler) areAllLocalDisksHealthy(ctx context.Context, localDisks []unstructured.Unstructured) bool {
-	logger := log.FromContext(ctx)
-
-	for _, ld := range localDisks {
-		// Extract conditions from the LocalDisk status
-		conds, err := extractResourceConditions(&ld)
-		if err != nil {
-			logger.V(1).Info("Failed to extract LocalDisk conditions",
-				"localdisk", ld.GetName(),
-				"error", err)
-			return false
-		}
-
-		// Check if Ready condition exists and is True
-		readyCondition := apimeta.FindStatusCondition(conds, "Ready")
-		if readyCondition == nil {
-			logger.V(1).Info("LocalDisk Ready condition not found",
-				"localdisk", ld.GetName())
-			return false
-		}
-
-		if readyCondition.Status != metav1.ConditionTrue {
-			logger.V(1).Info("LocalDisk not ready",
-				"localdisk", ld.GetName(),
-				"readyStatus", readyCondition.Status,
-				"reason", readyCondition.Reason,
-				"message", readyCondition.Message)
-			return false
-		}
-	}
-
-	// All LocalDisks are healthy
-	return true
 }
 
 // getRandomStorageNode returns a random node name that has both

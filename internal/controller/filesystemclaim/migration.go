@@ -53,6 +53,16 @@ const (
 	InitialObservedGeneration    = int64(1) // Initial observed generation for status conditions
 )
 
+// Precompiled regex patterns for WWN matching
+var (
+	wwnPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`^uuid\..+`),
+		regexp.MustCompile(`^eui\..+`),
+		regexp.MustCompile(`^0x[0-9a-fA-F]+`),
+		regexp.MustCompile(`^dm-uuid-mpath-.+`),
+	}
+)
+
 // LegacyResourceGroup represents a group of v1.0 resources that belong together
 type LegacyResourceGroup struct {
 	FilesystemName string
@@ -237,16 +247,11 @@ func isV1LocalDisk(ld *unstructured.Unstructured) bool {
 
 // matchesWWNPattern checks if a name matches the expected WWN pattern
 func matchesWWNPattern(name string) bool {
-	// Match patterns: uuid.*, eui.*, 0x*
-	patterns := []string{
-		`^uuid\.`,
-		`^eui\.`,
-		`^0x`,
-	}
-
-	for _, pattern := range patterns {
-		matched, _ := regexp.MatchString(pattern, name)
-		if matched {
+	// Match patterns: uuid.* (must have content after dot), eui.* (must have content after dot),
+	// 0x* (must have content after 0x), dm-uuid-mpath-* (device mapper multipath)
+	// These patterns ensure at least one character follows the prefix
+	for _, pattern := range wwnPatterns {
+		if pattern.MatchString(name) {
 			return true
 		}
 	}

@@ -47,23 +47,92 @@ var _ = Describe("Migration Helper Functions", func() {
 	})
 
 	Describe("matchesWWNPattern", func() {
-		It("should match uuid prefix", func() {
-			Expect(matchesWWNPattern("uuid.12345678-1234-1234-1234-123456789abc")).To(BeTrue())
+		Context("Valid WWN patterns", func() {
+			It("should match uuid prefix with full UUID", func() {
+				Expect(matchesWWNPattern("uuid.12345678-1234-1234-1234-123456789abc")).To(BeTrue())
+			})
+
+			It("should match uuid prefix with short form", func() {
+				Expect(matchesWWNPattern("uuid.abcdef123456")).To(BeTrue())
+			})
+
+			It("should match eui prefix with standard format", func() {
+				Expect(matchesWWNPattern("eui.0025388200000001")).To(BeTrue())
+			})
+
+			It("should match eui prefix with different format", func() {
+				Expect(matchesWWNPattern("eui.e8eba83bf22cc001")).To(BeTrue())
+			})
+
+			It("should match 0x prefix with hex identifier", func() {
+				Expect(matchesWWNPattern("0x5000c50089876543")).To(BeTrue())
+			})
+
+			It("should match 0x prefix with uppercase hex", func() {
+				Expect(matchesWWNPattern("0x5000C50089ABCDEF")).To(BeTrue())
+			})
+
+			It("should match dm-uuid-mpath prefix with WWN", func() {
+				Expect(matchesWWNPattern("dm-uuid-mpath-360014056c502dc2555642e399e2f14af")).To(BeTrue())
+			})
+
+			It("should match dm-uuid-mpath prefix with different WWN", func() {
+				Expect(matchesWWNPattern("dm-uuid-mpath-360014053a3f231f43804d01957be1757")).To(BeTrue())
+			})
+
+			It("should match dm-uuid-mpath prefix with short identifier", func() {
+				Expect(matchesWWNPattern("dm-uuid-mpath-12345")).To(BeTrue())
+			})
 		})
 
-		It("should match eui prefix", func() {
-			Expect(matchesWWNPattern("eui.0025388200000001")).To(BeTrue())
+		Context("Real-world v1.0 LocalDisk names", func() {
+			It("should match NVMe UUID format", func() {
+				Expect(matchesWWNPattern("uuid.e8eba839-00b5-284e-a286-5097a2c51c00")).To(BeTrue())
+			})
+
+			It("should match EUI format from real deployments", func() {
+				Expect(matchesWWNPattern("eui.0025388b21109b01")).To(BeTrue())
+				Expect(matchesWWNPattern("eui.0025388b21109b02")).To(BeTrue())
+			})
+
+			It("should match WWN with 0x prefix", func() {
+				Expect(matchesWWNPattern("0x5000c500deadbeef")).To(BeTrue())
+			})
+
+			It("should match device mapper multipath names from production", func() {
+				// Real names from the bug report must-gather logs
+				Expect(matchesWWNPattern("dm-uuid-mpath-360014053a3f231f43804d01957be1757")).To(BeTrue())
+				Expect(matchesWWNPattern("dm-uuid-mpath-360014056c502dc2555642e399e2f14af")).To(BeTrue())
+				Expect(matchesWWNPattern("dm-uuid-mpath-360014059498973b52cd446fb27b15595")).To(BeTrue())
+			})
 		})
 
-		It("should match 0x prefix", func() {
-			Expect(matchesWWNPattern("0x5000c50089876543")).To(BeTrue())
-		})
+		Context("Invalid patterns that should NOT match", func() {
+			It("should not match simple device names", func() {
+				Expect(matchesWWNPattern("nvme0n1")).To(BeFalse())
+				Expect(matchesWWNPattern("sda")).To(BeFalse())
+				Expect(matchesWWNPattern("sdb1")).To(BeFalse())
+			})
 
-		It("should not match invalid patterns", func() {
-			Expect(matchesWWNPattern("nvme0n1")).To(BeFalse())
-			Expect(matchesWWNPattern("sda")).To(BeFalse())
-			Expect(matchesWWNPattern("disk-123")).To(BeFalse())
-			Expect(matchesWWNPattern("")).To(BeFalse())
+			It("should not match custom disk names", func() {
+				Expect(matchesWWNPattern("disk-123")).To(BeFalse())
+				Expect(matchesWWNPattern("my-disk")).To(BeFalse())
+				Expect(matchesWWNPattern("localdisk-1")).To(BeFalse())
+			})
+
+			It("should not match empty or partial patterns", func() {
+				Expect(matchesWWNPattern("")).To(BeFalse())
+				Expect(matchesWWNPattern("uuid")).To(BeFalse())
+				Expect(matchesWWNPattern("eui")).To(BeFalse())
+				Expect(matchesWWNPattern("0x")).To(BeFalse())
+				Expect(matchesWWNPattern("dm-uuid-mpath-")).To(BeFalse())
+				Expect(matchesWWNPattern("dm-uuid-mpath")).To(BeFalse())
+			})
+
+			It("should not match patterns with wrong prefix", func() {
+				Expect(matchesWWNPattern("wwn-12345678")).To(BeFalse())
+				Expect(matchesWWNPattern("id-12345678")).To(BeFalse())
+			})
 		})
 	})
 
@@ -173,47 +242,306 @@ var _ = Describe("Migration Helper Functions", func() {
 	})
 
 	Describe("discoverLegacyLocalDisks", func() {
-		It("should discover valid v1.0 LocalDisks", func() {
-			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+		Context("Valid v1.0 LocalDisks", func() {
+			It("should discover valid v1.0 LocalDisks with uuid pattern", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
 
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(ld).
-				Build()
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
 
-			localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(localDisks).To(HaveLen(1))
-			Expect(localDisks[0].GetName()).To(Equal("uuid.12345678"))
-		})
-
-		It("should skip already migrated LocalDisks", func() {
-			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
-			ld.SetLabels(map[string]string{
-				MigrationLabelMigrated: MigrationLabelValueTrue,
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(1))
+				Expect(localDisks[0].GetName()).To(Equal("uuid.12345678"))
 			})
 
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(ld).
-				Build()
+			It("should discover LocalDisks with eui pattern", func() {
+				ld := createV1LocalDisk("eui.0025388b21109b01", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
 
-			localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(localDisks).To(BeEmpty())
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(1))
+				Expect(localDisks[0].GetName()).To(Equal("eui.0025388b21109b01"))
+			})
+
+			It("should discover LocalDisks with 0x pattern", func() {
+				ld := createV1LocalDisk("0x5000c50089876543", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(1))
+				Expect(localDisks[0].GetName()).To(Equal("0x5000c50089876543"))
+			})
+
+			It("should discover LocalDisks with dm-uuid-mpath pattern", func() {
+				ld := createV1LocalDisk("dm-uuid-mpath-360014056c502dc2555642e399e2f14af", namespace, "/dev/disk/by-id/dm-uuid-mpath-360014056c502dc2555642e399e2f14af", "worker-1", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(1))
+				Expect(localDisks[0].GetName()).To(Equal("dm-uuid-mpath-360014056c502dc2555642e399e2f14af"))
+			})
+
+			It("should discover multiple LocalDisks with different patterns", func() {
+				ld1 := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld2 := createV1LocalDisk("eui.0025388b21109b01", namespace, "/dev/nvme1n1", "worker-2", "test-fs")
+				ld3 := createV1LocalDisk("0x5000c50089876543", namespace, "/dev/nvme2n1", "worker-3", "test-fs")
+				ld4 := createV1LocalDisk("dm-uuid-mpath-360014056c502dc2555642e399e2f14af", namespace, "/dev/disk/by-id/dm-uuid-mpath-360014056c502dc2555642e399e2f14af", "worker-4", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld1, ld2, ld3, ld4).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(4))
+			})
 		})
 
-		It("should skip LocalDisks with invalid names", func() {
-			ld := createV1LocalDisk("invalid-name", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+		Context("LocalDisks that should be filtered out", func() {
+			It("should skip already migrated LocalDisks", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld.SetLabels(map[string]string{
+					MigrationLabelMigrated: MigrationLabelValueTrue,
+				})
 
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(ld).
-				Build()
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
 
-			localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(localDisks).To(BeEmpty())
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks with invalid names (simple device names)", func() {
+				ld := createV1LocalDisk("nvme0n1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks with invalid names (custom names)", func() {
+				ld1 := createV1LocalDisk("my-disk-1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld2 := createV1LocalDisk("disk-123", namespace, "/dev/nvme1n1", "worker-2", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld1, ld2).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks without status.filesystem", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks without spec.device", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "", "worker-1", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks without spec.node", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "", "test-fs")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks with FSC ownerRef", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						Kind: FileSystemClaimKind,
+						Name: "test-fsc",
+					},
+				})
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+
+			It("should skip LocalDisks with skip-migration label", func() {
+				ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld.SetLabels(map[string]string{
+					MigrationLabelSkip: MigrationLabelValueTrue,
+				})
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+		})
+
+		Context("Mixed scenarios", func() {
+			It("should discover only valid LocalDisks in mixed environment", func() {
+				// Valid v1.0 LocalDisks
+				ld1 := createV1LocalDisk("uuid.valid1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+				ld2 := createV1LocalDisk("eui.valid2", namespace, "/dev/nvme1n1", "worker-2", "test-fs")
+
+				// Invalid - wrong name pattern
+				ld3 := createV1LocalDisk("nvme2n1", namespace, "/dev/nvme2n1", "worker-3", "test-fs")
+
+				// Invalid - already migrated
+				ld4 := createV1LocalDisk("uuid.migrated", namespace, "/dev/nvme3n1", "worker-4", "test-fs")
+				ld4.SetLabels(map[string]string{
+					MigrationLabelMigrated: MigrationLabelValueTrue,
+				})
+
+				// Invalid - missing filesystem
+				ld5 := createV1LocalDisk("uuid.nofsname", namespace, "/dev/nvme4n1", "worker-5", "")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld1, ld2, ld3, ld4, ld5).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(2))
+
+				names := []string{localDisks[0].GetName(), localDisks[1].GetName()}
+				Expect(names).To(ConsistOf("uuid.valid1", "eui.valid2"))
+			})
+
+			It("should handle empty namespace gracefully", func() {
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(BeEmpty())
+			})
+		})
+
+		Context("Real-world bug scenario", func() {
+			It("should discover LocalDisks from v1.0 GA deployment with real patterns", func() {
+				// Simulate the bug scenario: 3 LocalDisks created in v1.0
+				// Real-world patterns from NVMe devices
+				ld1 := createV1LocalDisk("uuid.e8eba839-00b5-284e-a286-5097a2c51c00", namespace, "/dev/nvme0n1", "worker-1", "fs1")
+				ld2 := createV1LocalDisk("uuid.f9fcb939-11c6-395f-b397-6108b3d62d11", namespace, "/dev/nvme1n1", "worker-2", "fs2")
+				ld3 := createV1LocalDisk("eui.0025388b21109b01", namespace, "/dev/nvme2n1", "worker-3", "fs1")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld1, ld2, ld3).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(localDisks).To(HaveLen(3), "All 3 LocalDisks should be discovered for migration")
+
+				// Verify all were found
+				names := []string{localDisks[0].GetName(), localDisks[1].GetName(), localDisks[2].GetName()}
+				Expect(names).To(ConsistOf(
+					"uuid.e8eba839-00b5-284e-a286-5097a2c51c00",
+					"uuid.f9fcb939-11c6-395f-b397-6108b3d62d11",
+					"eui.0025388b21109b01",
+				))
+			})
+
+			It("OCPNAS-292: should discover LocalDisks with multipath mapper names from actual bug report", func() {
+				// OCPNAS-292: FS are not migrated to FSC during upgrade from v1.0 to v1.1.0-0.4
+				// These are the ACTUAL 3 LocalDisk names from the must-gather logs that failed migration
+				ld1 := createV1LocalDisk(
+					"dm-uuid-mpath-360014053a3f231f43804d01957be1757",
+					namespace,
+					"/dev/disk/by-id/dm-uuid-mpath-360014053a3f231f43804d01957be1757",
+					"worker-0-0",
+					"dm-uuid-mpath-360014053a3f231f43804d01957be1757")
+				ld2 := createV1LocalDisk(
+					"dm-uuid-mpath-360014056c502dc2555642e399e2f14af",
+					namespace,
+					"/dev/disk/by-id/dm-uuid-mpath-360014056c502dc2555642e399e2f14af",
+					"worker-0-0",
+					"dm-uuid-mpath-360014056c502dc2555642e399e2f14af")
+				ld3 := createV1LocalDisk(
+					"dm-uuid-mpath-360014059498973b52cd446fb27b15595",
+					namespace,
+					"/dev/disk/by-id/dm-uuid-mpath-360014059498973b52cd446fb27b15595",
+					"worker-0-1",
+					"")
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(ld1, ld2, ld3).
+					Build()
+
+				localDisks, err := discoverLegacyLocalDisks(ctx, fakeClient)
+				Expect(err).NotTo(HaveOccurred())
+				// ld3 has no filesystem, so only 2 should be discovered
+				Expect(localDisks).To(HaveLen(2), "2 of 3 LocalDisks should be discovered (one has no filesystem)")
+
+				// Verify the correct ones were found
+				names := []string{localDisks[0].GetName(), localDisks[1].GetName()}
+				Expect(names).To(ConsistOf(
+					"dm-uuid-mpath-360014053a3f231f43804d01957be1757",
+					"dm-uuid-mpath-360014056c502dc2555642e399e2f14af",
+				))
+			})
 		})
 	})
 
