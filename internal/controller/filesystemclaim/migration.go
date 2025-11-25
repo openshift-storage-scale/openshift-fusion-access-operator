@@ -237,11 +237,14 @@ func isV1LocalDisk(ld *unstructured.Unstructured) bool {
 
 // matchesWWNPattern checks if a name matches the expected WWN pattern
 func matchesWWNPattern(name string) bool {
-	// Match patterns: uuid.*, eui.*, 0x*
+	// Match patterns: uuid.* (must have content after dot), eui.* (must have content after dot),
+	// 0x* (must have content after 0x), dm-uuid-mpath-* (device mapper multipath)
+	// These patterns ensure at least one character follows the prefix
 	patterns := []string{
-		`^uuid\.`,
-		`^eui\.`,
-		`^0x`,
+		`^uuid\..+`,
+		`^eui\..+`,
+		`^0x.+`,
+		`^dm-uuid-mpath-.+`,
 	}
 
 	for _, pattern := range patterns {
