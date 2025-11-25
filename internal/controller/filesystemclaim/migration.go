@@ -58,7 +58,7 @@ var (
 	wwnPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`^uuid\..+`),
 		regexp.MustCompile(`^eui\..+`),
-		regexp.MustCompile(`^0x.+`),
+		regexp.MustCompile(`^0x[0-9a-fA-F]+`),
 		regexp.MustCompile(`^dm-uuid-mpath-.+`),
 	}
 )
