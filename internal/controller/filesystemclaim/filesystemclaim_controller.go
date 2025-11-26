@@ -1206,7 +1206,7 @@ func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fu
 			}
 		}
 
-		logger.Info("Device validation successful", "device", device, "availableOnAllNodesWithWorkerAndstorageLabel", len(lvdrs))
+		logger.Info("Device validation successful", "deviceID", device, "availableOnAllNodesWithWorkerAndstorageLabel", len(lvdrs))
 	}
 
 	return nil

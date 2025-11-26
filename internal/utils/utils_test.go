@@ -852,10 +852,25 @@ var _ = Describe("ValidateDeviceIDs", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should accept an empty list", func() {
+		It("should reject an empty list", func() {
 			devices := []string{}
 			err := ValidateDeviceIDs(devices)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("spec.devices cannot be empty"))
+		})
+
+		It("should reject blank/empty strings in the list", func() {
+			devices := []string{""}
+			err := ValidateDeviceIDs(devices)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("spec.devices[0] cannot be blank/empty"))
+		})
+
+		It("should reject whitespace-only strings in the list", func() {
+			devices := []string{"   "}
+			err := ValidateDeviceIDs(devices)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("spec.devices[0] cannot be blank/empty"))
 		})
 	})
 

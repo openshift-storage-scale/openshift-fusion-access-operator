@@ -48,8 +48,17 @@ const (
 // and that there are no duplicates. Returns nil if valid.
 // This function is used by both the webhook and controller for defense-in-depth.
 func ValidateDeviceIDs(devices []string) error {
+	// Check for empty slice
+	if len(devices) == 0 {
+		return fmt.Errorf("spec.devices cannot be empty, at least one device must be specified")
+	}
+
 	seen := make(map[string]bool)
 	for i, device := range devices {
+		// Check for blank/empty strings
+		if strings.TrimSpace(device) == "" {
+			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid device ID (e.g., /dev/disk/by-id/nvme-...)", i)
+		}
 		// Check for leading/trailing whitespace
 		if strings.TrimSpace(device) != device {
 			return fmt.Errorf("spec.devices[%d]: %q has leading or trailing whitespace. "+
