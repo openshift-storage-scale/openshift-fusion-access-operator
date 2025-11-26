@@ -431,8 +431,9 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "uuid.12345678-abcd-1234-abcd-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.12345678-abcd-1234-abcd-123456789abc",
 						},
 					},
 				},
@@ -452,12 +453,12 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/nvme0n1", "node1")
+			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(wwn).To(Equal("uuid.12345678-abcd-1234-abcd-123456789abc"))
 		})
 
-		It("should return error when device not found in LVDR", func() {
+		It("should return error when device ID not found in LVDR", func() {
 			operatorNS := "test-operator"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
@@ -472,8 +473,9 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/sda",
-							WWN:  "uuid.different",
+							DeviceID: "/dev/disk/by-id/nvme-different-device",
+							Path:     "/dev/sda",
+							WWN:      "uuid.different",
 						},
 					},
 				},
@@ -493,7 +495,7 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/nvme0n1", "node1")
+			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("not found"))
 			Expect(wwn).To(BeEmpty())
@@ -511,8 +513,9 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "", // Empty WWN
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "", // Empty WWN
 						},
 					},
 				},
@@ -532,7 +535,7 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/nvme0n1", "node1")
+			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("WWN is empty"))
 			Expect(wwn).To(BeEmpty())

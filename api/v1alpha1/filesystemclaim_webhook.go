@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +67,11 @@ func (v *FileSystemClaimValidator) ValidateCreate(_ context.Context, obj runtime
 		return nil, err
 	}
 
+	// Validate device ID format and no duplicates
+	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -101,6 +107,11 @@ func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, new
 	}
 
 	if err := validateDevicesNotEmpty(newFSC.Spec.Devices); err != nil {
+		return nil, err
+	}
+
+	// Validate device ID format and no duplicates
+	if err := utils.ValidateDeviceIDs(newFSC.Spec.Devices); err != nil {
 		return nil, err
 	}
 
@@ -173,7 +184,7 @@ func validateDevicesNotEmpty(devices []string) error {
 	}
 	for i, device := range devices {
 		if strings.TrimSpace(device) == "" {
-			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid device path (e.g., /dev/nvme0n1)", i)
+			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid device ID (e.g., /dev/disk/by-id/nvme-...)", i)
 		}
 	}
 	return nil

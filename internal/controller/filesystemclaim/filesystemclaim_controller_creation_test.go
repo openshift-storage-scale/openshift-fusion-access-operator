@@ -729,7 +729,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 		})
 
 		It("should skip when DeviceValidated is not True", func() {
-			fsc := createTestFSC("test-fsc", namespace, []string{"/dev/nvme0n1"}, []metav1.Condition{
+			fsc := createTestFSC("test-fsc", namespace, []string{"/dev/disk/by-id/nvme-device-0"}, []metav1.Condition{
 				deviceValidatedCondition(metav1.ConditionFalse),
 			})
 
@@ -1228,7 +1228,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 			}
 
@@ -1236,8 +1236,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			node := createStorageNode("storage-node-1")
 			lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
 				{
-					Path: "/dev/nvme0n1",
-					WWN:  "uuid.12345678-1234-1234-1234-123456789abc",
+					DeviceID: "/dev/disk/by-id/nvme-device-0",
+					Path:     "/dev/nvme0n1",
+					WWN:      "uuid.12345678-1234-1234-1234-123456789abc",
 				},
 			})
 
@@ -1291,25 +1292,25 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			operatorNS := "test-operator-ns"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			// Create FSC1 with device /dev/nvme1n1
+			// Create FSC1 with device ID
 			fsc1 := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc-1",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme1n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
 				},
 			}
 
-			// Create FSC2 with the SAME device /dev/nvme1n1
+			// Create FSC2 with the SAME device ID
 			fsc2 := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc-2",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme1n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
 				},
 			}
 
@@ -1317,8 +1318,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			node := createStorageNode("storage-node-1")
 			lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
 				{
-					Path: "/dev/nvme1n1",
-					WWN:  "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+					DeviceID: "/dev/disk/by-id/nvme-device-1",
+					Path:     "/dev/nvme1n1",
+					WWN:      "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				},
 			})
 
@@ -1376,7 +1378,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond).NotTo(BeNil(), "DeviceValidated condition should be set")
 			Expect(deviceValidatedCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
-			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/nvme1n1"))
+			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"))
 			// Device disappeared from LVDR, so error is about device not found rather than ownership
 
 			// Check Ready condition
@@ -1384,7 +1386,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(readyCond).NotTo(BeNil())
 			Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(readyCond.Reason).To(Equal(ReasonValidationFailed))
-			Expect(readyCond.Message).To(ContainSubstring("/dev/nvme1n1"))
+			Expect(readyCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"))
 
 			// Verify only ONE LocalDisk was created (by FSC1, not FSC2)
 			Expect(fakeClient.List(ctx, lds, client.InNamespace(namespace))).To(Succeed())
@@ -1405,7 +1407,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-owner-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme1n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
 				},
 			}
 
@@ -1417,7 +1419,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-under-test-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme1n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
 				},
 			}
 
@@ -1425,13 +1427,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			node := createStorageNode("storage-node-1")
 			lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
 				{
-					Path: "/dev/nvme1n1",
-					WWN:  "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+					DeviceID: "/dev/disk/by-id/nvme-device-1",
+					Path:     "/dev/nvme1n1",
+					WWN:      "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				},
 			})
 
 			// Pre-create LocalDisk with ownerReference pointing to a different FSC
-			localDisk := createLocalDiskWithOwner("uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", namespace, "/dev/nvme1n1", "storage-node-1", fscOwner)
+			localDisk := createLocalDiskWithOwner("uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", namespace, "/dev/disk/by-id/nvme-device-1", "storage-node-1", fscOwner)
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
@@ -1479,7 +1482,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("already in use"), "message should indicate device is already in use by another FSC")
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("fsc-owner"), "message should mention the owner FSC name")
-			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/nvme1n1"), "message should mention the device path")
+			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"), "message should mention the device ID")
 
 			// Ready condition should be False with ReasonValidationFailed
 			readyCond := findCondition(updatedFSC.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
@@ -1497,7 +1500,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			operatorNS := "test-operator-ns"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			devPath := "/dev/nvme1n1"
+			deviceID := "/dev/disk/by-id/nvme-device-1"
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "fsc-with-preexisting-localdisk",
@@ -1505,7 +1508,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{devPath},
+					Devices: []string{deviceID},
 				},
 			}
 
@@ -1513,8 +1516,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			node := createStorageNode("storage-node-1")
 			lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
 				{
-					Path: devPath,
-					WWN:  "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+					DeviceID: deviceID,
+					Path:     "/dev/nvme1n1",
+					WWN:      "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				},
 			})
 
@@ -1524,7 +1528,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			localDisk := createLocalDiskWithoutFSCOwner(
 				"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				namespace,
-				devPath,
+				deviceID,
 				"storage-node-1",
 				[]metav1.OwnerReference{
 					{
@@ -1572,7 +1576,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("already in use"), "message should indicate device is already in use")
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("unknown"), "message should contain 'unknown' fallback when no FSC owner is found")
-			Expect(deviceValidatedCond.Message).To(ContainSubstring(devPath), "message should mention the device path")
+			Expect(deviceValidatedCond.Message).To(ContainSubstring(deviceID), "message should mention the device ID")
 
 			// Ready condition should be False with ReasonValidationFailed
 			readyCond := findCondition(updatedFSC.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
@@ -1633,8 +1637,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1", // Different device
-							WWN:  "uuid.12345678",
+							DeviceID: "/dev/disk/by-id/nvme-different-device", // Different device
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.12345678",
 						},
 					},
 				},
@@ -1675,7 +1680,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 			}
 
@@ -1725,7 +1730,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -1761,8 +1766,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "uuid.12345678-1234-1234-1234-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.12345678-1234-1234-1234-123456789abc",
 						},
 					},
 				},
@@ -1817,7 +1823,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -1853,8 +1859,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "uuid.12345678-1234-1234-1234-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.12345678-1234-1234-1234-123456789abc",
 						},
 					},
 				},
@@ -1922,7 +1929,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 			}
 
@@ -1971,14 +1978,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			operatorNS := "test-operator-ns"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			devPath := "/dev/nvme0n1"
+			deviceID := "/dev/disk/by-id/nvme-device-0"
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{devPath},
+					Devices: []string{deviceID},
 				},
 			}
 
@@ -2002,8 +2009,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/sda", // Different device
-							WWN:  "uuid.other",
+							DeviceID: "/dev/disk/by-id/nvme-different-device", // Different device
+							Path:     "/dev/sda",
+							WWN:      "uuid.other",
 						},
 					},
 				},
@@ -2034,14 +2042,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond).NotTo(BeNil())
 			Expect(deviceValidatedCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
-			Expect(deviceValidatedCond.Message).To(ContainSubstring(devPath))
+			Expect(deviceValidatedCond.Message).To(ContainSubstring(deviceID))
 
 			// Verify Ready condition
 			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonValidationFailed))
-			Expect(cond.Message).To(ContainSubstring(devPath))
+			Expect(cond.Message).To(ContainSubstring(deviceID))
 		})
 
 		It("should create multiple LocalDisks for multiple devices", func() {
@@ -2054,7 +2062,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1", "/dev/nvme1n1"}, // Multiple devices
+					Devices: []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"}, // Multiple devices
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -2090,12 +2098,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "uuid.aaaa-1111-2222-3333-bbbbbbbbbbbb",
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.aaaa-1111-2222-3333-bbbbbbbbbbbb",
 						},
 						{
-							Path: "/dev/nvme1n1",
-							WWN:  "uuid.cccc-4444-5555-6666-dddddddddddd",
+							DeviceID: "/dev/disk/by-id/nvme-device-1",
+							Path:     "/dev/nvme1n1",
+							WWN:      "uuid.cccc-4444-5555-6666-dddddddddddd",
 						},
 					},
 				},
@@ -2142,7 +2152,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -2176,8 +2186,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							Path: "/dev/nvme0n1",
-							WWN:  "uuid.12345678-1234-1234-1234-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							Path:     "/dev/nvme0n1",
+							WWN:      "uuid.12345678-1234-1234-1234-123456789abc",
 						},
 					},
 				},
