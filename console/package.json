@@ -58,7 +58,7 @@
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^6.4.1",
     "css-loader": "^6.7.1",
-    "cypress": "^12.17.4",
+    "cypress": "^15.0.0",
     "cypress-multi-reporters": "^1.6.2",
     "globals": "^16.0.0",
     "i18next": "^24.2.3",
