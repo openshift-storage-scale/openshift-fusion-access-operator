@@ -33,7 +33,10 @@ const (
 
 // FileSystemClaimSpec defines the desired state of FileSystemClaim.
 type FileSystemClaimSpec struct {
-	// Devices is a list of device paths to be used for the file system. For example, ["/dev/sda", "/dev/sdb"]
+	// Devices is a list of unique persistent device IDs to be used for the file system.
+	// Use /dev/disk/by-id/... paths (e.g., /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234).
+	// Device paths like /dev/sda or /dev/nvme0n1 are NOT accepted as they may vary across nodes.
+	// Each device must be unique - duplicates are not allowed.
 	Devices []string `json:"devices,omitempty"`
 }
 

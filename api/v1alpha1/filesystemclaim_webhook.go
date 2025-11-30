@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +62,11 @@ func (v *FileSystemClaimValidator) ValidateCreate(_ context.Context, obj runtime
 
 	logger.Info("validate create", "name", fsc.Name, "namespace", fsc.Namespace, "devices", fsc.Spec.Devices)
 
-	// Allow all creates - device validation will be performed by the controller
+	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
+	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -84,6 +89,22 @@ func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, new
 		"namespace", newFSC.Namespace,
 		"oldDevices", oldFSC.Spec.Devices,
 		"newDevices", newFSC.Spec.Devices)
+
+	// If the object is being deleted, allow the update (finalizer removal)
+	// but still prevent changes to spec.devices if they are not identical.
+	if !newFSC.DeletionTimestamp.IsZero() {
+		if reflect.DeepEqual(oldFSC.Spec.Devices, newFSC.Spec.Devices) {
+			logger.Info("object is being deleted and spec.devices unchanged, allowing update for finalizer removal", "name", newFSC.Name)
+			return nil, nil
+		}
+		// If spec.devices changed during deletion, it's still an invalid update.
+		return nil, fmt.Errorf("spec.devices cannot be modified during deletion")
+	}
+
+	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
+	if err := utils.ValidateDeviceIDs(newFSC.Spec.Devices); err != nil {
+		return nil, err
+	}
 
 	// Check if spec.devices changed
 	if reflect.DeepEqual(oldFSC.Spec.Devices, newFSC.Spec.Devices) {

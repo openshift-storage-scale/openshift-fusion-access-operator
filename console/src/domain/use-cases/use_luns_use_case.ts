@@ -91,14 +91,14 @@ export const useLunsUseCase = () => {
   ]);
 
   const isSelected = useCallback(
-    (lun: Lun) => luns.find((l) => l.path === lun.path)?.isSelected ?? false,
+    (lun: Lun) => luns.find((l) => l.wwn === lun.wwn)?.isSelected ?? false,
     [luns],
   );
 
   const setSelected = useCallback((lun: Lun, isSelected: boolean) => {
     setLuns((current) => {
       const draft = window.structuredClone(current);
-      const subject = draft.find((l) => l.path === lun.path);
+      const subject = draft.find((l) => l.wwn === lun.wwn);
       if (subject) {
         subject.isSelected = isSelected;
         return draft;
@@ -145,7 +145,7 @@ export type WithNodeName<T> = T & { nodeName: string };
  * The returned function is intended for use with Array.prototype.filter on discovered devices.
  * It returns true for a discovered device if:
  *   - The fileSystemClaims array is empty (i.e., no claims to check against), or
- *   - The device's path does NOT match any device path specified in any file system claim's spec.devices array.
+ *   - The device's WWN does NOT match any device WWN specified in any file system claim's spec.devices array.
  *
  * Note: This logic is used to exclude devices that are already associated with a file system claim, preventing
  * the same LUN from being selected for multiple claims (including those in provisioning status).
@@ -156,13 +156,13 @@ export type WithNodeName<T> = T & { nodeName: string };
 const outDevicesUsedByFileSystemClaims =
   (fileSystemClaims: FileSystemClaim[]) =>
   (dd: WithNodeName<DiscoveredDevice>): boolean => {
-    const usedDevicePaths = new Set<string>();
+    const usedDeviceIds = new Set<string>();
     fileSystemClaims.forEach((claim) => {
-      claim.spec?.devices?.forEach((devicePath) => {
-        usedDevicePaths.add(devicePath);
+      claim.spec?.devices?.forEach((deviceId) => {
+        usedDeviceIds.add(deviceId);
       });
     });
-    return !usedDevicePaths.has(dd.path);
+    return !usedDeviceIds.has(dd.deviceID);
   };
 
 /**
@@ -182,6 +182,7 @@ const toLun = (dd: WithNodeName<DiscoveredDevice>): Lun => ({
   nodeName: dd.nodeName,
   path: dd.path,
   wwn: dd.WWN,
+  deviceId: dd.deviceID,
   capacity: convert(dd.size, "B").to("GiB").toFixed(2) + " GiB",
 });
 

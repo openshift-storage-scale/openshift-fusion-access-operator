@@ -92,7 +92,7 @@ export const FileSystemClaimsCreateForm: React.FC<{ formId: string }> = ({
                 </Thead>
                 <Tbody>
                   {vm.luns.data.map((lun, rowIndex) => (
-                    <Tr key={lun.path}>
+                    <Tr key={lun.wwn}>
                       <Td
                         select={{
                           rowIndex,
@@ -100,8 +100,11 @@ export const FileSystemClaimsCreateForm: React.FC<{ formId: string }> = ({
                           onSelect: vm.handleSelectLun(lun),
                         }}
                       />
-                      <Td dataLabel={vm.columns.PATH}>{lun.path}</Td>
-                      <Td dataLabel={vm.columns.WWN}>{lun.wwn}</Td>
+                      <Td dataLabel={vm.columns.WWN}>
+                        <span className="pf-v6-u-font-family-monospace">
+                          {lun.wwn}
+                        </span>
+                      </Td>
                       <Td dataLabel={vm.columns.CAPACITY}>{lun.capacity}</Td>
                     </Tr>
                   ))}

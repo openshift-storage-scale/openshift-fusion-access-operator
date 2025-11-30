@@ -1,6 +1,5 @@
 import {
   GreenCheckCircleIcon,
-  RedExclamationCircleIcon,
   YellowExclamationTriangleIcon,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { InProgressIcon, UnknownIcon } from "@patternfly/react-icons";
@@ -9,7 +8,6 @@ import { SPECTRUM_SCALE_NAMESPACE, VALUE_NOT_AVAILABLE } from "@/constants";
 import { useFileSystemsRepository } from "@/data/repositories/use_file_systems_repository";
 import { useLocalizationService } from "@/domain/services/use_localization_service";
 import type { FileSystemClaim } from "@/shared/types/fusion-storage-openshift-io/v1alpha1/FileSystemClaim";
-import type { Filesystem } from "@/shared/types/scale-spectrum-ibm-com/v1beta1/Filesystem";
 import { getName } from "@/shared/utils/k8s_resource_common";
 
 export const useFileSystemClaimsTableRowViewModel = (
@@ -40,10 +38,19 @@ export const useFileSystemClaimsTableRowViewModel = (
           Icon: InProgressIcon,
         };
       case fileSystemClaimDeletionBlockedCondition?.status === "True":
+        if (
+          fileSystemClaimDeletionBlockedCondition.reason === "StorageClassInUse"
+        ) {
+          return {
+            title: t("Deletion blocked"),
+            message: fileSystemClaimDeletionBlockedCondition.message,
+            Icon: YellowExclamationTriangleIcon,
+          };
+        }
         return {
           title: t("Deletion blocked"),
           message:
-            "<bold>WARNING:</bold> Deleting the filesystem resource will result in loss of data. To confirm this action, please label the filesystem <FileSystemNameLink>{{fileSystemName}}</FileSystemNameLink> with <label>{{label}}</label> and try again.",
+            "<bold>WARNING:</bold> Deleting the filesystem resource will result in loss of data. To confirm this action, please label the filesystem <FileSystemNameLink>{{fileSystemName}}</FileSystemNameLink> with <label>{{label}}</label>.",
           Icon: YellowExclamationTriangleIcon,
         };
       case fileSystemClaimReadyCondition?.status === "False" &&
@@ -68,10 +75,12 @@ export const useFileSystemClaimsTableRowViewModel = (
     }
   }, [
     t,
-    fileSystemClaimDeletionBlockedCondition?.status,
     fileSystemClaimReadyCondition?.message,
     fileSystemClaimReadyCondition?.status,
     fileSystemClaimReadyCondition?.reason,
+    fileSystemClaimDeletionBlockedCondition?.message,
+    fileSystemClaimDeletionBlockedCondition?.status,
+    fileSystemClaimDeletionBlockedCondition?.reason,
   ]);
 
   return useMemo(

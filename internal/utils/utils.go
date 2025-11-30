@@ -39,7 +39,46 @@ const (
 	CheckPodPullInterval        = 2 * time.Second
 	CheckPodName                = "image-check-fusion-access"
 	CheckPodContainerName       = "check"
+
+	// DeviceIDPrefix is the required prefix for persistent device IDs
+	DeviceIDPrefix = "/dev/disk/by-id/"
 )
+
+// ValidateDeviceIDs validates that all device IDs have the correct format
+// and that there are no duplicates. Returns nil if valid.
+// This function is used by both the webhook and controller for defense-in-depth.
+func ValidateDeviceIDs(devices []string) error {
+	// Check for empty slice
+	if len(devices) == 0 {
+		return fmt.Errorf("spec.devices cannot be empty, at least one device must be specified")
+	}
+
+	seen := make(map[string]bool)
+	for i, device := range devices {
+		// Check for blank/empty strings
+		if strings.TrimSpace(device) == "" {
+			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid device ID (e.g., /dev/disk/by-id/nvme-...)", i)
+		}
+		// Check for leading/trailing whitespace
+		if strings.TrimSpace(device) != device {
+			return fmt.Errorf("spec.devices[%d]: %q has leading or trailing whitespace. "+
+				"Please remove whitespace from the device ID", i, device)
+		}
+		// Check format - must be /dev/disk/by-id/
+		if !strings.HasPrefix(device, DeviceIDPrefix) {
+			return fmt.Errorf("spec.devices[%d]: %q is invalid. "+
+				"Use persistent device IDs like /dev/disk/by-id/... "+
+				"(not paths like /dev/sda or /dev/nvme0n1)", i, device)
+		}
+		// Check for duplicates (O(n) with map)
+		if seen[device] {
+			return fmt.Errorf("spec.devices[%d]: duplicate device %q. "+
+				"Each device must be unique", i, device)
+		}
+		seen[device] = true
+	}
+	return nil
+}
 
 // Taken from https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=planning-software-requirements
 type FusionAccessData struct {

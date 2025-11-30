@@ -117,7 +117,8 @@ const (
 	FileSystemKind    = "Filesystem"
 	FileSystemList    = "FilesystemList"
 
-	FileSystemClaimKind = "FileSystemClaim"
+	FileSystemClaimKind       = "FileSystemClaim"
+	FileSystemClaimAPIVersion = "fusion.storage.openshift.io/v1alpha1"
 
 	// VolumeSnapshotClass constants
 	VolumeSnapshotClassGroup   = "snapshot.storage.k8s.io"
@@ -331,6 +332,8 @@ func (r *FileSystemClaimReconciler) handleDeletion(ctx context.Context, fsc *fus
 }
 
 // ensureLocalDisk creates LocalDisk/s
+//
+//nolint:funlen // Complex function with atomic validation+creation to prevent TOCTOU race condition
 func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (bool, error) {
 	logger := log.FromContext(ctx)
 
@@ -347,12 +350,12 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			return false, fmt.Errorf("failed to list owned LocalDisks: %w", err)
 		}
 
-		// Extract device paths from owned LocalDisks
+		// Extract device IDs from owned LocalDisks
 		ownedDevices := make(map[string]struct{})
 		for _, ld := range owned {
-			devicePath, _, _ := unstructured.NestedString(ld.Object, "spec", "device")
-			if devicePath != "" {
-				ownedDevices[devicePath] = struct{}{}
+			deviceID, _, _ := unstructured.NestedString(ld.Object, "spec", "device")
+			if deviceID != "" {
+				ownedDevices[deviceID] = struct{}{}
 			}
 		}
 
@@ -395,22 +398,21 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		return false, nil
 	}
 
-	// Phase 1: validate once
-	if !r.isConditionTrue(fsc, fusionv1alpha1.ConditionTypeDeviceValidated) {
-		if err := r.validateDevices(ctx, fsc); err != nil {
-			logger.Error(err, "Device validation failed")
-			if e := r.handleValidationError(ctx, fsc, err); e != nil {
-				logger.Error(e, "Failed to update status after disk validation failure")
-				return false, e
-			}
-			return true, nil
-		}
-
-		if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device/s validation succeeded"); e != nil {
-			logger.Error(e, "Failed to update status after device validation success")
+	logger.Info("Validating devices before LocalDisk creation", "devices", fsc.Spec.Devices)
+	if err := r.validateDevices(ctx, fsc); err != nil {
+		logger.Error(err, "Device validation failed")
+		if e := r.handleValidationError(ctx, fsc, err); e != nil {
+			logger.Error(e, "Failed to update status after disk validation failure")
 			return false, e
 		}
 		return true, nil
+	}
+	logger.Info("Device validation successful, proceeding to create LocalDisks")
+
+	// Set DeviceValidated=True after successful validation
+	if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device(s) validation succeeded"); e != nil {
+		logger.Error(e, "Failed to update DeviceValidated condition after successful validation")
+		return false, e
 	}
 
 	// Get node name first - the same node will be used for all LocalDisks
@@ -427,12 +429,12 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 	var requeue bool
 
 	// Phase 2: ensure LocalDisks
-	for _, devicePath := range fsc.Spec.Devices {
+	for _, deviceID := range fsc.Spec.Devices {
 		// Get WWN for the device
 		// this will fail if the device is not found in any of the LocalVolumeDiscoveryResult
-		wwn, err := r.getDeviceWWN(ctx, devicePath, nodeName)
+		wwn, err := r.getDeviceWWN(ctx, deviceID, nodeName)
 		if err != nil {
-			logger.Error(err, "failed to get WWN for device", "device", devicePath, "node", nodeName)
+			logger.Error(err, "failed to get WWN for device", "deviceID", deviceID, "node", nodeName)
 			if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
 				return false, e
 			}
@@ -465,7 +467,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		switch {
 		case errors.IsNotFound(err):
 			// Create LocalDisk with new naming
-			spec := map[string]any{"device": devicePath, "node": nodeName}
+			spec := map[string]any{"device": deviceID, "node": nodeName}
 			if err := r.createResourceWithOwnership(ctx, fsc, ld, spec); err != nil {
 				logger.Error(err, "failed to create LocalDisk", "name", localDiskName)
 				if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
@@ -474,7 +476,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 				return true, nil
 			}
 
-			logger.Info("Creating LocalDisk", "name", localDiskName, "device", devicePath, "node", nodeName)
+			logger.Info("Creating LocalDisk", "name", localDiskName, "deviceID", deviceID, "node", nodeName)
 			_, e := r.updateConditionIfChanged(
 				ctx, fsc,
 				fusionv1alpha1.ConditionTypeLocalDiskCreated,
@@ -493,12 +495,22 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			return false, fmt.Errorf("failed to get LocalDisk %s: %w", localDiskName, err)
 
 		default:
-			// Check for drift and patch if needed
-			// There is a admission webhook that prevents the update of spec.device, spec.node and spec.thinDiskType after the LocalDisk is created.
-			// example error:
-			// ... cannot be edited because a related NSD is already created in Storage Scale
-			logger.Info("localDisk already exists, skipping drift detection and patching", "name", localDiskName)
-			return false, nil
+			// LocalDisk already exists - check if it's owned by this FSC or another one
+			if !isOwnedByThisFSC(ld, fsc.Name) {
+				// LocalDisk is owned by a different FSC - get the actual owner name
+				actualOwnerName := getOwnerFSCName(ld)
+				errMsg := fmt.Sprintf("Device ID %s is already in use by FileSystemClaim: %s",
+					deviceID, actualOwnerName)
+				logger.Error(fmt.Errorf("device already in use"), errMsg, "deviceID", deviceID, "localDisk", localDiskName, "owner", actualOwnerName)
+
+				if e := r.handleValidationError(ctx, fsc, fmt.Errorf("%s", errMsg)); e != nil {
+					return false, e
+				}
+				return true, nil
+			}
+
+			logger.Info("localDisk already exists and is owned by this FSC, skipping drift detection", "name", localDiskName)
+			continue
 		}
 	}
 
@@ -1041,12 +1053,23 @@ func (r *FileSystemClaimReconciler) patchFSCSpec(ctx context.Context, fsc *fusio
 func isOwnedByThisFSC(obj client.Object, fscName string) bool {
 	for _, or := range obj.GetOwnerReferences() {
 		if or.Kind == FileSystemClaimKind &&
-			or.APIVersion == "fusion.storage.openshift.io/v1alpha1" &&
+			or.APIVersion == FileSystemClaimAPIVersion &&
 			or.Name == fscName {
 			return true
 		}
 	}
 	return false
+}
+
+// getOwnerFSCName returns the name of the FileSystemClaim that owns this resource
+func getOwnerFSCName(obj client.Object) string {
+	for _, or := range obj.GetOwnerReferences() {
+		if or.Kind == FileSystemClaimKind &&
+			or.APIVersion == FileSystemClaimAPIVersion {
+			return or.Name
+		}
+	}
+	return "unknown"
 }
 
 // isConditionTrue checks if a condition is true in the FileSystemClaim status
@@ -1109,6 +1132,11 @@ func (r *FileSystemClaimReconciler) getRandomStorageNode(ctx context.Context) (s
 func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) error {
 	logger := log.FromContext(ctx)
 
+	// Defense-in-depth: validate format and duplicates even if webhook is disabled
+	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
+		return err
+	}
+
 	allNodes := &metav1.PartialObjectMetadataList{}
 	allNodes.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("NodeList"))
 
@@ -1167,27 +1195,27 @@ func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fu
 
 			deviceFound := false
 			for _, discoveredDevice := range lvdr.Status.DiscoveredDevices {
-				if discoveredDevice.Path == device {
+				if discoveredDevice.DeviceID == device {
 					deviceFound = true
 					break
 				}
 			}
 
 			if !deviceFound {
-				return fmt.Errorf("device %s not found in LocalVolumeDiscoveryResult for node %s", device, nodeName)
+				return fmt.Errorf("device ID %s not found in LocalVolumeDiscoveryResult for node %s", device, nodeName)
 			}
 		}
 
-		logger.Info("Device validation successful", "device", device, "availableOnAllNodesWithWorkerAndstorageLabel", len(lvdrs))
+		logger.Info("Device validation successful", "deviceID", device, "availableOnAllNodesWithWorkerAndstorageLabel", len(lvdrs))
 	}
 
 	return nil
 }
 
-// getDeviceWWN looks up the WWN for a device path from LocalVolumeDiscoveryResult
+// getDeviceWWN looks up the WWN for a device ID from LocalVolumeDiscoveryResult
 func (r *FileSystemClaimReconciler) getDeviceWWN(
 	ctx context.Context,
-	devicePath string,
+	deviceID string,
 	nodeName string,
 ) (string, error) {
 	logger := log.FromContext(ctx)
@@ -1214,18 +1242,18 @@ func (r *FileSystemClaimReconciler) getDeviceWWN(
 		return "", fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", nodeName, err)
 	}
 
-	// Search for the device in DiscoveredDevices
+	// Search for the device in DiscoveredDevices by DeviceID
 	for _, device := range lvdr.Status.DiscoveredDevices {
-		if device.Path == devicePath {
+		if device.DeviceID == deviceID {
 			if device.WWN == "" {
-				return "", fmt.Errorf("device %s found but WWN is empty", devicePath)
+				return "", fmt.Errorf("device ID %s found but WWN is empty", deviceID)
 			}
-			logger.Info("Found WWN for device", "device", devicePath, "wwn", device.WWN, "node", nodeName)
+			logger.Info("Found WWN for device", "deviceID", deviceID, "wwn", device.WWN, "node", nodeName)
 			return device.WWN, nil
 		}
 	}
 
-	return "", fmt.Errorf("device %s not found in LocalVolumeDiscoveryResult for node %s", devicePath, nodeName)
+	return "", fmt.Errorf("device ID %s not found in LocalVolumeDiscoveryResult for node %s", deviceID, nodeName)
 }
 
 // generateLocalDiskName generates a LocalDisk name from WWN
@@ -1518,7 +1546,9 @@ func (r *FileSystemClaimReconciler) detectAndPatchDrift(
 	return true, nil
 }
 
-// handleValidationError updates both Ready and DeviceValidated conditions for validation errors
+// handleValidationError updates both DeviceValidated and Ready conditions
+// to False when device validation fails. This ensures consistent error reporting
+// across all validation failure paths (initial validation, ownership conflicts, etc.)
 func (r *FileSystemClaimReconciler) handleValidationError(
 	ctx context.Context,
 	fsc *fusionv1alpha1.FileSystemClaim,
@@ -1526,12 +1556,20 @@ func (r *FileSystemClaimReconciler) handleValidationError(
 ) error {
 	return r.patchFSCStatus(ctx, fsc, func(cur *fusionv1alpha1.FileSystemClaim) {
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, fusionv1alpha1.ConditionTypeReady,
-			metav1.ConditionFalse, ReasonValidationFailed, err.Error(), cur.Generation,
+			cur.Status.Conditions,
+			fusionv1alpha1.ConditionTypeDeviceValidated,
+			metav1.ConditionFalse,
+			ReasonDeviceValidationFailed,
+			err.Error(),
+			cur.Generation,
 		)
 		cur.Status.Conditions = utils.UpdateCondition(
-			cur.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated,
-			metav1.ConditionFalse, ReasonDeviceValidationFailed, err.Error(), cur.Generation,
+			cur.Status.Conditions,
+			fusionv1alpha1.ConditionTypeReady,
+			metav1.ConditionFalse,
+			ReasonValidationFailed,
+			err.Error(),
+			cur.Generation,
 		)
 	})
 }
@@ -2207,8 +2245,8 @@ func isInTargetNamespace(obj client.Object) bool {
 func isOwnedByFileSystemClaim(obj client.Object) bool {
 	ownerRefs := obj.GetOwnerReferences()
 	for _, ownerRef := range ownerRefs {
-		if ownerRef.Kind == "FileSystemClaim" &&
-			ownerRef.APIVersion == "fusion.storage.openshift.io/v1alpha1" {
+		if ownerRef.Kind == FileSystemClaimKind &&
+			ownerRef.APIVersion == FileSystemClaimAPIVersion {
 			return true
 		}
 	}

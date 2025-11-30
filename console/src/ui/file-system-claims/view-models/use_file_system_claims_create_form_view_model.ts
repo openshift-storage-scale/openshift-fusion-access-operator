@@ -19,7 +19,6 @@ export const useFileSystemClaimsCreateFormViewModel = () => {
   const columns = useMemo(
     () =>
       ({
-        PATH: t("Path"),
         WWN: "WWN",
         CAPACITY: t("Capacity"),
       }) as const,
@@ -55,16 +54,16 @@ export const useFileSystemClaimsCreateFormViewModel = () => {
 
   const createFileSystemClaim = useFileSystemClaimsCreateUseCase();
 
-  const selectedDevices = useMemo(() => {
-    return luns.data.filter((l) => l.isSelected).map((l) => l.path);
+  const selectedLuns = useMemo(() => {
+    return luns.data.filter((l) => l.isSelected);
   }, [luns.data]);
 
   const handleSubmitForm = useCallback(
     (e) => {
       e.preventDefault();
-      createFileSystemClaim(fileSystemName, selectedDevices);
+      createFileSystemClaim(fileSystemName, selectedLuns);
     },
-    [createFileSystemClaim, fileSystemName, selectedDevices],
+    [createFileSystemClaim, fileSystemName, selectedLuns],
   );
 
   useEffect(() => {

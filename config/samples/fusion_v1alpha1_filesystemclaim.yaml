@@ -7,7 +7,7 @@ metadata:
   name: filesystemclaim-sample
 spec:
   devices:
-    - "/dev/nvme0n1"
-    - "/dev/nvme1n1"
-    - "/dev/nvme2n1"
+    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0"
+    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF1"
+    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF2"
 

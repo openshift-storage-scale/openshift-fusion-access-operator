@@ -2,6 +2,7 @@ export interface Lun {
   isSelected: boolean;
   nodeName: string;
   path: string;
+  deviceId: string;
   wwn: string;
   /**
    * The capacity of the LUN, expressed as a string in GiB units.

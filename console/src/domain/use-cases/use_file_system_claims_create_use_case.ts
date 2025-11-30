@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import { useFileSystemClaimsRepository } from "@/data/repositories/use_file_system_claims_repository";
-import type { Lun } from "@/domain/models/lun";
 import { useLocalizationService } from "@/domain/services/use_localization_service";
 import { useStore } from "@/shared/store/provider";
 import type { Actions, State } from "@/shared/store/types";
 import { useRedirectHandler } from "@/shared/utils/use_redirect_handler";
+import type { Lun } from "../models/lun";
 
 export const useFileSystemClaimsCreateUseCase = () => {
   const [, dispatch] = useStore<State, Actions>();
@@ -15,13 +15,14 @@ export const useFileSystemClaimsCreateUseCase = () => {
   const fileSystemClaimsRepository = useFileSystemClaimsRepository();
 
   return useCallback(
-    async (fileSystemName: string, devices: string[]) => {
+    async (fileSystemName: string, luns: Lun[]) => {
       dispatch({
         type: "global/updateCta",
         payload: { isLoading: true },
       });
 
       try {
+        const devices = luns.map((l) => l.deviceId);
         await fileSystemClaimsRepository.create(fileSystemName, devices);
         goToFileSystemClaimsHome();
       } catch (e) {
