@@ -18,6 +18,7 @@ package filesystemclaim
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -631,7 +632,22 @@ var _ = Describe("Migration Helper Functions", func() {
 	})
 
 	Describe("Full Migration Flow", func() {
-		It("should successfully migrate a complete resource group", func() {
+		var operatorNamespace string
+
+		BeforeEach(func() {
+			// Set operator namespace for LVDR lookup
+			operatorNamespace = "openshift-fusion-access-operator"
+			// Set environment variable for GetDeploymentNamespace()
+			// This is required for convertDevicePathsToIDs to work
+			os.Setenv("DEPLOYMENT_NAMESPACE", operatorNamespace)
+		})
+
+		AfterEach(func() {
+			// Clean up environment variable
+			os.Unsetenv("DEPLOYMENT_NAMESPACE")
+		})
+
+		It("should successfully migrate a complete resource group and convert paths to device IDs", func() {
 			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
 			fs := createV1Filesystem("test-fs", namespace)
 			sc := &storagev1.StorageClass{
@@ -641,23 +657,35 @@ var _ = Describe("Migration Helper Functions", func() {
 				Provisioner: "spectrumscale.csi.ibm.com",
 			}
 
+			// Create LVDR with device path and device ID for conversion
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.12345678",
+					WWN:      "uuid.12345678",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(ld, fs, sc).
+				WithObjects(ld, fs, sc, lvdr).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
 			err := RunMigration(ctx, fakeClient)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify FSC was created
+			// Verify FSC was created with device ID (not path)
 			fsc := &fusionv1alpha1.FileSystemClaim{}
 			err = fakeClient.Get(ctx, client.ObjectKey{
 				Name:      "test-fs",
 				Namespace: namespace,
 			}, fsc)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/nvme0n1"))
+			// Migration should convert /dev/nvme0n1 to /dev/disk/by-id/nvme-uuid.12345678
+			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/disk/by-id/nvme-uuid.12345678"))
 			Expect(fsc.Labels[MigrationLabelMigrated]).To(Equal(MigrationLabelValueTrue))
 			Expect(fsc.Labels[MigrationLabelSource]).To(Equal(MigrationSourceV1))
 
@@ -700,9 +728,20 @@ var _ = Describe("Migration Helper Functions", func() {
 			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
 			fs := createV1Filesystem("test-fs", namespace)
 
+			// Create LVDR for path to ID conversion
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.12345678",
+					WWN:      "uuid.12345678",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(ld, fs).
+				WithObjects(ld, fs, lvdr).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
@@ -721,21 +760,39 @@ var _ = Describe("Migration Helper Functions", func() {
 			Expect(fscList.Items).To(HaveLen(1))
 		})
 
-		It("should handle multiple LocalDisks for one Filesystem", func() {
+		It("should handle multiple LocalDisks for one Filesystem and convert all paths to device IDs", func() {
 			ld1 := createV1LocalDisk("uuid.ld1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
-			ld2 := createV1LocalDisk("uuid.ld2", namespace, "/dev/nvme1n1", "worker-2", "test-fs")
+			ld2 := createV1LocalDisk("uuid.ld2", namespace, "/dev/nvme1n1", "worker-1", "test-fs")
 			fs := createV1Filesystem("test-fs", namespace)
+
+			// Create LVDR with both device paths and device IDs
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.ld1",
+					WWN:      "uuid.ld1",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+				{
+					Path:     "/dev/nvme1n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.ld2",
+					WWN:      "uuid.ld2",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(ld1, ld2, fs).
+				WithObjects(ld1, ld2, fs, lvdr).
 				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
 			err := RunMigration(ctx, fakeClient)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify FSC has both devices
+			// Verify FSC has both devices converted to device IDs
 			fsc := &fusionv1alpha1.FileSystemClaim{}
 			err = fakeClient.Get(ctx, client.ObjectKey{
 				Name:      "test-fs",
@@ -743,7 +800,8 @@ var _ = Describe("Migration Helper Functions", func() {
 			}, fsc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fsc.Spec.Devices).To(HaveLen(2))
-			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/nvme0n1", "/dev/nvme1n1"))
+			// Migration should convert paths to device IDs
+			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/disk/by-id/nvme-uuid.ld1", "/dev/disk/by-id/nvme-uuid.ld2"))
 
 			// Verify both LocalDisks have ownerRef
 			for _, ldName := range []string{"uuid.ld1", "uuid.ld2"} {
@@ -788,13 +846,14 @@ var _ = Describe("Migration Helper Functions", func() {
 			fs := createV1Filesystem("test-fs", namespace)
 
 			// Create FSC that already exists (from manual creation or previous migration)
+			// Note: If FSC already exists, conversion won't run, so it can have either paths or IDs
 			existingFSC := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fs",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/nvme0n1"},
+					Devices: []string{"/dev/disk/by-id/nvme-uuid.12345678"},
 				},
 			}
 
@@ -830,6 +889,95 @@ var _ = Describe("Migration Helper Functions", func() {
 
 			err := RunMigration(ctx, fakeClient)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail when LVDR is missing for device path conversion", func() {
+			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+			fs := createV1Filesystem("test-fs", namespace)
+
+			// No LVDR created - conversion should fail
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld, fs).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			// RunMigration logs errors but returns nil, so we verify no FSC was created
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred()) // RunMigration always returns nil
+
+			// Verify no FSC was created due to conversion failure
+			fscList := &fusionv1alpha1.FileSystemClaimList{}
+			err = fakeClient.List(ctx, fscList, client.InNamespace(namespace))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fscList.Items).To(BeEmpty(), "FSC should not be created when LVDR is missing")
+		})
+
+		It("should fail when device path not found in LVDR", func() {
+			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+			fs := createV1Filesystem("test-fs", namespace)
+
+			// LVDR exists but doesn't have the device path
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme1n1", // Different device
+					DeviceID: "/dev/disk/by-id/nvme-uuid.other",
+					WWN:      "uuid.other",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld, fs, lvdr).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			// RunMigration logs errors but returns nil, so we verify no FSC was created
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred()) // RunMigration always returns nil
+
+			// Verify no FSC was created due to conversion failure
+			fscList := &fusionv1alpha1.FileSystemClaimList{}
+			err = fakeClient.List(ctx, fscList, client.InNamespace(namespace))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fscList.Items).To(BeEmpty(), "FSC should not be created when device path is not found in LVDR")
+		})
+
+		It("should skip conversion for devices already in device ID format", func() {
+			// LocalDisk with device ID instead of path (edge case)
+			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/disk/by-id/nvme-uuid.12345678", "worker-1", "test-fs")
+			fs := createV1Filesystem("test-fs", namespace)
+
+			// LVDR with matching device ID
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.12345678",
+					WWN:      "uuid.12345678",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld, fs, lvdr).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify FSC has device ID (not converted, already correct)
+			fsc := &fusionv1alpha1.FileSystemClaim{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "test-fs",
+				Namespace: namespace,
+			}, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/disk/by-id/nvme-uuid.12345678"))
 		})
 	})
 })

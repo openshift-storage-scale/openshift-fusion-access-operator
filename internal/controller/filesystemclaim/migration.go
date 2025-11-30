@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	fusionv1alpha1 "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
+	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -391,6 +393,75 @@ func migrateResourceGroup(ctx context.Context, c client.Client, group *LegacyRes
 	return nil
 }
 
+// convertDevicePathsToIDs converts device paths to device IDs by looking them up in LVDR
+// This is needed because migration preserves v1.0 device paths, but operator requires device IDs
+func convertDevicePathsToIDs(ctx context.Context, c client.Client, devicePaths []string, nodeName string) ([]string, error) {
+	logger := log.FromContext(ctx).WithValues("node", nodeName)
+
+	// Get operator namespace (where LVDRs are stored)
+	operatorNamespace, err := utils.GetDeploymentNamespace()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operator deployment namespace: %w", err)
+	}
+
+	// Get LVDR for the node
+	lvdrName := fmt.Sprintf("discovery-result-%s", nodeName)
+	lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{}
+	err = c.Get(ctx, types.NamespacedName{
+		Name:      lvdrName,
+		Namespace: operatorNamespace,
+	}, lvdr)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, fmt.Errorf("LocalVolumeDiscoveryResult %s not found in namespace %s. "+
+				"Device discovery must run before migration. Please ensure devicefinder-discovery pods are running",
+				lvdrName, operatorNamespace)
+		}
+		return nil, fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", nodeName, err)
+	}
+
+	// Convert paths to IDs
+	deviceIDs := make([]string, 0, len(devicePaths))
+	notFoundPaths := make([]string, 0)
+
+	for _, path := range devicePaths {
+		// Check if already a device ID (skip conversion)
+		if strings.HasPrefix(path, "/dev/disk/by-id/") {
+			logger.Info("Device already in device ID format, skipping conversion", "device", path)
+			deviceIDs = append(deviceIDs, path)
+			continue
+		}
+
+		// Look up device ID from path in LVDR
+		found := false
+		for _, discoveredDevice := range lvdr.Status.DiscoveredDevices {
+			if discoveredDevice.Path != path {
+				continue
+			}
+			if discoveredDevice.DeviceID == "" {
+				return nil, fmt.Errorf("device path %s found in LVDR but DeviceID is empty. "+
+					"This may indicate a discovery issue", path)
+			}
+			logger.Info("Converted device path to device ID", "path", path, "deviceID", discoveredDevice.DeviceID)
+			deviceIDs = append(deviceIDs, discoveredDevice.DeviceID)
+			found = true
+			break
+		}
+
+		if !found {
+			notFoundPaths = append(notFoundPaths, path)
+		}
+	}
+
+	if len(notFoundPaths) > 0 {
+		return nil, fmt.Errorf("device path(s) not found in LocalVolumeDiscoveryResult for node %s: %v. "+
+			"These devices may be in use, filtered out by discovery, or not present on the node. "+
+			"Please check devicefinder-discovery pod logs", nodeName, notFoundPaths)
+	}
+
+	return deviceIDs, nil
+}
+
 // createOrGetFilesystemClaim creates a new FSC or returns existing one
 func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *LegacyResourceGroup) (*fusionv1alpha1.FileSystemClaim, error) {
 	logger := log.FromContext(ctx).WithValues("filesystem", group.FilesystemName)
@@ -420,7 +491,27 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 		return nil, fmt.Errorf("failed to get FilesystemClaim: %w", err)
 	}
 
-	// Create new FSC
+	// Convert device paths to device IDs before creating FSC
+	// Get node name from first LocalDisk (all LocalDisks in a group should be on the same node)
+	if len(group.LocalDisks) == 0 {
+		return nil, fmt.Errorf("no LocalDisks in group, cannot determine node for device conversion")
+	}
+
+	nodeName, _, _ := unstructured.NestedString(group.LocalDisks[0].Object, "spec", "node")
+	if nodeName == "" {
+		return nil, fmt.Errorf("LocalDisk %s does not have spec.node, cannot determine node for device conversion",
+			group.LocalDisks[0].GetName())
+	}
+
+	logger.Info("Converting device paths to device IDs", "paths", group.DevicePaths, "node", nodeName)
+	deviceIDs, err := convertDevicePathsToIDs(ctx, c, group.DevicePaths, nodeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert device paths to device IDs: %w", err)
+	}
+
+	logger.Info("Device path to ID conversion successful", "paths", group.DevicePaths, "deviceIDs", deviceIDs)
+
+	// Create new FSC with device IDs (not paths)
 	// Use RFC3339 timestamp in annotation (human-readable)
 	timestamp := time.Now().Format(time.RFC3339)
 	fsc = &fusionv1alpha1.FileSystemClaim{
@@ -436,7 +527,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			},
 		},
 		Spec: fusionv1alpha1.FileSystemClaimSpec{
-			Devices: group.DevicePaths,
+			Devices: deviceIDs, // Use device IDs instead of paths
 		},
 	}
 
