@@ -761,6 +761,7 @@ var _ = Describe("Migration Helper Functions", func() {
 		})
 
 		It("should handle multiple LocalDisks for one Filesystem and convert all paths to device IDs", func() {
+			// Both LocalDisks on the same node (required for migration)
 			ld1 := createV1LocalDisk("uuid.ld1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
 			ld2 := createV1LocalDisk("uuid.ld2", namespace, "/dev/nvme1n1", "worker-1", "test-fs")
 			fs := createV1Filesystem("test-fs", namespace)
@@ -978,6 +979,101 @@ var _ = Describe("Migration Helper Functions", func() {
 			}, fsc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/disk/by-id/nvme-uuid.12345678"))
+		})
+
+		It("should handle mixed device lists with some IDs and some paths", func() {
+			// LocalDisk already using a device ID path (should be left unchanged)
+			ld1 := createV1LocalDisk("uuid.12345678", namespace, "/dev/disk/by-id/nvme-uuid.12345678", "worker-1", "test-fs")
+			// LocalDisk using a legacy device path (should be converted to device ID)
+			ld2 := createV1LocalDisk("uuid.87654321", namespace, "/dev/nvme1n1", "worker-1", "test-fs")
+			fs := createV1Filesystem("test-fs", namespace)
+
+			// LVDR with both devices:
+			// - Device already referenced by ID (should be left untouched)
+			// - Legacy-path device (should be converted to ID)
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.12345678",
+					WWN:      "uuid.12345678",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+				{
+					Path:     "/dev/nvme1n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.87654321",
+					WWN:      "uuid.87654321",
+					Size:     2000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld1, ld2, fs, lvdr).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify FSC has both devices converted to IDs
+			fsc := &fusionv1alpha1.FileSystemClaim{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "test-fs",
+				Namespace: namespace,
+			}, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Both devices should be in device ID format:
+			// - The pre-migrated ID path should remain unchanged
+			// - The legacy path should be converted to its device ID
+			Expect(fsc.Spec.Devices).To(HaveLen(2))
+			Expect(fsc.Spec.Devices).To(ContainElement("/dev/disk/by-id/nvme-uuid.12345678"))
+			Expect(fsc.Spec.Devices).To(ContainElement("/dev/disk/by-id/nvme-uuid.87654321"))
+		})
+
+		It("should fail when LocalDisks in group are on different nodes", func() {
+			// Create LocalDisks on different nodes (should fail validation)
+			ld1 := createV1LocalDisk("uuid.ld1", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
+			ld2 := createV1LocalDisk("uuid.ld2", namespace, "/dev/nvme1n1", "worker-2", "test-fs")
+			fs := createV1Filesystem("test-fs", namespace)
+
+			// LVDRs for both nodes
+			lvdr1 := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.ld1",
+					WWN:      "uuid.ld1",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+			lvdr2 := createLVDR("worker-2", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme1n1",
+					DeviceID: "/dev/disk/by-id/nvme-uuid.ld2",
+					WWN:      "uuid.ld2",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld1, ld2, fs, lvdr1, lvdr2).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			// RunMigration logs errors but returns nil, so we verify no FSC was created
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred()) // RunMigration always returns nil
+
+			// Verify no FSC was created due to node mismatch
+			fscList := &fusionv1alpha1.FileSystemClaimList{}
+			err = fakeClient.List(ctx, fscList, client.InNamespace(namespace))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fscList.Items).To(BeEmpty(), "FSC should not be created when LocalDisks are on different nodes")
 		})
 	})
 })

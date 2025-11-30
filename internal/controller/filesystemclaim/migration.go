@@ -73,6 +73,9 @@ type LegacyResourceGroup struct {
 	StorageClass   *storagev1.StorageClass
 	DevicePaths    []string
 	IsValid        bool
+	// NodeName is the node where all LocalDisks in this group are located
+	// Set during validation - all LocalDisks must be on the same node
+	NodeName string
 }
 
 // MigrationStats tracks migration progress
@@ -326,7 +329,59 @@ func validateResourceGroup(ctx context.Context, c client.Client, group *LegacyRe
 		return fmt.Errorf("no device paths found in LocalDisks")
 	}
 
+	// Validate that all LocalDisks in the group are on the same node
+	// This is required for device path-to-ID conversion which uses a single node's LVDR
+	// Also stores the node name in the group for later use
+	// Only validate if LocalDisks are present (they may not be set in unit tests)
+	if len(group.LocalDisks) > 0 {
+		if err := validateLocalDisksSameNode(group); err != nil {
+			return fmt.Errorf("node validation failed: %w", err)
+		}
+	}
+
 	group.IsValid = true
+	return nil
+}
+
+// validateLocalDisksSameNode validates that all LocalDisks in a group are on the same node
+// and stores the node name in group.NodeName for later use.
+// This is required because device path-to-ID conversion uses a single node's LVDR
+func validateLocalDisksSameNode(group *LegacyResourceGroup) error {
+	if len(group.LocalDisks) == 0 {
+		return fmt.Errorf("no LocalDisks in group")
+	}
+
+	// Get node name from first LocalDisk
+	firstNodeName, found, err := unstructured.NestedString(group.LocalDisks[0].Object, "spec", "node")
+	if err != nil {
+		return fmt.Errorf("failed to read spec.node from LocalDisk %s: %w",
+			group.LocalDisks[0].GetName(), err)
+	}
+	if !found || firstNodeName == "" {
+		return fmt.Errorf("LocalDisk %s does not have spec.node",
+			group.LocalDisks[0].GetName())
+	}
+
+	// Validate all other LocalDisks are on the same node
+	for i := 1; i < len(group.LocalDisks); i++ {
+		nodeName, found, err := unstructured.NestedString(group.LocalDisks[i].Object, "spec", "node")
+		if err != nil {
+			return fmt.Errorf("failed to read spec.node from LocalDisk %s: %w",
+				group.LocalDisks[i].GetName(), err)
+		}
+		if !found || nodeName == "" {
+			return fmt.Errorf("LocalDisk %s does not have spec.node",
+				group.LocalDisks[i].GetName())
+		}
+		if nodeName != firstNodeName {
+			return fmt.Errorf("LocalDisks in group are on different nodes: %s (from %s) != %s (from %s). "+
+				"All LocalDisks in a filesystem group must be on the same node for device conversion",
+				firstNodeName, group.LocalDisks[0].GetName(), nodeName, group.LocalDisks[i].GetName())
+		}
+	}
+
+	// Store the validated node name in the group for later use
+	group.NodeName = firstNodeName
 	return nil
 }
 
@@ -395,6 +450,11 @@ func migrateResourceGroup(ctx context.Context, c client.Client, group *LegacyRes
 
 // convertDevicePathsToIDs converts device paths to device IDs by looking them up in LVDR
 // This is needed because migration preserves v1.0 device paths, but operator requires device IDs
+//
+// Note: This function is called once per group during migration. Each group is validated
+// to be on the same node, so we only do one LVDR lookup per group. GetDeploymentNamespace()
+// is a fast environment variable lookup, so caching is not necessary for typical migration
+// scenarios with a small number of groups.
 func convertDevicePathsToIDs(ctx context.Context, c client.Client, devicePaths []string, nodeName string) ([]string, error) {
 	logger := log.FromContext(ctx).WithValues("node", nodeName)
 
@@ -492,16 +552,11 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 	}
 
 	// Convert device paths to device IDs before creating FSC
-	// Get node name from first LocalDisk (all LocalDisks in a group should be on the same node)
-	if len(group.LocalDisks) == 0 {
-		return nil, fmt.Errorf("no LocalDisks in group, cannot determine node for device conversion")
+	// Node name was already validated and stored in group.NodeName during validateResourceGroup
+	if group.NodeName == "" {
+		return nil, fmt.Errorf("node name not set in group (validation should have set this)")
 	}
-
-	nodeName, _, _ := unstructured.NestedString(group.LocalDisks[0].Object, "spec", "node")
-	if nodeName == "" {
-		return nil, fmt.Errorf("LocalDisk %s does not have spec.node, cannot determine node for device conversion",
-			group.LocalDisks[0].GetName())
-	}
+	nodeName := group.NodeName
 
 	logger.Info("Converting device paths to device IDs", "paths", group.DevicePaths, "node", nodeName)
 	deviceIDs, err := convertDevicePathsToIDs(ctx, c, group.DevicePaths, nodeName)
