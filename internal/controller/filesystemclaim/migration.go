@@ -480,37 +480,40 @@ func convertDevicePathsToIDs(ctx context.Context, c client.Client, devicePaths [
 		return nil, fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", nodeName, err)
 	}
 
+	// Build a map of path -> deviceID for O(1) lookups instead of O(n²) nested loops
+	pathToDeviceID := make(map[string]string, len(lvdr.Status.DiscoveredDevices))
+	for _, discoveredDevice := range lvdr.Status.DiscoveredDevices {
+		if discoveredDevice.Path != "" {
+			pathToDeviceID[discoveredDevice.Path] = discoveredDevice.DeviceID
+		}
+	}
+
 	// Convert paths to IDs
 	deviceIDs := make([]string, 0, len(devicePaths))
 	notFoundPaths := make([]string, 0)
 
 	for _, path := range devicePaths {
 		// Check if already a device ID (skip conversion)
-		if strings.HasPrefix(path, "/dev/disk/by-id/") {
+		if strings.HasPrefix(path, utils.DeviceIDPrefix) {
 			logger.Info("Device already in device ID format, skipping conversion", "device", path)
 			deviceIDs = append(deviceIDs, path)
 			continue
 		}
 
-		// Look up device ID from path in LVDR
-		found := false
-		for _, discoveredDevice := range lvdr.Status.DiscoveredDevices {
-			if discoveredDevice.Path != path {
-				continue
-			}
-			if discoveredDevice.DeviceID == "" {
-				return nil, fmt.Errorf("device path %s found in LVDR but DeviceID is empty. "+
-					"This may indicate a discovery issue", path)
-			}
-			logger.Info("Converted device path to device ID", "path", path, "deviceID", discoveredDevice.DeviceID)
-			deviceIDs = append(deviceIDs, discoveredDevice.DeviceID)
-			found = true
-			break
-		}
-
+		// Look up device ID from path in map (O(1) lookup)
+		deviceID, found := pathToDeviceID[path]
 		if !found {
 			notFoundPaths = append(notFoundPaths, path)
+			continue
 		}
+
+		if deviceID == "" {
+			return nil, fmt.Errorf("device path %s found in LVDR but DeviceID is empty. "+
+				"This may indicate a discovery issue", path)
+		}
+
+		logger.Info("Converted device path to device ID", "path", path, "deviceID", deviceID)
+		deviceIDs = append(deviceIDs, deviceID)
 	}
 
 	if len(notFoundPaths) > 0 {

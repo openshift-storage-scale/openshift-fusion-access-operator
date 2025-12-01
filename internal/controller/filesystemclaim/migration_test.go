@@ -915,9 +915,6 @@ var _ = Describe("Migration Helper Functions", func() {
 		})
 
 		It("should fail when device path not found in LVDR", func() {
-			ld := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs")
-			fs := createV1Filesystem("test-fs", namespace)
-
 			// LVDR exists but doesn't have the device path
 			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
 				{
@@ -929,21 +926,22 @@ var _ = Describe("Migration Helper Functions", func() {
 				},
 			})
 
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(ld, fs, lvdr).
-				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
-				Build()
+			verifyMigrationFailsWithLVDR(ctx, scheme, lvdr, "FSC should not be created when device path is not found in LVDR")
+		})
 
-			// RunMigration logs errors but returns nil, so we verify no FSC was created
-			err := RunMigration(ctx, fakeClient)
-			Expect(err).NotTo(HaveOccurred()) // RunMigration always returns nil
+		It("should fail when device path exists in LVDR but DeviceID is empty", func() {
+			// LVDR has the device path but DeviceID is empty (discovery issue)
+			lvdr := createLVDR("worker-1", operatorNamespace, []fusionv1alpha1.DiscoveredDevice{
+				{
+					Path:     "/dev/nvme0n1", // Matching path
+					DeviceID: "",             // Empty DeviceID - discovery issue
+					WWN:      "uuid.12345678",
+					Size:     1000000000,
+					Type:     fusionv1alpha1.DiskType,
+				},
+			})
 
-			// Verify no FSC was created due to conversion failure
-			fscList := &fusionv1alpha1.FileSystemClaimList{}
-			err = fakeClient.List(ctx, fscList, client.InNamespace(namespace))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fscList.Items).To(BeEmpty(), "FSC should not be created when device path is not found in LVDR")
+			verifyMigrationFailsWithLVDR(ctx, scheme, lvdr, "FSC should not be created when DeviceID is empty in LVDR")
 		})
 
 		It("should skip conversion for devices already in device ID format", func() {
@@ -1077,3 +1075,26 @@ var _ = Describe("Migration Helper Functions", func() {
 		})
 	})
 })
+
+// verifyMigrationFailsWithLVDR is a helper function to verify that migration fails
+// when given an LVDR that causes conversion to fail (e.g., missing device path or empty DeviceID)
+func verifyMigrationFailsWithLVDR(ctx context.Context, scheme *runtime.Scheme, lvdr *fusionv1alpha1.LocalVolumeDiscoveryResult, failureMessage string) {
+	ld := createV1LocalDisk("uuid.12345678", MigrationNamespace, "/dev/nvme0n1", "worker-1", "test-fs")
+	fs := createV1Filesystem("test-fs", MigrationNamespace)
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(ld, fs, lvdr).
+		WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+		Build()
+
+	// RunMigration logs errors but returns nil, so we verify no FSC was created
+	err := RunMigration(ctx, fakeClient)
+	Expect(err).NotTo(HaveOccurred()) // RunMigration always returns nil
+
+	// Verify no FSC was created due to conversion failure
+	fscList := &fusionv1alpha1.FileSystemClaimList{}
+	err = fakeClient.List(ctx, fscList, client.InNamespace(MigrationNamespace))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(fscList.Items).To(BeEmpty(), failureMessage)
+}
