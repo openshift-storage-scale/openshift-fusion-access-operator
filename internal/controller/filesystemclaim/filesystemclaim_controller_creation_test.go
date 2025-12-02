@@ -1173,6 +1173,194 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 	})
 
 	Describe("ensureLocalDisks", func() {
+		Context("with migrated FSC when LocalDisks are deleted", func() {
+			It("should set Ready=False but keep LocalDiskCreated=True when LocalDisks are deleted for migrated FSC", func() {
+				// Scenario: A migrated FSC has LocalDiskCreated=True (from migration),
+				// but the actual LocalDisks were deleted by someone.
+				// Expected behavior:
+				// - LocalDiskCreated condition should remain True with MigrationComplete reason (unchanged)
+				// - Ready condition should be set to False with ImmutableFieldModified reason
+				// - Error message should indicate this is a migrated FSC and LocalDisks won't be reconciled
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-migrated",
+						Namespace: namespace,
+						Labels: map[string]string{
+							MigrationLabelMigrated: MigrationLabelValueTrue,
+						},
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme2n1"}, // Device path (migrated FSCs have paths, not IDs)
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:               fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status:             metav1.ConditionTrue,
+								Reason:             MigrationReasonComplete,
+								Message:            "LocalDisks already exist from v1.0 (1 disks)",
+								LastTransitionTime: metav1.Now(),
+							},
+							{
+								Type:               fusionv1alpha1.ConditionTypeReady,
+								Status:             metav1.ConditionTrue,
+								Reason:             MigrationReasonComplete,
+								Message:            "All resources migrated successfully from v1.0",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
+					},
+				}
+
+				// No LocalDisks exist - simulating deletion
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue(), "should report changed when setting Ready=False")
+
+				// Verify the updated FSC
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				// LocalDiskCreated should remain True with MigrationComplete reason (unchanged)
+				ldCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
+				Expect(ldCond).NotTo(BeNil(), "LocalDiskCreated condition should still exist")
+				Expect(ldCond.Status).To(Equal(metav1.ConditionTrue), "LocalDiskCreated should remain True")
+				Expect(ldCond.Reason).To(Equal(MigrationReasonComplete), "LocalDiskCreated reason should remain MigrationComplete")
+
+				// Ready condition should be False with ImmutableFieldModified reason
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(readyCond).NotTo(BeNil(), "Ready condition should exist")
+				Expect(readyCond.Status).To(Equal(metav1.ConditionFalse), "Ready should be False")
+				Expect(readyCond.Reason).To(Equal(ReasonImmutableFieldModified), "Ready reason should be ImmutableFieldModified")
+				Expect(readyCond.Message).To(ContainSubstring("migrated FSC"), "Error message should mention migrated FSC")
+				Expect(readyCond.Message).To(ContainSubstring("won't be reconciled"), "Error message should indicate LocalDisks won't be reconciled")
+				Expect(readyCond.Message).To(ContainSubstring("Please delete this FileSystemClaim"), "Error message should guide user to delete FSC")
+			})
+
+			It("should detect mismatch when some LocalDisks are deleted for migrated FSC", func() {
+				// Scenario: A migrated FSC originally had 2 LocalDisks, but one was deleted
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-migrated-partial",
+						Namespace: namespace,
+						UID:       "test-uid-partial",
+						Labels: map[string]string{
+							MigrationLabelMigrated: MigrationLabelValueTrue,
+						},
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme1n1", "/dev/nvme2n1"}, // Two devices
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:               fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status:             metav1.ConditionTrue,
+								Reason:             MigrationReasonComplete,
+								Message:            "LocalDisks already exist from v1.0 (2 disks)",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
+					},
+				}
+
+				// Only one LocalDisk exists (simulating one was deleted)
+				existingLD := createLocalDiskWithOwner(
+					"uuid.12345678-1234-1234-1234-123456789abc",
+					namespace,
+					"/dev/nvme1n1", // Only first device exists
+					"worker-1",
+					fsc,
+				)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, existingLD).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify Ready condition is False with migration-specific message
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(readyCond).NotTo(BeNil())
+				Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(readyCond.Message).To(ContainSubstring("migrated FSC"))
+			})
+
+			It("should not affect non-migrated FSC when LocalDisks mismatch", func() {
+				// Scenario: A regular (non-migrated) FSC has LocalDisk mismatch
+				// It should show the standard error message, not the migration-specific one
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-regular",
+						Namespace: namespace,
+						// No migration label
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{"/dev/disk/by-id/nvme-device-1"},
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:               fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status:             metav1.ConditionTrue,
+								Reason:             ReasonLocalDiskCreationSucceeded,
+								LastTransitionTime: metav1.Now(),
+							},
+						},
+					},
+				}
+
+				// No LocalDisks exist - simulating deletion
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify Ready condition has standard error message (not migration-specific)
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(readyCond).NotTo(BeNil())
+				Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(readyCond.Reason).To(Equal(ReasonImmutableFieldModified))
+				Expect(readyCond.Message).To(ContainSubstring("spec.devices was modified"))
+				Expect(readyCond.Message).NotTo(ContainSubstring("migrated FSC"))
+			})
+		})
 		It("should skip when LocalDiskCreated is already True", func() {
 			fsc := createTestFSC("test-fsc", namespace, nil, []metav1.Condition{
 				localDiskCreatedCondition(metav1.ConditionTrue, ReasonLocalDiskCreationSucceeded),

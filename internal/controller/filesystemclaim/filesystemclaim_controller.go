@@ -367,12 +367,20 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 
 		// Compare the two sets
 		if !reflect.DeepEqual(ownedDevices, specDevices) {
-			errMsg := fmt.Sprintf("spec.devices was modified after LocalDisks were created. "+
-				"Original: %v, Current: %v. "+
-				"Either delete this FileSystemClaim (%s) and create new with desired devices, "+
-				"or create a new FileSystemClaim with UNUSED and AVAILABLE shared devices.",
-				mapKeysToSlice(ownedDevices), fsc.Spec.Devices, fsc.Name)
-			logger.Info(errMsg)
+			var errMsg string
+			if fsc.Labels != nil && fsc.Labels[MigrationLabelMigrated] == MigrationLabelValueTrue {
+				errMsg = fmt.Sprintf("Either the spec.devices was modified or the associated LocalDisks were deleted. "+
+					"Since this is a migrated FSC, therefore, its LocalDisk(s) won't be reconciled. "+
+					"Please delete this FileSystemClaim (%s) and create new with desired devices.", fsc.Name)
+				logger.Info(errMsg)
+			} else {
+				errMsg = fmt.Sprintf("spec.devices was modified after LocalDisks were created. "+
+					"Original: %v, Current: %v. "+
+					"Either delete this FileSystemClaim (%s) and create new with desired devices, "+
+					"or create a new FileSystemClaim with UNUSED and AVAILABLE shared devices.",
+					mapKeysToSlice(ownedDevices), fsc.Spec.Devices, fsc.Name)
+				logger.Info(errMsg)
+			}
 
 			// Set error condition
 			if e := r.patchFSCStatus(ctx, fsc, func(cur *fusionv1alpha1.FileSystemClaim) {
@@ -1606,16 +1614,30 @@ func buildFilesystemSpec(ldNames []string) map[string]any {
 }
 
 func buildStorageClass(fsc *fusionv1alpha1.FileSystemClaim, scName, fsName string) *storagev1.StorageClass {
+	labels := map[string]string{
+		FileSystemClaimOwnedByNameLabel:      fsc.Name,
+		FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
+	}
+
+	annotations := map[string]string{
+		StorageClassDefaultAnnotation: "true",
+	}
+
+	// If FSC is migrated, add migration labels and annotations to StorageClass
+	if fsc.Labels != nil && fsc.Labels[MigrationLabelMigrated] == MigrationLabelValueTrue {
+		labels[MigrationLabelMigrated] = MigrationLabelValueTrue
+		labels[MigrationLabelSource] = MigrationSourceV1
+		// Copy migration timestamp annotation if it exists
+		if timestamp, ok := fsc.Annotations[MigrationAnnotationTimestamp]; ok {
+			annotations[MigrationAnnotationTimestamp] = timestamp
+		}
+	}
+
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: scName,
-			Annotations: map[string]string{
-				StorageClassDefaultAnnotation: "true",
-			},
-			Labels: map[string]string{
-				FileSystemClaimOwnedByNameLabel:      fsc.Name,
-				FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
-			},
+			Name:        scName,
+			Annotations: annotations,
+			Labels:      labels,
 		},
 		Provisioner:          "spectrumscale.csi.ibm.com",
 		AllowVolumeExpansion: ptr.To(true),

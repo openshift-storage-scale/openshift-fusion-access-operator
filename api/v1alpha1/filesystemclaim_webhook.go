@@ -62,6 +62,16 @@ func (v *FileSystemClaimValidator) ValidateCreate(_ context.Context, obj runtime
 
 	logger.Info("validate create", "name", fsc.Name, "namespace", fsc.Namespace, "devices", fsc.Spec.Devices)
 
+	// Skip device ID format validation for migrated FSCs (they have device paths, not device IDs)
+	if fsc.Labels != nil && fsc.Labels["fusion.storage.openshift.io/migrated"] == "true" {
+		// Still check for empty devices list for migrated FSCs
+		if len(fsc.Spec.Devices) == 0 {
+			return nil, fmt.Errorf("spec.devices cannot be empty, at least one device must be specified")
+		}
+		logger.Info("skipping device ID format validation for migrated FSC", "name", fsc.Name)
+		return nil, nil
+	}
+
 	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
 	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
 		return nil, err
@@ -101,9 +111,19 @@ func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, new
 		return nil, fmt.Errorf("spec.devices cannot be modified during deletion")
 	}
 
-	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
-	if err := utils.ValidateDeviceIDs(newFSC.Spec.Devices); err != nil {
-		return nil, err
+	// Skip device ID format validation for migrated FSCs (they have device paths, not device IDs)
+	if newFSC.Labels != nil && newFSC.Labels["fusion.storage.openshift.io/migrated"] == "true" {
+		// Still check for empty devices list for migrated FSCs
+		if len(newFSC.Spec.Devices) == 0 {
+			return nil, fmt.Errorf("spec.devices cannot be empty, at least one device must be specified")
+		}
+		logger.Info("skipping device ID format validation for migrated FSC", "name", newFSC.Name)
+		// Continue with device change validation below (don't return early)
+	} else {
+		// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
+		if err := utils.ValidateDeviceIDs(newFSC.Spec.Devices); err != nil {
+			return nil, err
+		}
 	}
 
 	// Check if spec.devices changed

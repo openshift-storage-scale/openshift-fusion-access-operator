@@ -182,6 +182,66 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			})
 		})
 
+		Context("with migrated FSC (skip validation)", func() {
+			It("should allow creation with device paths for migrated FSC", func() {
+				fsc := &FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-migrated",
+						Namespace: "ibm-spectrum-scale",
+						Labels: map[string]string{
+							"fusion.storage.openshift.io/migrated": "true",
+						},
+					},
+					Spec: FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme2n1"}, // Device path, not device ID
+					},
+				}
+
+				warnings, err := validator.ValidateCreate(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred(), "should allow device paths for migrated FSC")
+				Expect(warnings).To(BeNil())
+			})
+
+			It("should allow creation with multiple device paths for migrated FSC", func() {
+				fsc := &FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-migrated",
+						Namespace: "ibm-spectrum-scale",
+						Labels: map[string]string{
+							"fusion.storage.openshift.io/migrated": "true",
+						},
+					},
+					Spec: FileSystemClaimSpec{
+						Devices: []string{"/dev/nvme2n1", "/dev/sda", "/dev/nvme0n1"}, // Device paths
+					},
+				}
+
+				warnings, err := validator.ValidateCreate(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred(), "should allow device paths for migrated FSC")
+				Expect(warnings).To(BeNil())
+			})
+
+			It("should still reject empty devices for migrated FSC", func() {
+				fsc := &FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc-migrated",
+						Namespace: "ibm-spectrum-scale",
+						Labels: map[string]string{
+							"fusion.storage.openshift.io/migrated": "true",
+						},
+					},
+					Spec: FileSystemClaimSpec{
+						Devices: []string{}, // Empty devices
+					},
+				}
+
+				warnings, err := validator.ValidateCreate(ctx, fsc)
+				Expect(err).To(HaveOccurred(), "should still reject empty devices even for migrated FSC")
+				Expect(err.Error()).To(ContainSubstring("spec.devices cannot be empty"))
+				Expect(warnings).To(BeNil())
+			})
+		})
+
 		Context("with empty or blank devices", func() {
 			It("should reject creation when devices list is empty", func() {
 				fsc := &FileSystemClaim{
@@ -602,6 +662,81 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Expect(err).To(HaveOccurred(), "should reject device IDs with leading whitespace on update")
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+			Expect(warnings).To(BeNil())
+		})
+
+		It("should allow device paths for migrated FSC on update", func() {
+			oldFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc-migrated",
+					Namespace: "ibm-spectrum-scale",
+					Labels: map[string]string{
+						"fusion.storage.openshift.io/migrated": "true",
+					},
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"/dev/nvme2n1"}, // Device path
+				},
+			}
+
+			newFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc-migrated",
+					Namespace: "ibm-spectrum-scale",
+					Labels: map[string]string{
+						"fusion.storage.openshift.io/migrated": "true",
+					},
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"/dev/nvme2n1", "/dev/sda"}, // Device paths
+				},
+			}
+
+			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
+			Expect(err).NotTo(HaveOccurred(), "should allow device paths for migrated FSC on update")
+			Expect(warnings).To(BeNil())
+		})
+
+		It("should still block device changes for migrated FSC when LocalDiskCreated=True", func() {
+			oldFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc-migrated",
+					Namespace: "ibm-spectrum-scale",
+					Labels: map[string]string{
+						"fusion.storage.openshift.io/migrated": "true",
+					},
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"/dev/nvme2n1"},
+				},
+				Status: FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "LocalDiskCreated",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MigrationComplete",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			}
+
+			newFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc-migrated",
+					Namespace: "ibm-spectrum-scale",
+					Labels: map[string]string{
+						"fusion.storage.openshift.io/migrated": "true",
+					},
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"/dev/sda"}, // Different device path
+				},
+			}
+
+			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
+			Expect(err).To(HaveOccurred(), "should still block device changes for migrated FSC when LocalDiskCreated=True")
+			Expect(err.Error()).To(ContainSubstring("spec.devices cannot be modified"))
 			Expect(warnings).To(BeNil())
 		})
 
