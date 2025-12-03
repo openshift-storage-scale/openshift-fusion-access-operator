@@ -149,6 +149,36 @@ wait_for_catalogsource_ready() {
     fi
 }
 
+extract_quay_credentials_from_auth_file() {
+    # Extract quay.io credentials from a container auth file
+    # Usage: extract_quay_credentials_from_auth_file <auth_file_path>
+    # Sets global variables: QUAY_USER and QUAY_PASSWORD
+    # Note: If QUAY_USER is already set, it will be preserved (useful for podman case)
+    local auth_file=$1
+    local existing_user="${QUAY_USER:-}"
+    
+    # Only reset QUAY_USER if it's not already set
+    if [ -z "${existing_user}" ]; then
+        QUAY_USER=""
+    fi
+    QUAY_PASSWORD=""
+    
+    if [ -f "${auth_file}" ] && command -v jq &> /dev/null; then
+        QUAY_AUTH=$(jq -r ".auths.\"quay.io\".auth // empty" "${auth_file}" 2>/dev/null || echo "")
+        if [ -n "${QUAY_AUTH}" ]; then
+            # Decode base64 and extract username:password
+            DECODED=$(echo "${QUAY_AUTH}" | base64 -d 2>/dev/null || echo "")
+            if [ -n "${DECODED}" ]; then
+                # Only set QUAY_USER if it wasn't already set
+                if [ -z "${existing_user}" ]; then
+                    QUAY_USER=$(echo "${DECODED}" | cut -d':' -f1)
+                fi
+                QUAY_PASSWORD=$(echo "${DECODED}" | cut -d':' -f2)
+            fi
+        fi
+    fi
+}
+
 create_catalog_pull_secret() {
     echo "Setting up image pull secret for CatalogSource..."
     # Extract registry from REGISTRY (e.g., quay.io/rh-ee-nlevanon -> quay.io)
@@ -162,12 +192,28 @@ create_catalog_pull_secret() {
         if oc get secret quay-pull-secret -n openshift-marketplace &>/dev/null; then
             echo "SUCCESS: Pull secret already exists in openshift-marketplace"
         else
-            echo "Creating pull secret from podman credentials..."
-            # Get username from podman
-            QUAY_USER=$(podman login --get-login quay.io 2>/dev/null || echo "")
+            echo "Creating pull secret from ${CONTAINER_TOOL} credentials..."
+            QUAY_USER=""
+            QUAY_PASSWORD=""
+            
+            # Extract credentials based on container tool
+            if [[ "${CONTAINER_TOOL}" == "docker" ]]; then
+                # Docker: Read from ~/.docker/config.json
+                DOCKER_AUTH_FILE="${HOME}/.docker/config.json"
+                extract_quay_credentials_from_auth_file "${DOCKER_AUTH_FILE}"
+            elif [[ "${CONTAINER_TOOL}" == "podman" ]]; then
+                # Podman: Try to get username from podman login command
+                QUAY_USER=$(podman login --get-login quay.io 2>/dev/null || echo "")
+                
+                # Try to extract password from auth.json if available
+                AUTH_FILE="${HOME}/.config/containers/auth.json"
+                extract_quay_credentials_from_auth_file "${AUTH_FILE}"
+                # Note: QUAY_USER from podman login takes precedence, only use password from auth file
+                # QUAY_USER is already set above, QUAY_PASSWORD is set by the function
+            fi
             
             if [ -z "${QUAY_USER}" ]; then
-                echo "WARNING: Could not get quay.io username from podman login"
+                echo "WARNING: Could not get quay.io username from ${CONTAINER_TOOL} credentials"
                 echo "WARNING: Please create the pull secret manually:"
                 echo "   oc create secret docker-registry quay-pull-secret \\"
                 echo "     --docker-server=quay.io \\"
@@ -176,17 +222,6 @@ create_catalog_pull_secret() {
                 echo "     --docker-email=\"\" \\"
                 echo "     -n openshift-marketplace"
                 return 1
-            fi
-            
-            # Try to extract password from auth.json if available
-            AUTH_FILE="${HOME}/.config/containers/auth.json"
-            if [ -f "${AUTH_FILE}" ] && command -v jq &> /dev/null; then
-                QUAY_AUTH=$(jq -r ".auths.\"quay.io\".auth // empty" "${AUTH_FILE}" 2>/dev/null || echo "")
-                if [ -n "${QUAY_AUTH}" ]; then
-                    # Decode base64 and extract password (format: username:password)
-                    DECODED=$(echo "${QUAY_AUTH}" | base64 -d 2>/dev/null || echo "")
-                    QUAY_PASSWORD=$(echo "${DECODED}" | cut -d':' -f2)
-                fi
             fi
             
             # If still no password, provide instructions
@@ -279,9 +314,9 @@ verify_catalog_image() {
     local catalog_image="${REGISTRY}/openshift-fusion-access-catalog:${VERSION}"
     
     # Try to pull the image locally to verify it exists
-    if command -v podman &> /dev/null; then
+    if command -v "${CONTAINER_TOOL}" &> /dev/null; then
         echo "Checking if catalog image exists: ${catalog_image}"
-        if podman pull "${catalog_image}" &>/dev/null; then
+        if "${CONTAINER_TOOL}" pull "${catalog_image}" &>/dev/null; then
             echo "SUCCESS: Catalog image exists and is accessible"
             return 0
         else
@@ -291,7 +326,7 @@ verify_catalog_image() {
             return 1
         fi
     else
-        echo "WARNING: podman not found, skipping image verification"
+        echo "WARNING: ${CONTAINER_TOOL} not found, skipping image verification"
         return 0
     fi
 }
