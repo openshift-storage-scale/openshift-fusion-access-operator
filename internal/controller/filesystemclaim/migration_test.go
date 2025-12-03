@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -657,7 +658,7 @@ var _ = Describe("Migration Helper Functions", func() {
 				Namespace: namespace,
 			}, fsc)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/nvme0n1"))
+			Expect(fsc.Spec.Devices).To(ConsistOf("uuid.12345678")) // WWN from LocalDisk name
 			Expect(fsc.Labels[MigrationLabelMigrated]).To(Equal(MigrationLabelValueTrue))
 			Expect(fsc.Labels[MigrationLabelSource]).To(Equal(MigrationSourceV1))
 
@@ -735,7 +736,7 @@ var _ = Describe("Migration Helper Functions", func() {
 			err := RunMigration(ctx, fakeClient)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify FSC has both devices
+			// Verify FSC has both WWNs (from LocalDisk names)
 			fsc := &fusionv1alpha1.FileSystemClaim{}
 			err = fakeClient.Get(ctx, client.ObjectKey{
 				Name:      "test-fs",
@@ -743,7 +744,7 @@ var _ = Describe("Migration Helper Functions", func() {
 			}, fsc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fsc.Spec.Devices).To(HaveLen(2))
-			Expect(fsc.Spec.Devices).To(ConsistOf("/dev/nvme0n1", "/dev/nvme1n1"))
+			Expect(fsc.Spec.Devices).To(ConsistOf("uuid.ld1", "uuid.ld2")) // WWNs from LocalDisk names
 
 			// Verify both LocalDisks have ownerRef
 			for _, ldName := range []string{"uuid.ld1", "uuid.ld2"} {
@@ -758,6 +759,106 @@ var _ = Describe("Migration Helper Functions", func() {
 				Expect(ownerRefs).To(HaveLen(1))
 				Expect(ownerRefs[0].Name).To(Equal("test-fs"))
 			}
+		})
+
+		It("should not create FSC when all LocalDisks have invalid WWN-based names", func() {
+			// All LocalDisks use invalid/legacy/non-WWN names - the whole group should be skipped
+			// because isV1LocalDisk() filters them out before grouping
+			ld1 := createV1LocalDisk("sda", namespace, "/dev/sda", "worker-1", "test-fs-all-invalid-wwn")
+			ld2 := createV1LocalDisk("sdb", namespace, "/dev/sdb", "worker-2", "test-fs-all-invalid-wwn")
+
+			// Filesystem that references the above LocalDisks
+			fs := createV1Filesystem("test-fs-all-invalid-wwn", namespace)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld1, ld2, fs).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			// Run migration - invalid LocalDisks are filtered out by isV1LocalDisk()
+			// so no group is created, and no FSC should be created
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify no FSC was created because all LocalDisks were filtered out
+			fsc := &fusionv1alpha1.FileSystemClaim{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "test-fs-all-invalid-wwn",
+				Namespace: namespace,
+			}, fsc)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), "FSC should not be created when all LocalDisks have invalid names")
+
+			// Verify invalid LocalDisks do NOT have ownerRef (were skipped)
+			for _, ldName := range []string{"sda", "sdb"} {
+				updatedLD := createV1LocalDisk("", "", "", "", "")
+				err = fakeClient.Get(ctx, client.ObjectKey{
+					Name:      ldName,
+					Namespace: namespace,
+				}, updatedLD)
+				Expect(err).NotTo(HaveOccurred())
+				ownerRefs := updatedLD.GetOwnerReferences()
+				Expect(ownerRefs).To(BeEmpty(), "Invalid LocalDisk %s should not have ownerRef", ldName)
+			}
+		})
+
+		It("should skip LocalDisks with invalid WWN-based names during migration", func() {
+			// Valid WWN-based LocalDisk
+			ld1 := createV1LocalDisk("uuid.12345678", namespace, "/dev/nvme0n1", "worker-1", "test-fs-invalid-wwn")
+
+			// Invalid LocalDisk with legacy/non-WWN name - should be treated as invalid
+			// This simulates a LocalDisk that doesn't match the WWN pattern
+			ld2 := createV1LocalDisk("sda", namespace, "/dev/sda", "worker-2", "test-fs-invalid-wwn")
+
+			fs := createV1Filesystem("test-fs-invalid-wwn", namespace)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ld1, ld2, fs).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			// Run the migration. The expected contract for invalid LocalDisk names
+			// is that they are skipped and do not appear in the migrated .spec.devices list.
+			err := RunMigration(ctx, fakeClient)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify FSC was created
+			fsc := &fusionv1alpha1.FileSystemClaim{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "test-fs-invalid-wwn",
+				Namespace: namespace,
+			}, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Only the valid WWN-based LocalDisk name should be present in Devices.
+			Expect(fsc.Spec.Devices).To(ConsistOf("uuid.12345678"))
+
+			// Labels should still indicate a successful migration.
+			Expect(fsc.Labels[MigrationLabelMigrated]).To(Equal(MigrationLabelValueTrue))
+			Expect(fsc.Labels[MigrationLabelSource]).To(Equal(MigrationSourceV1))
+
+			// Verify only the valid LocalDisk has ownerRef
+			updatedLD1 := createV1LocalDisk("", "", "", "", "")
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "uuid.12345678",
+				Namespace: namespace,
+			}, updatedLD1)
+			Expect(err).NotTo(HaveOccurred())
+			ownerRefs1 := updatedLD1.GetOwnerReferences()
+			Expect(ownerRefs1).To(HaveLen(1))
+			Expect(ownerRefs1[0].Name).To(Equal("test-fs-invalid-wwn"))
+
+			// Verify invalid LocalDisk does NOT have ownerRef (was skipped)
+			updatedLD2 := createV1LocalDisk("", "", "", "", "")
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      "sda",
+				Namespace: namespace,
+			}, updatedLD2)
+			Expect(err).NotTo(HaveOccurred())
+			ownerRefs2 := updatedLD2.GetOwnerReferences()
+			Expect(ownerRefs2).To(BeEmpty(), "Invalid LocalDisk should not have ownerRef")
 		})
 
 		It("should skip resources with skip-migration label", func() {

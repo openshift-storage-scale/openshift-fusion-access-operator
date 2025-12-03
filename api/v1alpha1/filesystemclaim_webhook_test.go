@@ -36,8 +36,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 	})
 
 	Describe("ValidateCreate", func() {
-		Context("with valid device IDs", func() {
-			It("should allow creation with valid device IDs", func() {
+		Context("with valid WWNs", func() {
+			It("should allow creation with valid WWNs", func() {
 				fsc := &FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-fsc",
@@ -45,8 +45,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 					Spec: FileSystemClaimSpec{
 						Devices: []string{
-							"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
-							"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF1",
+							"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+							"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556",
 						},
 					},
 				}
@@ -56,7 +56,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				Expect(warnings).To(BeNil())
 			})
 
-			It("should reject device IDs with leading whitespace", func() {
+			It("should reject WWNs with leading whitespace", func() {
 				fsc := &FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-fsc-whitespace",
@@ -64,20 +64,20 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 					Spec: FileSystemClaimSpec{
 						Devices: []string{
-							"  /dev/disk/by-id/nvme-device-0",
+							"  uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 						},
 					},
 				}
 
 				warnings, err := validator.ValidateCreate(ctx, fsc)
-				Expect(err).To(HaveOccurred(), "should reject device IDs with leading whitespace")
+				Expect(err).To(HaveOccurred(), "should reject WWNs with leading whitespace")
 				Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
-				Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+				Expect(err.Error()).To(ContainSubstring("whitespace"))
 				Expect(warnings).To(BeNil())
 			})
 		})
 
-		Context("with invalid device paths instead of IDs", func() {
+		Context("with invalid device paths instead of WWNs", func() {
 			It("should reject creation with /dev/sda", func() {
 				fsc := &FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
@@ -93,7 +93,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 				Expect(err.Error()).To(ContainSubstring("/dev/sda"))
-				Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+				Expect(err.Error()).To(ContainSubstring("WWN"))
 				Expect(warnings).To(BeNil())
 			})
 
@@ -123,7 +123,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 					Spec: FileSystemClaimSpec{
 						Devices: []string{
-							"/dev/disk/by-id/nvme-valid-device",
+							"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 							"/dev/sdb", // Invalid at index 1
 						},
 					},
@@ -135,10 +135,28 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				Expect(err.Error()).To(ContainSubstring("/dev/sdb"))
 				Expect(warnings).To(BeNil())
 			})
+
+			It("should reject creation with /dev/disk/by-id paths", func() {
+				fsc := &FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: "ibm-spectrum-scale",
+					},
+					Spec: FileSystemClaimSpec{
+						Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					},
+				}
+
+				warnings, err := validator.ValidateCreate(ctx, fsc)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
+				Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+				Expect(warnings).To(BeNil())
+			})
 		})
 
 		Context("with duplicate devices", func() {
-			It("should reject creation with duplicate device IDs", func() {
+			It("should reject creation with duplicate WWNs", func() {
 				fsc := &FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-fsc",
@@ -146,8 +164,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 					Spec: FileSystemClaimSpec{
 						Devices: []string{
-							"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
-							"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
+							"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+							"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 						},
 					},
 				}
@@ -167,9 +185,9 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 					Spec: FileSystemClaimSpec{
 						Devices: []string{
-							"/dev/disk/by-id/device-a",
-							"/dev/disk/by-id/device-b",
-							"/dev/disk/by-id/device-a", // Duplicate at index 2
+							"eui.0025388b21109b01",
+							"eui.0025388b21109b02",
+							"eui.0025388b21109b01", // Duplicate at index 2
 						},
 					},
 				}
@@ -241,7 +259,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 						Namespace: "ibm-spectrum-scale",
 					},
 					Spec: FileSystemClaimSpec{
-						Devices: []string{"/dev/disk/by-id/nvme-device-0", ""},
+						Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", ""},
 					},
 				}
 
@@ -304,8 +322,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("allow update when no status conditions exist",
 				updateTestCase{
 					description:   "should allow device update when no status conditions exist",
-					oldDevices:    []string{"/dev/disk/by-id/nvme-invalid-device"},
-					newDevices:    []string{"/dev/disk/by-id/nvme-valid-device"},
+					oldDevices:    []string{"uuid.invalid-wwn"},
+					newDevices:    []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					oldConditions: []metav1.Condition{},
 					expectError:   false,
 				},
@@ -313,8 +331,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("allow update when DeviceValidated=False",
 				updateTestCase{
 					description: "should allow device update when DeviceValidated=False",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-invalid-device"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-valid-device"},
+					oldDevices:  []string{"uuid.invalid-wwn"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:   "DeviceValidated",
@@ -328,8 +346,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("allow update when LocalDiskCreated=False",
 				updateTestCase{
 					description: "should allow device update when LocalDiskCreated=False",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-invalid"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.invalid-wwn"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:   "DeviceValidated",
@@ -347,14 +365,14 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			),
 
 			// Reject device path format on update
-			Entry("reject update with device path instead of ID",
+			Entry("reject update with device path instead of WWN",
 				updateTestCase{
-					description:     "should reject update with device path instead of ID",
-					oldDevices:      []string{"/dev/disk/by-id/nvme-device-0"},
+					description:     "should reject update with device path instead of WWN",
+					oldDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:      []string{"/dev/nvme1n1"},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
-					errorSubstrings: []string{"spec.devices[0]", "/dev/nvme1n1", "/dev/disk/by-id/"},
+					errorSubstrings: []string{"spec.devices[0]", "/dev/nvme1n1", "WWN"},
 				},
 			),
 
@@ -362,10 +380,10 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject update with duplicate devices",
 				updateTestCase{
 					description: "should reject update with duplicate devices",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices: []string{
-						"/dev/disk/by-id/nvme-device-1",
-						"/dev/disk/by-id/nvme-device-1",
+						"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556",
+						"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556",
 					},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
@@ -377,7 +395,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject update when devices list becomes empty",
 				updateTestCase{
 					description:     "should reject update when devices list becomes empty",
-					oldDevices:      []string{"/dev/disk/by-id/nvme-device-0"},
+					oldDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:      []string{},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
@@ -387,7 +405,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject update when device becomes blank",
 				updateTestCase{
 					description:     "should reject update when device becomes blank",
-					oldDevices:      []string{"/dev/disk/by-id/nvme-device-0"},
+					oldDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:      []string{""},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
@@ -397,8 +415,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject update when one of multiple devices becomes blank",
 				updateTestCase{
 					description:     "should reject update when one of multiple devices becomes blank",
-					oldDevices:      []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
-					newDevices:      []string{"/dev/disk/by-id/nvme-device-0", ""},
+					oldDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+					newDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", ""},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
 					errorSubstrings: []string{"spec.devices[1] cannot be blank/empty"},
@@ -407,7 +425,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject update when devices list contains whitespace-only entries",
 				updateTestCase{
 					description:     "should reject update when devices list contains whitespace-only entries",
-					oldDevices:      []string{"/dev/disk/by-id/nvme-device-0"},
+					oldDevices:      []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:      []string{" ", "\t", " \t "},
 					oldConditions:   []metav1.Condition{},
 					expectError:     true,
@@ -419,8 +437,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject device value change when LocalDiskCreated=True",
 				updateTestCase{
 					description: "should reject device value change when LocalDiskCreated=True",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-999"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
+					newDevices:  []string{"uuid.different-wwn-value"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:               "LocalDiskCreated",
@@ -436,8 +454,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject device order change when LocalDiskCreated=True",
 				updateTestCase{
 					description: "should reject device order change when LocalDiskCreated=True",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-1", "/dev/disk/by-id/nvme-device-0"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+					newDevices:  []string{"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556", "uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:               "LocalDiskCreated",
@@ -453,8 +471,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject adding device when LocalDiskCreated=True",
 				updateTestCase{
 					description: "should reject adding device when LocalDiskCreated=True",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:               "LocalDiskCreated",
@@ -470,8 +488,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("reject removing device when LocalDiskCreated=True",
 				updateTestCase{
 					description: "should reject removing device when LocalDiskCreated=True",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-0"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:               "LocalDiskCreated",
@@ -489,8 +507,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("allow update when devices are identical (no change)",
 				updateTestCase{
 					description: "should allow update when devices are identical (no change)",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					oldConditions: []metav1.Condition{
 						{
 							Type:               "LocalDiskCreated",
@@ -505,8 +523,8 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Entry("handle missing FSC gracefully (allow update)",
 				updateTestCase{
 					description: "should handle missing FSC gracefully (allow update)",
-					oldDevices:  []string{"/dev/disk/by-id/nvme-device-0"},
-					newDevices:  []string{"/dev/disk/by-id/nvme-device-1"},
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
+					newDevices:  []string{"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					expectError: false,
 				},
 			),
@@ -553,7 +571,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					Finalizers:        []string{"fusion.storage.openshift.io/filesystemclaim-finalizer"},
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 				},
 			}
 
@@ -565,7 +583,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					Finalizers:        []string{"fusion.storage.openshift.io/filesystemclaim-finalizer"},
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-1"}, // Different device
+					Devices: []string{"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"}, // Different device
 				},
 			}
 
@@ -575,14 +593,14 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 			Expect(warnings).To(BeNil())
 		})
 
-		It("should reject device IDs with leading whitespace on update", func() {
+		It("should reject WWNs with leading whitespace on update", func() {
 			oldFSC := &FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc-whitespace",
 					Namespace: "ibm-spectrum-scale",
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 				},
 			}
 
@@ -593,15 +611,15 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				},
 				Spec: FileSystemClaimSpec{
 					Devices: []string{
-						"  /dev/disk/by-id/nvme-device-0",
+						"  uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 					},
 				},
 			}
 
 			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
-			Expect(err).To(HaveOccurred(), "should reject device IDs with leading whitespace on update")
+			Expect(err).To(HaveOccurred(), "should reject WWNs with leading whitespace on update")
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
-			Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+			Expect(err.Error()).To(ContainSubstring("whitespace"))
 			Expect(warnings).To(BeNil())
 		})
 
@@ -615,7 +633,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 				},
 				Status: FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -638,7 +656,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					},
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"}, // Same devices
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}, // Same devices
 				},
 			}
 
@@ -656,7 +674,7 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 					Namespace: "ibm-spectrum-scale",
 				},
 				Spec: FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 				},
 			}
 
