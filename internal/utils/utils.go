@@ -39,41 +39,38 @@ const (
 	CheckPodPullInterval        = 2 * time.Second
 	CheckPodName                = "image-check-fusion-access"
 	CheckPodContainerName       = "check"
-
-	// DeviceIDPrefix is the required prefix for persistent device IDs
-	DeviceIDPrefix = "/dev/disk/by-id/"
 )
 
-// ValidateDeviceIDs validates that all device IDs have the correct format
+// ValidateWWNs validates that all WWN identifiers have the correct format
 // and that there are no duplicates. Returns nil if valid.
 // This function is used by both the webhook and controller for defense-in-depth.
-func ValidateDeviceIDs(devices []string) error {
+func ValidateWWNs(devices []string) error {
 	// Check for empty slice
 	if len(devices) == 0 {
-		return fmt.Errorf("spec.devices cannot be empty, at least one device must be specified")
+		return fmt.Errorf("spec.devices cannot be empty, at least one WWN must be specified")
 	}
 
 	seen := make(map[string]bool)
 	for i, device := range devices {
 		// Check for blank/empty strings
 		if strings.TrimSpace(device) == "" {
-			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid device ID (e.g., /dev/disk/by-id/nvme-...)", i)
+			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid WWN (e.g., uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b)", i)
 		}
 		// Check for leading/trailing whitespace
 		if strings.TrimSpace(device) != device {
 			return fmt.Errorf("spec.devices[%d]: %q has leading or trailing whitespace. "+
-				"Please remove whitespace from the device ID", i, device)
+				"Please remove whitespace from the WWN", i, device)
 		}
-		// Check format - must be /dev/disk/by-id/
-		if !strings.HasPrefix(device, DeviceIDPrefix) {
-			return fmt.Errorf("spec.devices[%d]: %q is invalid. "+
-				"Use persistent device IDs like /dev/disk/by-id/... "+
-				"(not paths like /dev/sda or /dev/nvme0n1)", i, device)
+		// Check format - must NOT be a device path
+		if strings.HasPrefix(device, "/dev/") {
+			return fmt.Errorf("spec.devices[%d]: %q is invalid "+
+				"- use WWN identifiers (e.g., uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b, eui.0025388b21109b01, 0x5000c500deadbeef) "+
+				"not device paths like /dev/sda, /dev/nvme0n1, or /dev/disk/by-id/", i, device)
 		}
 		// Check for duplicates (O(n) with map)
 		if seen[device] {
-			return fmt.Errorf("spec.devices[%d]: duplicate device %q. "+
-				"Each device must be unique", i, device)
+			return fmt.Errorf("spec.devices[%d]: duplicate WWN %q. "+
+				"Each WWN must be unique", i, device)
 		}
 		seen[device] = true
 	}

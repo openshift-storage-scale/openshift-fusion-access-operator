@@ -407,10 +407,10 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 		logger.Info("FilesystemClaim already exists")
 
 		// Verify devices match
-		if len(fsc.Spec.Devices) != len(group.DevicePaths) {
+		if len(fsc.Spec.Devices) != len(group.LocalDisks) {
 			logger.Info("Warning: FSC device count doesn't match LocalDisk group",
 				"fscDevices", len(fsc.Spec.Devices),
-				"groupDevices", len(group.DevicePaths))
+				"groupLocalDisks", len(group.LocalDisks))
 		}
 
 		return fsc, nil
@@ -423,6 +423,16 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 	// Create new FSC
 	// Use RFC3339 timestamp in annotation (human-readable)
 	timestamp := time.Now().Format(time.RFC3339)
+
+	// Extract WWNs from LocalDisk names (v1.0 LocalDisks are named with WWN)
+	wwns := make([]string, 0, len(group.LocalDisks))
+	for _, ld := range group.LocalDisks {
+		wwn := ld.GetName()
+		if wwn != "" {
+			wwns = append(wwns, wwn)
+		}
+	}
+
 	fsc = &fusionv1alpha1.FileSystemClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      group.FilesystemName,
@@ -436,7 +446,7 @@ func createOrGetFilesystemClaim(ctx context.Context, c client.Client, group *Leg
 			},
 		},
 		Spec: fusionv1alpha1.FileSystemClaimSpec{
-			Devices: group.DevicePaths,
+			Devices: wwns, // Use WWNs from LocalDisk names (v1.0 LocalDisks are WWN-named)
 		},
 	}
 

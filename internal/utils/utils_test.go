@@ -834,59 +834,59 @@ func mustMarshal(obj any) []byte {
 	return b
 }
 
-var _ = Describe("ValidateDeviceIDs", func() {
-	Context("with valid device IDs", func() {
-		It("should accept a single valid device ID", func() {
-			devices := []string{"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0"}
-			err := ValidateDeviceIDs(devices)
+var _ = Describe("ValidateWWNs", func() {
+	Context("with valid WWNs", func() {
+		It("should accept a single valid WWN with uuid prefix", func() {
+			devices := []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}
+			err := ValidateWWNs(devices)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should accept multiple valid device IDs", func() {
+		It("should accept multiple valid WWNs", func() {
 			devices := []string{
-				"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
-				"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF1",
-				"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF2",
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+				"eui.0025388b21109b01",
+				"0x5000c500deadbeef",
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should reject an empty list", func() {
 			devices := []string{}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices cannot be empty"))
 		})
 
 		It("should reject blank/empty strings in the list", func() {
 			devices := []string{""}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0] cannot be blank/empty"))
 		})
 
 		It("should reject whitespace-only strings in the list", func() {
 			devices := []string{"   "}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0] cannot be blank/empty"))
 		})
 	})
 
-	Context("with invalid device paths instead of IDs", func() {
+	Context("with invalid device paths instead of WWNs", func() {
 		It("should reject /dev/sda", func() {
 			devices := []string{"/dev/sda"}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).To(ContainSubstring("/dev/sda"))
-			Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
+			Expect(err.Error()).To(ContainSubstring("WWN"))
 		})
 
 		It("should reject /dev/nvme0n1", func() {
 			devices := []string{"/dev/nvme0n1"}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).To(ContainSubstring("/dev/nvme0n1"))
@@ -894,28 +894,36 @@ var _ = Describe("ValidateDeviceIDs", func() {
 
 		It("should reject /dev/xvda", func() {
 			devices := []string{"/dev/xvda"}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
+		})
+
+		It("should reject /dev/disk/by-id paths", func() {
+			devices := []string{"/dev/disk/by-id/nvme-device-0"}
+			err := ValidateWWNs(devices)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
+			Expect(err.Error()).To(ContainSubstring("/dev/disk/by-id/"))
 		})
 
 		It("should report the correct index for invalid device", func() {
 			devices := []string{
-				"/dev/disk/by-id/nvme-valid-device-0",
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 				"/dev/sda", // Invalid at index 1
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[1]"))
 		})
 	})
 
 	Context("with duplicate devices", func() {
-		It("should reject duplicate device IDs", func() {
+		It("should reject duplicate WWNs", func() {
 			devices := []string{
-				"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
-				"/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0",
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate"))
 			Expect(err.Error()).To(ContainSubstring("spec.devices[1]"))
@@ -923,14 +931,14 @@ var _ = Describe("ValidateDeviceIDs", func() {
 
 		It("should report the correct index for the duplicate", func() {
 			devices := []string{
-				"/dev/disk/by-id/device-a",
-				"/dev/disk/by-id/device-b",
-				"/dev/disk/by-id/device-a", // Duplicate at index 2
+				"eui.0025388b21109b01",
+				"eui.0025388b21109b02",
+				"eui.0025388b21109b01", // Duplicate at index 2
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[2]"))
-			Expect(err.Error()).To(ContainSubstring("device-a"))
+			Expect(err.Error()).To(ContainSubstring("eui.0025388b21109b01"))
 		})
 	})
 
@@ -940,53 +948,53 @@ var _ = Describe("ValidateDeviceIDs", func() {
 			// Format error should be reported first
 			devices := []string{
 				"/dev/sda",
-				"/dev/disk/by-id/device-b",
-				"/dev/disk/by-id/device-b", // Would be duplicate if we got here
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", // Would be duplicate if we got here
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).ToNot(ContainSubstring("duplicate"))
 		})
 	})
 
-	Context("with whitespace in device IDs", func() {
-		It("should reject device ID with leading whitespace", func() {
-			devices := []string{"  /dev/disk/by-id/nvme-valid-device"}
-			err := ValidateDeviceIDs(devices)
+	Context("with whitespace in WWNs", func() {
+		It("should reject WWN with leading whitespace", func() {
+			devices := []string{"  uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).To(ContainSubstring("leading or trailing whitespace"))
 		})
 
-		It("should reject device ID with trailing whitespace", func() {
-			devices := []string{"/dev/disk/by-id/nvme-valid-device  "}
-			err := ValidateDeviceIDs(devices)
+		It("should reject WWN with trailing whitespace", func() {
+			devices := []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b  "}
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[0]"))
 			Expect(err.Error()).To(ContainSubstring("leading or trailing whitespace"))
 		})
 
-		It("should reject device ID with both leading and trailing whitespace", func() {
-			devices := []string{"  /dev/disk/by-id/nvme-valid-device  "}
-			err := ValidateDeviceIDs(devices)
+		It("should reject WWN with both leading and trailing whitespace", func() {
+			devices := []string{"  uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b  "}
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("whitespace"))
 		})
 
-		It("should reject device ID with tabs", func() {
-			devices := []string{"\t/dev/disk/by-id/nvme-valid-device"}
-			err := ValidateDeviceIDs(devices)
+		It("should reject WWN with tabs", func() {
+			devices := []string{"\tuuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("whitespace"))
 		})
 
 		It("should reject whitespace at correct index in list", func() {
 			devices := []string{
-				"/dev/disk/by-id/nvme-valid-device-0",
-				"/dev/disk/by-id/nvme-valid-device-1  ", // Whitespace at index 1
+				"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b",
+				"eui.0025388b21109b01  ", // Whitespace at index 1
 			}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.devices[1]"))
 			Expect(err.Error()).To(ContainSubstring("whitespace"))
@@ -996,7 +1004,7 @@ var _ = Describe("ValidateDeviceIDs", func() {
 			// Leading whitespace makes it look like invalid format,
 			// but whitespace error should be more helpful
 			devices := []string{"  /dev/sda"}
-			err := ValidateDeviceIDs(devices)
+			err := ValidateWWNs(devices)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("whitespace"))
 		})

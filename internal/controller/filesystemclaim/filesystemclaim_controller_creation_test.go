@@ -729,7 +729,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 		})
 
 		It("should skip when DeviceValidated is not True", func() {
-			fsc := createTestFSC("test-fsc", namespace, []string{"/dev/disk/by-id/nvme-device-0"}, []metav1.Condition{
+			fsc := createTestFSC("test-fsc", namespace, []string{"uuid.12345678-1234-1234-1234-123456789abc"}, []metav1.Condition{
 				deviceValidatedCondition(metav1.ConditionFalse),
 			})
 
@@ -1228,7 +1228,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 			}
 
@@ -1299,18 +1299,18 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
+					Devices: []string{"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
 				},
 			}
 
-			// Create FSC2 with the SAME device ID
+			// Create FSC2 with the SAME WWN
 			fsc2 := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc-2",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
+					Devices: []string{"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
 				},
 			}
 
@@ -1378,7 +1378,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond).NotTo(BeNil(), "DeviceValidated condition should be set")
 			Expect(deviceValidatedCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
-			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"))
+			Expect(deviceValidatedCond.Message).To(ContainSubstring("uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 			// Device disappeared from LVDR, so error is about device not found rather than ownership
 
 			// Check Ready condition
@@ -1386,7 +1386,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(readyCond).NotTo(BeNil())
 			Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(readyCond.Reason).To(Equal(ReasonValidationFailed))
-			Expect(readyCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"))
+			Expect(readyCond.Message).To(ContainSubstring("uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
 			// Verify only ONE LocalDisk was created (by FSC1, not FSC2)
 			Expect(fakeClient.List(ctx, lds, client.InNamespace(namespace))).To(Succeed())
@@ -1407,11 +1407,11 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-owner-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
+					Devices: []string{"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
 				},
 			}
 
-			// FSC under test that is trying to use the same device
+			// FSC under test that is trying to use the same WWN
 			fscUnderTest := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "fsc-under-test",
@@ -1419,7 +1419,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-under-test-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-1"},
+					Devices: []string{"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
 				},
 			}
 
@@ -1482,7 +1482,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("already in use"), "message should indicate device is already in use by another FSC")
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("fsc-owner"), "message should mention the owner FSC name")
-			Expect(deviceValidatedCond.Message).To(ContainSubstring("/dev/disk/by-id/nvme-device-1"), "message should mention the device ID")
+			Expect(deviceValidatedCond.Message).To(ContainSubstring("uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "message should mention the WWN")
 
 			// Ready condition should be False with ReasonValidationFailed
 			readyCond := findCondition(updatedFSC.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
@@ -1500,7 +1500,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			operatorNS := "test-operator-ns"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			deviceID := "/dev/disk/by-id/nvme-device-1"
+			wwn := "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "fsc-with-preexisting-localdisk",
@@ -1508,7 +1508,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					UID:       "fsc-uid",
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{deviceID},
+					Devices: []string{wwn},
 				},
 			}
 
@@ -1516,7 +1516,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			node := createStorageNode("storage-node-1")
 			lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
 				{
-					DeviceID: deviceID,
+					DeviceID: "/dev/disk/by-id/nvme-device-1",
 					Path:     "/dev/nvme1n1",
 					WWN:      "uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				},
@@ -1528,7 +1528,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			localDisk := createLocalDiskWithoutFSCOwner(
 				"uuid.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				namespace,
-				deviceID,
+				"/dev/disk/by-id/nvme-device-1",
 				"storage-node-1",
 				[]metav1.OwnerReference{
 					{
@@ -1576,7 +1576,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("already in use"), "message should indicate device is already in use")
 			Expect(deviceValidatedCond.Message).To(ContainSubstring("unknown"), "message should contain 'unknown' fallback when no FSC owner is found")
-			Expect(deviceValidatedCond.Message).To(ContainSubstring(deviceID), "message should mention the device ID")
+			Expect(deviceValidatedCond.Message).To(ContainSubstring(wwn), "message should mention the WWN")
 
 			// Ready condition should be False with ReasonValidationFailed
 			readyCond := findCondition(updatedFSC.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
@@ -1680,7 +1680,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 			}
 
@@ -1730,7 +1730,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -1823,7 +1823,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -1929,7 +1929,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 			}
 
@@ -1978,14 +1978,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			operatorNS := "test-operator-ns"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			deviceID := "/dev/disk/by-id/nvme-device-0"
+			wwn := "uuid.12345678-1234-1234-1234-123456789abc"
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-fsc",
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{deviceID},
+					Devices: []string{wwn},
 				},
 			}
 
@@ -2042,14 +2042,14 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(deviceValidatedCond).NotTo(BeNil())
 			Expect(deviceValidatedCond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(deviceValidatedCond.Reason).To(Equal(ReasonDeviceValidationFailed))
-			Expect(deviceValidatedCond.Message).To(ContainSubstring(deviceID))
+			Expect(deviceValidatedCond.Message).To(ContainSubstring(wwn))
 
 			// Verify Ready condition
 			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(ReasonValidationFailed))
-			Expect(cond.Message).To(ContainSubstring(deviceID))
+			Expect(cond.Message).To(ContainSubstring(wwn))
 		})
 
 		It("should create multiple LocalDisks for multiple devices", func() {
@@ -2062,7 +2062,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0", "/dev/disk/by-id/nvme-device-1"}, // Multiple devices
+					Devices: []string{"uuid.aaaa-1111-2222-3333-bbbbbbbbbbbb", "uuid.cccc-4444-5555-6666-dddddddddddd"}, // Multiple devices
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -2152,7 +2152,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Namespace: namespace,
 				},
 				Spec: fusionv1alpha1.FileSystemClaimSpec{
-					Devices: []string{"/dev/disk/by-id/nvme-device-0"},
+					Devices: []string{"uuid.12345678-1234-1234-1234-123456789abc"},
 				},
 				Status: fusionv1alpha1.FileSystemClaimStatus{
 					Conditions: []metav1.Condition{
@@ -2182,6 +2182,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "discovery-result-storage-node-1",
 					Namespace: operatorNS,
+				},
+				Spec: fusionv1alpha1.LocalVolumeDiscoveryResultSpec{
+					NodeName: "storage-node-1",
 				},
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
@@ -2507,15 +2510,20 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 
 	Describe("Device Update Protection", func() {
 		Context("Controller Safety Check - Detect spec.devices mismatch", func() {
-			It("should detect and block when spec.devices changed after LocalDisks created", func() {
-				// Scenario: Webhook is bypassed and spec.devices is modified
+			It("should detect and block when single WWN is changed after LocalDisks created", func() {
+				// Scenario: Webhook is bypassed and spec.devices WWN is modified
+				// FSC now has a DIFFERENT WWN than what the LocalDisk represents
+				originalWWN := "uuid.original-1234-5678-abcd-123456789abc"
+				changedWWN := "uuid.changed-9999-8888-ffff-999999999999"
+
 				fsc := &fusionv1alpha1.FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-fsc",
 						Namespace: namespace,
+						UID:       "test-fsc-uid",
 					},
 					Spec: fusionv1alpha1.FileSystemClaimSpec{
-						Devices: []string{"/dev/nvme500n500"}, // Changed from original
+						Devices: []string{changedWWN}, // Changed WWN (different from LocalDisk name)
 					},
 					Status: fusionv1alpha1.FileSystemClaimStatus{
 						Conditions: []metav1.Condition{
@@ -2528,8 +2536,8 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					},
 				}
 
-				// Create LocalDisk with original device path using helper
-				ld1 := createLocalDiskWithOwner("test-ld-1", fsc.Namespace, "/dev/nvme1n1", "node1", fsc)
+				// Create LocalDisk with original WWN as name
+				ld1 := createLocalDiskWithOwner(originalWWN, fsc.Namespace, "/dev/disk/by-id/nvme-device-0", "node1", fsc)
 
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -2542,7 +2550,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Scheme: scheme,
 				}
 
-				// Controller should detect the mismatch
+				// Controller should detect the WWN mismatch
 				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(changed).To(BeTrue())
@@ -2557,18 +2565,24 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
 				Expect(cond.Message).To(ContainSubstring("spec.devices was modified after LocalDisks were created"))
 				Expect(cond.Message).To(ContainSubstring("Original:"))
+				Expect(cond.Message).To(ContainSubstring(originalWWN), "error message should contain original WWN from LocalDisk name")
 				Expect(cond.Message).To(ContainSubstring("Current:"))
-				Expect(cond.Message).To(ContainSubstring("/dev/nvme1n1"))
+				Expect(cond.Message).To(ContainSubstring(changedWWN), "error message should contain changed WWN from spec.devices")
 			})
 
-			It("should allow when spec.devices matches owned LocalDisks", func() {
+			It("should allow when spec.devices WWNs match owned LocalDisk names", func() {
+				// Scenario: spec.devices contains WWNs that exactly match LocalDisk names
+				wwn1 := "uuid.12345678-1234-1234-1234-123456789abc"
+				wwn2 := "eui.0025388b21109b01"
+
 				fsc := &fusionv1alpha1.FileSystemClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-fsc",
 						Namespace: namespace,
+						UID:       "test-fsc-uid",
 					},
 					Spec: fusionv1alpha1.FileSystemClaimSpec{
-						Devices: []string{"/dev/nvme1n1", "/dev/nvme2n2"},
+						Devices: []string{wwn1, wwn2}, // WWNs match LocalDisk names
 					},
 					Status: fusionv1alpha1.FileSystemClaimStatus{
 						Conditions: []metav1.Condition{
@@ -2581,9 +2595,9 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					},
 				}
 
-				// Create LocalDisks matching spec.devices using helpers
-				ld1 := createLocalDiskWithOwner("test-ld-1", fsc.Namespace, "/dev/nvme1n1", "node1", fsc)
-				ld2 := createLocalDiskWithOwner("test-ld-2", fsc.Namespace, "/dev/nvme2n2", "node1", fsc)
+				// Create LocalDisks with WWN names matching spec.devices
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-uuid.12345678-1234-1234-1234-123456789abc", "node1", fsc)
+				ld2 := createLocalDiskWithOwner(wwn2, fsc.Namespace, "/dev/disk/by-id/nvme-eui.0025388b21109b01", "node2", fsc)
 
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -2596,10 +2610,179 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Scheme: scheme,
 				}
 
-				// Controller should allow - devices match
+				// Controller should allow - WWNs match LocalDisk names
 				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(changed).To(BeFalse()) // No change needed
+				Expect(changed).To(BeFalse()) // No change needed - devices match
+			})
+
+			It("should detect when WWN is removed from spec.devices", func() {
+				// Scenario: FSC originally had 2 WWNs, but one was removed
+				wwn1 := "uuid.12345678-1234-1234-1234-123456789abc"
+				wwn2 := "eui.0025388b21109b02"
+
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+						UID:       "test-fsc-uid",
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{wwn1}, // Only wwn1, wwn2 was removed!
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Two LocalDisks exist (original state had both)
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "node1", fsc)
+				ld2 := createLocalDiskWithOwner(wwn2, fsc.Namespace, "/dev/disk/by-id/nvme-device-2", "node2", fsc)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1, ld2).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should detect mismatch (2 LDs exist, but only 1 WWN in spec)
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify error condition
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
+				Expect(cond.Message).To(ContainSubstring("spec.devices was modified"))
+				Expect(cond.Message).To(ContainSubstring(wwn2), "should mention the removed WWN")
+			})
+
+			It("should detect when WWN is added to spec.devices", func() {
+				// Scenario: FSC originally had 1 WWN, but another was added
+				wwn1 := "uuid.12345678-1234-1234-1234-123456789abc"
+				wwn2 := "eui.0025388b21109b03"
+
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+						UID:       "test-fsc-uid",
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{wwn1, wwn2}, // wwn2 was added!
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Only one LocalDisk exists (original state)
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "node1", fsc)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should detect mismatch (1 LD exists, but 2 WWNs in spec)
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify error condition
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
+				Expect(cond.Message).To(ContainSubstring("spec.devices was modified"))
+				Expect(cond.Message).To(ContainSubstring(wwn2), "should mention the added WWN")
+			})
+
+			It("should detect when all WWNs are replaced with different ones", func() {
+				// Scenario: Complete replacement of WWNs
+				originalWWNs := []string{"uuid.aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "uuid.bbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
+				changedWWNs := []string{"uuid.cccc-cccc-cccc-cccc-cccccccccccc", "uuid.dddd-dddd-dddd-dddd-dddddddddddd"}
+
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+						UID:       "test-fsc-uid",
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: changedWWNs, // Completely different WWNs
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// LocalDisks with original WWNs
+				ld1 := createLocalDiskWithOwner(originalWWNs[0], fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "node1", fsc)
+				ld2 := createLocalDiskWithOwner(originalWWNs[1], fsc.Namespace, "/dev/disk/by-id/nvme-device-2", "node2", fsc)
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1, ld2).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should detect complete mismatch
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify error condition
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
+				Expect(cond.Message).To(ContainSubstring("spec.devices was modified"))
 			})
 		})
 	})
