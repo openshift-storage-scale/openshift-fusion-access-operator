@@ -22,7 +22,7 @@ export const useFileSystemClaimsCreateUseCase = () => {
       });
 
       try {
-        const devices = luns.map((l) => l.deviceId);
+        const devices = luns.map((l) => l.wwn);
         await fileSystemClaimsRepository.create(fileSystemName, devices);
         goToFileSystemClaimsHome();
       } catch (e) {

@@ -156,13 +156,13 @@ export type WithNodeName<T> = T & { nodeName: string };
 const outDevicesUsedByFileSystemClaims =
   (fileSystemClaims: FileSystemClaim[]) =>
   (dd: WithNodeName<DiscoveredDevice>): boolean => {
-    const usedDeviceIds = new Set<string>();
+    const usedDevices = new Set<string>();
     fileSystemClaims.forEach((claim) => {
-      claim.spec?.devices?.forEach((deviceId) => {
-        usedDeviceIds.add(deviceId);
+      claim.spec?.devices?.forEach((device) => {
+        usedDevices.add(device);
       });
     });
-    return !usedDeviceIds.has(dd.deviceID);
+    return !usedDevices.has(dd.WWN);
   };
 
 /**
