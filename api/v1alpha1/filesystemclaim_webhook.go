@@ -62,8 +62,8 @@ func (v *FileSystemClaimValidator) ValidateCreate(_ context.Context, obj runtime
 
 	logger.Info("validate create", "name", fsc.Name, "namespace", fsc.Namespace, "devices", fsc.Spec.Devices)
 
-	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
-	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
+	// Validate WWN format, no duplicates, and non-empty (defense-in-depth)
+	if err := utils.ValidateWWNs(fsc.Spec.Devices); err != nil {
 		return nil, err
 	}
 
@@ -101,8 +101,8 @@ func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, new
 		return nil, fmt.Errorf("spec.devices cannot be modified during deletion")
 	}
 
-	// Validate device ID format, no duplicates, and non-empty (defense-in-depth)
-	if err := utils.ValidateDeviceIDs(newFSC.Spec.Devices); err != nil {
+	// Validate WWN format, no duplicates, and non-empty (defense-in-depth)
+	if err := utils.ValidateWWNs(newFSC.Spec.Devices); err != nil {
 		return nil, err
 	}
 

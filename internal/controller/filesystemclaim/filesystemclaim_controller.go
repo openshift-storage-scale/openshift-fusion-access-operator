@@ -176,7 +176,7 @@ func (r *FileSystemClaimReconciler) Reconcile(
 
 	logger.Info("Reconciling FileSystemClaim", "name", fsc.Name, "namespace", fsc.Namespace)
 
-	// Finalizers first
+	// 1) Handle finalizers
 	if changed, err := r.handleFinalizers(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
@@ -184,7 +184,7 @@ func (r *FileSystemClaimReconciler) Reconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// Handle deletion
+	// 2) Handle deletion
 	if requeueAfter, changed, err := r.handleDeletion(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if requeueAfter > 0 {
@@ -194,7 +194,7 @@ func (r *FileSystemClaimReconciler) Reconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 1) Ensure LocalDisks exist (create/update if needed)
+	// 3) Ensure LocalDisks exist (create/update if needed)
 	if changed, err := r.ensureLocalDisks(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
@@ -202,7 +202,7 @@ func (r *FileSystemClaimReconciler) Reconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 2) Sync FSC conditions from owned LocalDisks
+	// 4) Sync FSC conditions from owned LocalDisks
 	if changed, err := r.syncLocalDiskConditions(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
@@ -210,35 +210,35 @@ func (r *FileSystemClaimReconciler) Reconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 3) Ensure Filesystems (only if LD preconditions are satisfied)
+	// 5) Ensure Filesystems (only if LD preconditions are satisfied)
 	if changed, err := r.ensureFileSystem(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 4) Sync FSC conditions from owned Filesystems
+	// 6) Sync FSC conditions from owned Filesystems
 	if changed, err := r.syncFilesystemConditions(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 5) Ensure StorageClass (only after Filesystem ready)
+	// 7) Ensure StorageClass (only after Filesystem ready)
 	if changed, err := r.ensureStorageClass(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 6) Ensure VolumeSnapshotClass (only after StorageClass ready)
+	// 8) Ensure VolumeSnapshotClass (only after StorageClass ready)
 	if changed, err := r.ensureVolumeSnapshotClass(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	// 7) Aggregate/Ready
+	// 9) Aggregate/Ready
 	if changed, err := r.syncFSCReady(ctx, fsc); err != nil {
 		return ctrl.Result{}, err
 	} else if changed {
@@ -350,12 +350,12 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			return false, fmt.Errorf("failed to list owned LocalDisks: %w", err)
 		}
 
-		// Extract device IDs from owned LocalDisks
+		// Extract WWNs from owned LocalDisks (LocalDisk names are WWNs)
 		ownedDevices := make(map[string]struct{})
 		for _, ld := range owned {
-			deviceID, _, _ := unstructured.NestedString(ld.Object, "spec", "device")
-			if deviceID != "" {
-				ownedDevices[deviceID] = struct{}{}
+			ldName := ld.GetName() // LocalDisk name IS the WWN
+			if ldName != "" {
+				ownedDevices[ldName] = struct{}{}
 			}
 		}
 
@@ -399,7 +399,8 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 	}
 
 	logger.Info("Validating devices before LocalDisk creation", "devices", fsc.Spec.Devices)
-	if err := r.validateDevices(ctx, fsc); err != nil {
+	storageNodeName, err := r.validateDevices(ctx, fsc)
+	if err != nil {
 		logger.Error(err, "Device validation failed")
 		if e := r.handleValidationError(ctx, fsc, err); e != nil {
 			logger.Error(e, "Failed to update status after disk validation failure")
@@ -407,7 +408,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		}
 		return true, nil
 	}
-	logger.Info("Device validation successful, proceeding to create LocalDisks")
+	logger.Info("Device validation successful, proceeding to create LocalDisks", "selectedNode", storageNodeName)
 
 	// Set DeviceValidated=True after successful validation
 	if _, e := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device(s) validation succeeded"); e != nil {
@@ -415,26 +416,18 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		return false, e
 	}
 
-	// Get node name first - the same node will be used for all LocalDisks
-	nodeName, selErr := r.getRandomStorageNode(ctx)
-	if selErr != nil {
-		logger.Error(selErr, "failed to pick a storage node")
-		if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", selErr); e != nil {
-			return false, e
-		}
-		return true, nil
-	}
-
 	// variable to track if we need to requeue the reconciliation
 	var requeue bool
 
 	// Phase 2: ensure LocalDisks
-	for _, deviceID := range fsc.Spec.Devices {
-		// Get WWN for the device
-		// this will fail if the device is not found in any of the LocalVolumeDiscoveryResult
-		wwn, err := r.getDeviceWWN(ctx, deviceID, nodeName)
+	// Use the storage node selected after successful validation (all LocalDisks for this FSC will use the same node)
+	// This ensures deterministic behavior for LocalDisk creation
+	for _, wwn := range fsc.Spec.Devices {
+		// Get deviceID for the WWN
+		// this will fail if the WWN is not found in all LocalVolumeDiscoveryResults
+		deviceID, err := r.getDeviceIDFromWWN(ctx, wwn, storageNodeName)
 		if err != nil {
-			logger.Error(err, "failed to get WWN for device", "deviceID", deviceID, "node", nodeName)
+			logger.Error(err, "failed to get device ID for WWN", "wwn", wwn)
 			if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
 				return false, e
 			}
@@ -466,8 +459,9 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 
 		switch {
 		case errors.IsNotFound(err):
-			// Create LocalDisk with new naming
-			spec := map[string]any{"device": deviceID, "node": nodeName}
+			// Create LocalDisk with WWN-based naming
+			// Use storageNodeName directly since we validated it matches the LVDR's nodeName
+			spec := map[string]any{"device": deviceID, "node": storageNodeName}
 			if err := r.createResourceWithOwnership(ctx, fsc, ld, spec); err != nil {
 				logger.Error(err, "failed to create LocalDisk", "name", localDiskName)
 				if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
@@ -476,7 +470,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 				return true, nil
 			}
 
-			logger.Info("Creating LocalDisk", "name", localDiskName, "deviceID", deviceID, "node", nodeName)
+			logger.Info("Creating LocalDisk", "name", localDiskName, "wwn", wwn, "deviceID", deviceID, "node", storageNodeName)
 			_, e := r.updateConditionIfChanged(
 				ctx, fsc,
 				fusionv1alpha1.ConditionTypeLocalDiskCreated,
@@ -499,9 +493,9 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 			if !isOwnedByThisFSC(ld, fsc.Name) {
 				// LocalDisk is owned by a different FSC - get the actual owner name
 				actualOwnerName := getOwnerFSCName(ld)
-				errMsg := fmt.Sprintf("Device ID %s is already in use by FileSystemClaim: %s",
-					deviceID, actualOwnerName)
-				logger.Error(fmt.Errorf("device already in use"), errMsg, "deviceID", deviceID, "localDisk", localDiskName, "owner", actualOwnerName)
+				errMsg := fmt.Sprintf("WWN %s is already in use by FileSystemClaim: %s",
+					wwn, actualOwnerName)
+				logger.Error(fmt.Errorf("device already in use"), errMsg, "wwn", wwn, "localDisk", localDiskName, "owner", actualOwnerName)
 
 				if e := r.handleValidationError(ctx, fsc, fmt.Errorf("%s", errMsg)); e != nil {
 					return false, e
@@ -1082,71 +1076,35 @@ func (r *FileSystemClaimReconciler) isConditionTrue(fsc *fusionv1alpha1.FileSyst
 	return false
 }
 
-// getRandomStorageNode returns a random node name that has both
-// WorkerNodeRoleLabel and ScaleStorageRoleLabel=ScaleStorageRoleValue labels
-func (r *FileSystemClaimReconciler) getRandomStorageNode(ctx context.Context) (string, error) {
+// validateDevices checks if the specified WWNs are present in ALL LocalVolumeDiscoveryResult
+// which ensures both the WWN is valid and shared across all nodes.
+// Returns a randomly selected storage node name if validation succeeds, empty string if validation fails.
+// When this function is called, return a human readable error message.
+func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) (selectedNodeName string, err error) {
 	logger := log.FromContext(ctx)
+
+	// Defense-in-depth: validate format and duplicates even if webhook is disabled
+	if err := utils.ValidateWWNs(fsc.Spec.Devices); err != nil {
+		return "", err
+	}
 
 	allNodes := &metav1.PartialObjectMetadataList{}
 	allNodes.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("NodeList"))
 
 	// List all nodes
-	err := r.List(ctx, allNodes)
+	err = r.List(ctx, allNodes)
 	if err != nil {
 		return "", fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	// Filter nodes with both worker and storage labels
-	var storageNodes []string
-	for i := range allNodes.Items {
-		node := &allNodes.Items[i]
-		labels := node.GetLabels()
-		_, hasWorkerLabel := labels[WorkerNodeRoleLabel]
-		hasStorageLabel := labels[ScaleStorageRoleLabel] == ScaleStorageRoleValue
-
-		if hasWorkerLabel && hasStorageLabel {
-			storageNodes = append(storageNodes, node.Name)
-		}
-	}
-
-	if len(storageNodes) == 0 {
-		return "", fmt.Errorf("no nodes found with both %s and %s=%s labels",
-			WorkerNodeRoleLabel, ScaleStorageRoleLabel, ScaleStorageRoleValue)
-	}
-
-	// Return random node
-	idx, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(storageNodes))))
+	// Get the operator namespace once before the loop to avoid repeated lookups
+	operatorNamespace, err := utils.GetDeploymentNamespace()
 	if err != nil {
-		return "", fmt.Errorf("failed to select random storage node: %w", err)
-	}
-	selectedNode := storageNodes[idx.Int64()]
-
-	logger.Info("Selected random storage node", "node", selectedNode, "totalStorageNodes", len(storageNodes))
-	return selectedNode, nil
-}
-
-// validateDevices checks if the specified devices are present in ALL LocalVolumeDiscoveryResult
-// which ensures both the device is valid and shared across all nodes.
-// When this function is called.
-// return a human readable error message.
-func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fusionv1alpha1.FileSystemClaim) error {
-	logger := log.FromContext(ctx)
-
-	// Defense-in-depth: validate format and duplicates even if webhook is disabled
-	if err := utils.ValidateDeviceIDs(fsc.Spec.Devices); err != nil {
-		return err
-	}
-
-	allNodes := &metav1.PartialObjectMetadataList{}
-	allNodes.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("NodeList"))
-
-	// List all nodes
-	err := r.List(ctx, allNodes)
-	if err != nil {
-		return fmt.Errorf("failed to list nodes: %w", err)
+		return "", fmt.Errorf("failed to get operator deployment namespace: %w", err)
 	}
 
 	lvdrs := make(map[string]*fusionv1alpha1.LocalVolumeDiscoveryResult)
+	var storageNodeNames []string
 	for i := range allNodes.Items {
 		node := &allNodes.Items[i]
 		labels := node.GetLabels()
@@ -1159,65 +1117,84 @@ func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fu
 			lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{}
 
 			// Get the LVDR for the node (LVDRs are in the operator's namespace)
-			operatorNamespace, err := utils.GetDeploymentNamespace()
-			if err != nil {
-				return fmt.Errorf("failed to get operator deployment namespace: %w", err)
-			}
-
 			err = r.Get(ctx, types.NamespacedName{
 				Name:      lvdrName,
 				Namespace: operatorNamespace,
 			}, lvdr)
 			if err != nil {
 				if errors.IsNotFound(err) {
-					return fmt.Errorf("LocalVolumeDiscoveryResult: %s not found for node: %s", lvdrName, node.Name)
+					return "", fmt.Errorf("LocalVolumeDiscoveryResult: %s not found for node: %s", lvdrName, node.Name)
 				}
-				return fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", node.Name, err)
+				return "", fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", node.Name, err)
+			}
+
+			// Validate that LVDR's nodeName matches the node we associated it with
+			// This catches data inconsistencies early, before we use the LVDR for validation
+			if lvdr.Spec.NodeName == "" {
+				return "", fmt.Errorf("LocalVolumeDiscoveryResult %s has empty spec.nodeName. The LVDR may be incomplete or corrupted", lvdrName)
+			}
+			if lvdr.Spec.NodeName != node.Name {
+				return "", fmt.Errorf("LocalVolumeDiscoveryResult %s spec.nodeName (%s) does not match expected node name (%s). This indicates a data inconsistency", lvdrName, lvdr.Spec.NodeName, node.Name)
 			}
 
 			lvdrs[node.Name] = lvdr
+			storageNodeNames = append(storageNodeNames, node.Name)
 		}
 	}
 
 	if len(lvdrs) == 0 {
-		return fmt.Errorf("no nodes found with both %s and %s=%s labels", WorkerNodeRoleLabel, ScaleStorageRoleLabel, ScaleStorageRoleValue)
+		return "", fmt.Errorf("no nodes found with both %s and %s=%s labels", WorkerNodeRoleLabel, ScaleStorageRoleLabel, ScaleStorageRoleValue)
 	}
 
-	// For each device, check if it exists in ALL LVDRs
-	for _, device := range fsc.Spec.Devices {
+	// For each WWN, check if it exists in ALL LVDRs
+	for _, wwn := range fsc.Spec.Devices {
 		for nodeName, lvdr := range lvdrs {
 			// Check if DiscoveredDevices exists and is not empty
 			if len(lvdr.Status.DiscoveredDevices) == 0 {
-				return fmt.Errorf("no discovered devices available for node %s. "+
-					"Device: %s may be in use in another filesystem or is not "+
-					"shared across all nodes", nodeName, device)
+				return "", fmt.Errorf("no discovered devices available for node %s. "+
+					"WWN(s) %s may be in use in another filesystem or is not "+
+					"shared across all nodes", nodeName, wwn)
 			}
 
-			deviceFound := false
+			wwnFound := false
 			for _, discoveredDevice := range lvdr.Status.DiscoveredDevices {
-				if discoveredDevice.DeviceID == device {
-					deviceFound = true
+				if discoveredDevice.WWN == wwn {
+					wwnFound = true
 					break
 				}
 			}
 
-			if !deviceFound {
-				return fmt.Errorf("device ID %s not found in LocalVolumeDiscoveryResult for node %s", device, nodeName)
+			// We expect the WWN to be found in all LocalVolumeDiscoveryResults for all nodes.
+			// therefore, the moment it is not found in one of the LocalVolumeDiscoveryResults,
+			// we return an error.
+			if !wwnFound {
+				return "", fmt.Errorf("WWN %s not found in LocalVolumeDiscoveryResult for node %s", wwn, nodeName)
 			}
 		}
 
-		logger.Info("Device validation successful", "deviceID", device, "availableOnAllNodesWithWorkerAndstorageLabel", len(lvdrs))
+		logger.Info("WWN validation successful", "wwn", wwn, "availableOnAllNodesWithWorkerAndStorageLabel", len(lvdrs))
 	}
 
-	return nil
+	// Validation successful - select a random storage node
+	idx, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(storageNodeNames))))
+	if err != nil {
+		return "", fmt.Errorf("failed to select random storage node: %w", err)
+	}
+	selectedNodeName = storageNodeNames[idx.Int64()]
+
+	logger.Info("Selected random storage node", "node", selectedNodeName, "totalStorageNodes", len(storageNodeNames))
+	return selectedNodeName, nil
 }
 
-// getDeviceWWN looks up the WWN for a device ID from LocalVolumeDiscoveryResult
-func (r *FileSystemClaimReconciler) getDeviceWWN(
+// getDeviceIDFromWWN looks up the deviceID for a WWN from LocalVolumeDiscoveryResult.
+// This function should be called AFTER validateDevices, which ensures the WWN exists on all storage nodes.
+// The storageNodeName parameter ensures deterministic behavior - all WWNs in the same FSC will use the same node.
+// Returns the deviceID; the nodeName is the same as storageNodeName (validated during lookup).
+func (r *FileSystemClaimReconciler) getDeviceIDFromWWN(
 	ctx context.Context,
-	deviceID string,
-	nodeName string,
-) (string, error) {
+	wwn string,
+	storageNodeName string,
+) (deviceID string, err error) {
 	logger := log.FromContext(ctx)
 
 	// Get the operator namespace
@@ -1226,34 +1203,47 @@ func (r *FileSystemClaimReconciler) getDeviceWWN(
 		return "", fmt.Errorf("failed to get operator deployment namespace: %w", err)
 	}
 
-	// Construct LVDR name
-	lvdrName := fmt.Sprintf("discovery-result-%s", nodeName)
-
-	// Get the LVDR for the node
+	// Get the LVDR for the provided node
+	lvdrName := fmt.Sprintf("discovery-result-%s", storageNodeName)
 	lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{}
+
 	err = r.Get(ctx, types.NamespacedName{
 		Name:      lvdrName,
 		Namespace: operatorNamespace,
 	}, lvdr)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return "", fmt.Errorf("LocalVolumeDiscoveryResult %s not found for node %s", lvdrName, nodeName)
+			return "", fmt.Errorf("LocalVolumeDiscoveryResult %s not found for node %s", lvdrName, storageNodeName)
 		}
-		return "", fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", nodeName, err)
+		return "", fmt.Errorf("failed to get LocalVolumeDiscoveryResult for node %s: %w", storageNodeName, err)
 	}
 
-	// Search for the device in DiscoveredDevices by DeviceID
+	// Validate that LVDR's nodeName matches the storageNodeName we used to find it
+	// This ensures consistency and catches data inconsistencies early
+	if lvdr.Spec.NodeName == "" {
+		return "", fmt.Errorf("LocalVolumeDiscoveryResult %s has empty spec.nodeName. The LVDR may be incomplete or corrupted", lvdrName)
+	}
+	if lvdr.Spec.NodeName != storageNodeName {
+		return "", fmt.Errorf("LocalVolumeDiscoveryResult %s spec.nodeName (%s) does not match expected node name (%s). This indicates a data inconsistency", lvdrName, lvdr.Spec.NodeName, storageNodeName)
+	}
+
+	// Find the device with matching WWN in this LVDR
+	// It is guaranteed to be found because validateDevices ensures the WWN exists on all nodes.
 	for _, device := range lvdr.Status.DiscoveredDevices {
-		if device.DeviceID == deviceID {
-			if device.WWN == "" {
-				return "", fmt.Errorf("device ID %s found but WWN is empty", deviceID)
+		if device.WWN == wwn {
+			// Validate that deviceID is populated
+			if device.DeviceID == "" {
+				return "", fmt.Errorf("WWN %s found in LocalVolumeDiscoveryResult for node %s, but DeviceID field is empty. The LVDR may be incomplete or corrupted", wwn, storageNodeName)
 			}
-			logger.Info("Found WWN for device", "deviceID", deviceID, "wwn", device.WWN, "node", nodeName)
-			return device.WWN, nil
+
+			// Return deviceID (nodeName is the same as storageNodeName, validated above)
+			logger.Info("Found device ID for WWN", "wwn", wwn, "deviceID", device.DeviceID, "node", storageNodeName)
+			return device.DeviceID, nil
 		}
 	}
 
-	return "", fmt.Errorf("device ID %s not found in LocalVolumeDiscoveryResult for node %s", deviceID, nodeName)
+	// This should never happen if validateDevices was called first, but handle gracefully
+	return "", fmt.Errorf("WWN %s not found in LocalVolumeDiscoveryResult for node %s. This is unexpected - validation should have caught this", wwn, storageNodeName)
 }
 
 // generateLocalDiskName generates a LocalDisk name from WWN

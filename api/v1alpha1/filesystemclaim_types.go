@@ -33,10 +33,10 @@ const (
 
 // FileSystemClaimSpec defines the desired state of FileSystemClaim.
 type FileSystemClaimSpec struct {
-	// Devices is a list of unique persistent device IDs to be used for the file system.
-	// Use /dev/disk/by-id/... paths (e.g., /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234).
-	// Device paths like /dev/sda or /dev/nvme0n1 are NOT accepted as they may vary across nodes.
-	// Each device must be unique - duplicates are not allowed.
+	// Devices is a list of unique WWN (World Wide Name) identifiers to be used for the file system.
+	// Use WWN format (e.g., uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b, eui.0025388b21109b01, 0x5000c500deadbeef).
+	// Device paths like /dev/sda, /dev/nvme0n1, or /dev/disk/by-id/... are NOT accepted.
+	// Each WWN must be unique - duplicates are not allowed.
 	Devices []string `json:"devices,omitempty"`
 }
 

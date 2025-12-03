@@ -332,108 +332,42 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 		})
 	})
 
-	Describe("getRandomStorageNode", func() {
+	Describe("getDeviceIDFromWWN", func() {
 		var ctx context.Context
 
 		BeforeEach(func() {
 			ctx = context.Background()
 		})
 
-		It("should select a node with both worker and storage labels", func() {
-			// Create nodes
-			node1 := &corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "storage-node-1",
-					Labels: map[string]string{
-						WorkerNodeRoleLabel:   "",
-						ScaleStorageRoleLabel: ScaleStorageRoleValue,
-					},
-				},
-			}
+		It("should return deviceID for WWN", func() {
+			operatorNS := "test-operator"
+			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
-			node2 := &corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "worker-only",
-					Labels: map[string]string{
-						WorkerNodeRoleLabel: "", // No storage label
-					},
-				},
-			}
-
-			scheme := runtime.NewScheme()
-			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(node1, node2).
-				Build()
-
-			reconciler := &FileSystemClaimReconciler{
-				Client: fakeClient,
-				Scheme: scheme,
-			}
-
-			nodeName, err := reconciler.getRandomStorageNode(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeName).To(Equal("storage-node-1"))
-		})
-
-		It("should return error when no storage nodes found", func() {
-			// Create node without storage label
+			// Create storage node
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "worker-only",
+					Name: "storage-node1",
 					Labels: map[string]string{
-						WorkerNodeRoleLabel: "",
+						"node-role.kubernetes.io/worker": "",
+						"scale.spectrum.ibm.com/role":    "storage",
 					},
 				},
 			}
 
-			scheme := runtime.NewScheme()
-			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(node).
-				Build()
-
-			reconciler := &FileSystemClaimReconciler{
-				Client: fakeClient,
-				Scheme: scheme,
-			}
-
-			nodeName, err := reconciler.getRandomStorageNode(ctx)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("no nodes found"))
-			Expect(nodeName).To(BeEmpty())
-		})
-	})
-
-	Describe("getDeviceWWN", func() {
-		var ctx context.Context
-
-		BeforeEach(func() {
-			ctx = context.Background()
-		})
-
-		It("should return WWN for device on specified node", func() {
-			operatorNS := "test-operator"
-			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
-
 			lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "discovery-result-node1",
+					Name:      "discovery-result-storage-node1",
 					Namespace: operatorNS,
 				},
 				Spec: fusionv1alpha1.LocalVolumeDiscoveryResultSpec{
-					NodeName: "node1",
+					NodeName: "storage-node1",
 				},
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							DeviceID: "/dev/disk/by-id/nvme-device-0",
-							Path:     "/dev/nvme0n1",
 							WWN:      "uuid.12345678-abcd-1234-abcd-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc",
+							Path:     "/dev/nvme0n1",
 						},
 					},
 				},
@@ -442,10 +376,11 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 			scheme := runtime.NewScheme()
 			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 			Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(lvdr).
+				WithObjects(node, lvdr).
 				Build()
 
 			reconciler := &FileSystemClaimReconciler{
@@ -453,29 +388,40 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
+			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(wwn).To(Equal("uuid.12345678-abcd-1234-abcd-123456789abc"))
+			Expect(deviceID).To(Equal("/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc"))
 		})
 
-		It("should return error when device ID not found in LVDR", func() {
+		It("should return error when WWN not found in LVDR", func() {
 			operatorNS := "test-operator"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
+			// Create storage node
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "storage-node1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker": "",
+						"scale.spectrum.ibm.com/role":    "storage",
+					},
+				},
+			}
+
 			lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "discovery-result-node1",
+					Name:      "discovery-result-storage-node1",
 					Namespace: operatorNS,
 				},
 				Spec: fusionv1alpha1.LocalVolumeDiscoveryResultSpec{
-					NodeName: "node1",
+					NodeName: "storage-node1",
 				},
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							DeviceID: "/dev/disk/by-id/nvme-different-device",
+							WWN:      "uuid.different-wwn",
+							DeviceID: "/dev/disk/by-id/nvme-different",
 							Path:     "/dev/sda",
-							WWN:      "uuid.different",
 						},
 					},
 				},
@@ -484,10 +430,11 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 			scheme := runtime.NewScheme()
 			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 			Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(lvdr).
+				WithObjects(node, lvdr).
 				Build()
 
 			reconciler := &FileSystemClaimReconciler{
@@ -495,27 +442,171 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
+			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.nonexistent-wwn", "storage-node1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("not found"))
-			Expect(wwn).To(BeEmpty())
+			Expect(deviceID).To(BeEmpty())
 		})
 
-		It("should return error when WWN is empty", func() {
+		type incompleteDataTestCase struct {
+			description    string
+			lvdrNodeName   string
+			deviceID       string
+			errorSubstring string
+		}
+
+		DescribeTable("should return error when LVDR data is incomplete",
+			func(tc incompleteDataTestCase) {
+				operatorNS := "test-operator"
+				GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
+
+				node := &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "storage-node1",
+						Labels: map[string]string{
+							"node-role.kubernetes.io/worker": "",
+							"scale.spectrum.ibm.com/role":    "storage",
+						},
+					},
+				}
+
+				lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "discovery-result-storage-node1",
+						Namespace: operatorNS,
+					},
+					Spec: fusionv1alpha1.LocalVolumeDiscoveryResultSpec{
+						NodeName: tc.lvdrNodeName,
+					},
+					Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
+						DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
+							{
+								WWN:      "uuid.12345678-abcd-1234-abcd-123456789abc",
+								DeviceID: tc.deviceID,
+								Path:     "/dev/nvme0n1",
+							},
+						},
+					},
+				}
+
+				scheme := runtime.NewScheme()
+				Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
+				Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+				Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(node, lvdr).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(tc.errorSubstring))
+				Expect(err.Error()).To(ContainSubstring("incomplete or corrupted"))
+				Expect(deviceID).To(BeEmpty())
+			},
+			Entry("when DeviceID field is empty",
+				incompleteDataTestCase{
+					description:    "should return error when DeviceID field is empty",
+					lvdrNodeName:   "storage-node1",
+					deviceID:       "",
+					errorSubstring: "DeviceID field is empty",
+				},
+			),
+			Entry("when spec.nodeName is empty",
+				incompleteDataTestCase{
+					description:    "should return error when spec.nodeName is empty",
+					lvdrNodeName:   "",
+					deviceID:       "/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc",
+					errorSubstring: "empty spec.nodeName",
+				},
+			),
+		)
+
+		It("should return NotFound error when LocalVolumeDiscoveryResult is missing", func() {
 			operatorNS := "test-operator"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
+			// Create a storage node so validateDevices can find it,
+			// but do NOT create a corresponding LocalVolumeDiscoveryResult.
+			// This should force the LVDR client Get() to return a NotFound error.
+			storageNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-without-lvdr",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker": "",
+						"scale.spectrum.ibm.com/role":    "storage",
+					},
+				},
+			}
+
+			scheme := runtime.NewScheme()
+			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
+			Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(storageNode).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			// Act: attempt to resolve device ID for some WWN. Because there is
+			// no LocalVolumeDiscoveryResult for this node, the underlying Get()
+			// call should return a NotFound error which the controller checks and wraps.
+			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "wwn-missing-lvdr", "node-without-lvdr")
+			Expect(err).To(HaveOccurred())
+
+			// The controller checks for NotFound using errors.IsNotFound and wraps it
+			// with a specific error message. We verify the NotFound path was taken by
+			// checking the error message content, which covers the exact NotFound path
+			// and message formatting in getDeviceIDFromWWN.
+			Expect(err.Error()).To(ContainSubstring("LocalVolumeDiscoveryResult"))
+			Expect(err.Error()).To(ContainSubstring("not found"))
+
+			// No deviceID should be returned on error.
+			Expect(deviceID).To(BeEmpty())
+		})
+
+		It("should return error when LVDR nodeName does not match storageNodeName", func() {
+			operatorNS := "test-operator"
+			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
+
+			// Create storage node
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "storage-node1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker": "",
+						"scale.spectrum.ibm.com/role":    "storage",
+					},
+				},
+			}
+
+			// Create LVDR with mismatched nodeName (different from the node name)
 			lvdr := &fusionv1alpha1.LocalVolumeDiscoveryResult{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "discovery-result-node1",
+					Name:      "discovery-result-storage-node1",
 					Namespace: operatorNS,
+				},
+				Spec: fusionv1alpha1.LocalVolumeDiscoveryResultSpec{
+					NodeName: "different-node-name", // Mismatch!
 				},
 				Status: fusionv1alpha1.LocalVolumeDiscoveryResultStatus{
 					DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 						{
-							DeviceID: "/dev/disk/by-id/nvme-device-0",
+							WWN:      "uuid.12345678-abcd-1234-abcd-123456789abc",
+							DeviceID: "/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc",
 							Path:     "/dev/nvme0n1",
-							WWN:      "", // Empty WWN
 						},
 					},
 				},
@@ -524,10 +615,11 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 			scheme := runtime.NewScheme()
 			Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 			Expect(fusionv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
-				WithObjects(lvdr).
+				WithObjects(node, lvdr).
 				Build()
 
 			reconciler := &FileSystemClaimReconciler{
@@ -535,10 +627,14 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			wwn, err := reconciler.getDeviceWWN(ctx, "/dev/disk/by-id/nvme-device-0", "node1")
+			// Act: attempt to get device ID with storageNodeName that doesn't match LVDR's nodeName
+			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("WWN is empty"))
-			Expect(wwn).To(BeEmpty())
+			Expect(err.Error()).To(ContainSubstring("does not match"))
+			Expect(err.Error()).To(ContainSubstring("data inconsistency"))
+
+			// No deviceID should be returned on error.
+			Expect(deviceID).To(BeEmpty())
 		})
 	})
 
