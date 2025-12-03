@@ -164,16 +164,18 @@ extract_quay_credentials_from_auth_file() {
     QUAY_PASSWORD=""
     
     if [ -f "${auth_file}" ] && command -v jq &> /dev/null; then
-        QUAY_AUTH=$(jq -r ".auths.\"quay.io\".auth // empty" "${auth_file}" 2>/dev/null || echo "")
-        if [ -n "${QUAY_AUTH}" ]; then
+        local quay_auth=''
+        quay_auth=$(jq -r ".auths.\"quay.io\".auth // empty" "${auth_file}" 2>/dev/null || echo "")
+        if [ -n "${quay_auth}" ]; then
             # Decode base64 and extract username:password
-            DECODED=$(echo "${QUAY_AUTH}" | base64 -d 2>/dev/null || echo "")
-            if [ -n "${DECODED}" ]; then
+            local decoded_auth=''
+            decoded_auth=$(echo "${quay_auth}" | base64 -d 2>/dev/null || echo "")
+            if [ -n "${decoded_auth}" ]; then
                 # Only set QUAY_USER if it wasn't already set
                 if [ -z "${existing_user}" ]; then
-                    QUAY_USER=$(echo "${DECODED}" | cut -d':' -f1)
+                    QUAY_USER=$(echo "${decoded_auth}" | cut -d':' -f1)
                 fi
-                QUAY_PASSWORD=$(echo "${DECODED}" | cut -d':' -f2)
+                QUAY_PASSWORD=$(echo "${decoded_auth}" | cut -d':' -f2)
             fi
         fi
     fi
