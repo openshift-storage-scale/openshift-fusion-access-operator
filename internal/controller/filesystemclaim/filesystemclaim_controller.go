@@ -423,11 +423,11 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 	// Use the storage node selected after successful validation (all LocalDisks for this FSC will use the same node)
 	// This ensures deterministic behavior for LocalDisk creation
 	for _, wwn := range fsc.Spec.Devices {
-		// Get deviceID for the WWN
+		// Get device path for the WWN
 		// this will fail if the WWN is not found in all LocalVolumeDiscoveryResults
-		deviceID, err := r.getDeviceIDFromWWN(ctx, wwn, storageNodeName)
+		devicePath, err := r.getDevicePathFromWWN(ctx, wwn, storageNodeName)
 		if err != nil {
-			logger.Error(err, "failed to get device ID for WWN", "wwn", wwn)
+			logger.Error(err, "failed to get device path for WWN", "wwn", wwn)
 			if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
 				return false, e
 			}
@@ -461,7 +461,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		case errors.IsNotFound(err):
 			// Create LocalDisk with WWN-based naming
 			// Use storageNodeName directly since we validated it matches the LVDR's nodeName
-			spec := map[string]any{"device": deviceID, "node": storageNodeName}
+			spec := map[string]any{"device": devicePath, "node": storageNodeName}
 			if err := r.createResourceWithOwnership(ctx, fsc, ld, spec); err != nil {
 				logger.Error(err, "failed to create LocalDisk", "name", localDiskName)
 				if e := r.handleResourceCreationError(ctx, fsc, "LocalDisk", err); e != nil {
@@ -470,7 +470,7 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 				return true, nil
 			}
 
-			logger.Info("Creating LocalDisk", "name", localDiskName, "wwn", wwn, "deviceID", deviceID, "node", storageNodeName)
+			logger.Info("Creating LocalDisk", "name", localDiskName, "wwn", wwn, "path", devicePath, "node", storageNodeName)
 			_, e := r.updateConditionIfChanged(
 				ctx, fsc,
 				fusionv1alpha1.ConditionTypeLocalDiskCreated,
@@ -1186,15 +1186,15 @@ func (r *FileSystemClaimReconciler) validateDevices(ctx context.Context, fsc *fu
 	return selectedNodeName, nil
 }
 
-// getDeviceIDFromWWN looks up the deviceID for a WWN from LocalVolumeDiscoveryResult.
+// getDevicePathFromWWN looks up the device path for a WWN from LocalVolumeDiscoveryResult.
 // This function should be called AFTER validateDevices, which ensures the WWN exists on all storage nodes.
 // The storageNodeName parameter ensures deterministic behavior - all WWNs in the same FSC will use the same node.
-// Returns the deviceID; the nodeName is the same as storageNodeName (validated during lookup).
-func (r *FileSystemClaimReconciler) getDeviceIDFromWWN(
+// Returns the device path (e.g., /dev/nvme0n1); the nodeName is the same as storageNodeName (validated during lookup).
+func (r *FileSystemClaimReconciler) getDevicePathFromWWN(
 	ctx context.Context,
 	wwn string,
 	storageNodeName string,
-) (deviceID string, err error) {
+) (devicePath string, err error) {
 	logger := log.FromContext(ctx)
 
 	// Get the operator namespace
@@ -1231,14 +1231,14 @@ func (r *FileSystemClaimReconciler) getDeviceIDFromWWN(
 	// It is guaranteed to be found because validateDevices ensures the WWN exists on all nodes.
 	for _, device := range lvdr.Status.DiscoveredDevices {
 		if device.WWN == wwn {
-			// Validate that deviceID is populated
-			if device.DeviceID == "" {
-				return "", fmt.Errorf("WWN %s found in LocalVolumeDiscoveryResult for node %s, but DeviceID field is empty. The LVDR may be incomplete or corrupted", wwn, storageNodeName)
+			// Validate that Path is populated
+			if device.Path == "" {
+				return "", fmt.Errorf("WWN %s found in LocalVolumeDiscoveryResult for node %s, but Path field is empty. The LVDR may be incomplete or corrupted", wwn, storageNodeName)
 			}
 
-			// Return deviceID (nodeName is the same as storageNodeName, validated above)
-			logger.Info("Found device ID for WWN", "wwn", wwn, "deviceID", device.DeviceID, "node", storageNodeName)
-			return device.DeviceID, nil
+			// Return device path (nodeName is the same as storageNodeName, validated above)
+			logger.Info("Found device path for WWN", "wwn", wwn, "path", device.Path, "node", storageNodeName)
+			return device.Path, nil
 		}
 	}
 

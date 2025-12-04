@@ -332,14 +332,14 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 		})
 	})
 
-	Describe("getDeviceIDFromWWN", func() {
+	Describe("getDevicePathFromWWN", func() {
 		var ctx context.Context
 
 		BeforeEach(func() {
 			ctx = context.Background()
 		})
 
-		It("should return deviceID for WWN", func() {
+		It("should return device path for WWN", func() {
 			operatorNS := "test-operator"
 			GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
 
@@ -388,9 +388,9 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
+			devicePath, err := reconciler.getDevicePathFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(deviceID).To(Equal("/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc"))
+			Expect(devicePath).To(Equal("/dev/nvme0n1"))
 		})
 
 		It("should return error when WWN not found in LVDR", func() {
@@ -442,16 +442,16 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.nonexistent-wwn", "storage-node1")
+			devicePath, err := reconciler.getDevicePathFromWWN(ctx, "uuid.nonexistent-wwn", "storage-node1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("not found"))
-			Expect(deviceID).To(BeEmpty())
+			Expect(devicePath).To(BeEmpty())
 		})
 
 		type incompleteDataTestCase struct {
 			description    string
 			lvdrNodeName   string
-			deviceID       string
+			devicePath     string
 			errorSubstring string
 		}
 
@@ -482,8 +482,8 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 						DiscoveredDevices: []fusionv1alpha1.DiscoveredDevice{
 							{
 								WWN:      "uuid.12345678-abcd-1234-abcd-123456789abc",
-								DeviceID: tc.deviceID,
-								Path:     "/dev/nvme0n1",
+								DeviceID: "/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc",
+								Path:     tc.devicePath,
 							},
 						},
 					},
@@ -504,25 +504,25 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 					Scheme: scheme,
 				}
 
-				deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
+				devicePath, err := reconciler.getDevicePathFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(tc.errorSubstring))
 				Expect(err.Error()).To(ContainSubstring("incomplete or corrupted"))
-				Expect(deviceID).To(BeEmpty())
+				Expect(devicePath).To(BeEmpty())
 			},
-			Entry("when DeviceID field is empty",
+			Entry("when Path field is empty",
 				incompleteDataTestCase{
-					description:    "should return error when DeviceID field is empty",
+					description:    "should return error when Path field is empty",
 					lvdrNodeName:   "storage-node1",
-					deviceID:       "",
-					errorSubstring: "DeviceID field is empty",
+					devicePath:     "",
+					errorSubstring: "Path field is empty",
 				},
 			),
 			Entry("when spec.nodeName is empty",
 				incompleteDataTestCase{
 					description:    "should return error when spec.nodeName is empty",
 					lvdrNodeName:   "",
-					deviceID:       "/dev/disk/by-id/nvme-uuid.12345678-abcd-1234-abcd-123456789abc",
+					devicePath:     "/dev/nvme0n1",
 					errorSubstring: "empty spec.nodeName",
 				},
 			),
@@ -560,21 +560,21 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			// Act: attempt to resolve device ID for some WWN. Because there is
+			// Act: attempt to resolve device path for some WWN. Because there is
 			// no LocalVolumeDiscoveryResult for this node, the underlying Get()
 			// call should return a NotFound error which the controller checks and wraps.
-			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "wwn-missing-lvdr", "node-without-lvdr")
+			devicePath, err := reconciler.getDevicePathFromWWN(ctx, "wwn-missing-lvdr", "node-without-lvdr")
 			Expect(err).To(HaveOccurred())
 
 			// The controller checks for NotFound using errors.IsNotFound and wraps it
 			// with a specific error message. We verify the NotFound path was taken by
 			// checking the error message content, which covers the exact NotFound path
-			// and message formatting in getDeviceIDFromWWN.
+			// and message formatting in getDevicePathFromWWN.
 			Expect(err.Error()).To(ContainSubstring("LocalVolumeDiscoveryResult"))
 			Expect(err.Error()).To(ContainSubstring("not found"))
 
-			// No deviceID should be returned on error.
-			Expect(deviceID).To(BeEmpty())
+			// No device path should be returned on error.
+			Expect(devicePath).To(BeEmpty())
 		})
 
 		It("should return error when LVDR nodeName does not match storageNodeName", func() {
@@ -627,14 +627,14 @@ var _ = Describe("FileSystemClaim Helper Functions", func() {
 				Scheme: scheme,
 			}
 
-			// Act: attempt to get device ID with storageNodeName that doesn't match LVDR's nodeName
-			deviceID, err := reconciler.getDeviceIDFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
+			// Act: attempt to get device path with storageNodeName that doesn't match LVDR's nodeName
+			devicePath, err := reconciler.getDevicePathFromWWN(ctx, "uuid.12345678-abcd-1234-abcd-123456789abc", "storage-node1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("does not match"))
 			Expect(err.Error()).To(ContainSubstring("data inconsistency"))
 
-			// No deviceID should be returned on error.
-			Expect(deviceID).To(BeEmpty())
+			// No device path should be returned on error.
+			Expect(devicePath).To(BeEmpty())
 		})
 	})
 
