@@ -6,8 +6,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: filesystemclaim-sample
 spec:
+  # Devices must be specified using WWN (World Wide Name) identifiers
+  # Examples: uuid.*, eui.*, naa.*, or 0x* formats
   devices:
-    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF0"
-    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF1"
-    - "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_AWS1234567890ABCDEF2"
+    - uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b
+    - uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556
+    - eui.0025388b21109b01
 
