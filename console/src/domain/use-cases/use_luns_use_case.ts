@@ -153,17 +153,18 @@ export type WithNodeName<T> = T & { nodeName: string };
  * @param fileSystemClaims - Array of FileSystemClaim objects to check for existing usage.
  * @returns A predicate function that takes a WithNodeName<DiscoveredDevice> and returns a boolean indicating if the device is not used.
  */
-const outDevicesUsedByFileSystemClaims =
-  (fileSystemClaims: FileSystemClaim[]) =>
-  (dd: WithNodeName<DiscoveredDevice>): boolean => {
-    const usedDevices = new Set<string>();
-    fileSystemClaims.forEach((claim) => {
-      claim.spec?.devices?.forEach((device) => {
-        usedDevices.add(device);
-      });
+const outDevicesUsedByFileSystemClaims = (
+  fileSystemClaims: FileSystemClaim[],
+) => {
+  const usedDevices = new Set<string>();
+  fileSystemClaims.forEach((claim) => {
+    claim.spec?.devices?.forEach((device) => {
+      usedDevices.add(device);
     });
-    return !usedDevices.has(dd.WWN);
-  };
+  });
+
+  return (dd: WithNodeName<DiscoveredDevice>) => !usedDevices.has(dd.WWN);
+};
 
 /**
  * Transforms a discovered device entry (with nodeName) into a Lun object suitable to be displayed by the UI.
