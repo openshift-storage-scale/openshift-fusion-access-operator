@@ -19,7 +19,9 @@ export const useFileSystemClaimsTableRowViewModel = (
     name: fileSystemName,
     namespace: SPECTRUM_SCALE_NAMESPACE,
   });
-  const fileSystem = fileSystemsRepository.fileSystems[0];
+  const fileSystem = fileSystemsRepository.fileSystems.find(
+    (fs) => getName(fs) === fileSystemName,
+  );
   const rawCapacity =
     fileSystem?.status?.pools?.[0].totalDiskSize ?? VALUE_NOT_AVAILABLE;
   const fileSystemClaimConditions = fileSystemClaim.status?.conditions ?? [];
