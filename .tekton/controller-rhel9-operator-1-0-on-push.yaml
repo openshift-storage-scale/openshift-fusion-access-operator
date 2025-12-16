@@ -1,0 +1,47 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift-storage-scale/openshift-fusion-access-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "v1" && (
+      "go.mod".pathChanged() ||
+      "VERSION.txt".pathChanged() ||
+      "cmd/main.go".pathChanged() ||
+      "config/***".pathChanged() ||
+      "internal/common/***".pathChanged() ||
+      "internal/controller/***".pathChanged() ||
+      "internal/utils/***".pathChanged() ||
+      "templates/operator.Dockerfile.template".pathChanged() ||
+      ".tekton/controller-rhel9-operator-1-0-on-push.yaml".pathChanged() ||
+      ".tekton/controller-rhel9-operator-common.yaml".pathChanged()
+      )
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: operator-1-0
+    appstudio.openshift.io/component: controller-rhel9-operator-1-0
+    pipelines.appstudio.openshift.io/type: build
+  name: controller-rhel9-operator-1-0-on-push
+  namespace: storage-scale-releng-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/storage-scale-releng-tenant/controller-rhel9-operator:{{revision}}
+  - name: dockerfile
+    value: operator.Dockerfile
+  pipelineRef:
+    name: controller-rhel9-operator-common
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-controller-rhel9-operator-1-0
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
