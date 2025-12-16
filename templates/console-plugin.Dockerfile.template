@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-22:latest AS builder
+FROM registry.access.redhat.com/ubi9/nodejs-22:9.6 AS builder
 
 USER root
 
@@ -10,7 +10,7 @@ RUN npm ci --ignore-scripts && npm run build
 RUN mkdir licenses
 COPY LICENSE licenses/
 
-FROM registry.access.redhat.com/ubi9/nginx-120:latest
+FROM registry.access.redhat.com/ubi9/nginx-120:9.6
 LABEL \
     com.redhat.openshift.versions="${SUPPORTED_OCP_VERSIONS}" \
     com.redhat.component="Console plugin image for OpenShift Fusion Access Operator" \

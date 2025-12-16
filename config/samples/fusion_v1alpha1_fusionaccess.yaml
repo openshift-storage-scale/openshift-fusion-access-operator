@@ -3,4 +3,6 @@ kind: FusionAccess
 metadata:
   name: fusionaccess-object
 spec:
-  storageScaleVersion: "v5.2.3.1"
+  storageDeviceDiscovery:
+    create: true
+  storageScaleVersion: "v5.2.3.5"

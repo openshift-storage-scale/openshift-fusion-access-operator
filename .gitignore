@@ -39,10 +39,24 @@ bundle_tmp*/
 
 build/*
 bundle/*
+catalog/
+catalog-template.yaml
 
 *Dockerfile
 .claude
+CLAUDE.md
 
 # govulncheck outputs
 govulncheck.results
 /database
+
+# preflight outputs
+artifacts/
+preflight.log
+# Temp files
+Temp/*
+# Ignore e2e VolumeSnapshotClass tests suite and logs this are e2e tests agaisnt real cluster
+test/e2e/volumesnapshotclass
+test/logs/
+
+.envrc

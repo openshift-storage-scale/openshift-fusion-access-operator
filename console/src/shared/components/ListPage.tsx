@@ -1,10 +1,10 @@
-import { Helmet } from "react-helmet";
 import {
   ListPageBody,
   ListPageHeader,
 } from "@openshift-console/dynamic-plugin-sdk";
 import { Stack, StackItem } from "@patternfly/react-core";
 import { useLayoutEffect } from "react";
+import { Helmet } from "react-helmet";
 import type { State } from "../store/types";
 import { ListPageAlert } from "./ListPageAlert";
 
@@ -67,7 +67,7 @@ interface UseListPageBodyStyleHackOptions {
 const LIST_PAGE_BODY_SELECTOR = "#content-scrollable > .co-m-pane__body";
 
 const useListPageBodyStyleHack = (
-  options: Partial<UseListPageBodyStyleHackOptions>
+  options: Partial<UseListPageBodyStyleHackOptions>,
 ) => {
   const {
     isFlex = true,

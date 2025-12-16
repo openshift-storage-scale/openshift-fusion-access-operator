@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -30,8 +31,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
-
 	// +kubebuilder:scaffold:imports
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -45,6 +44,12 @@ import (
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+const (
+	// KubeTestVersion is the default Kubernetes version for testing.
+	// Can be overridden via KUBEBUILDER_ASSETS or TEST_K8S_ASSETS environment variables.
+	KubeTestVersion = "1.32.0"
+)
 
 var cfg *rest.Config
 var k8sClient client.Client
@@ -64,6 +69,18 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
+	// Determine binary assets directory: check KUBEBUILDER_ASSETS first (standard kubebuilder env var),
+	// then TEST_K8S_ASSETS (custom env var), or fall back to default path with KubeTestVersion constant.
+	var binaryAssetsDir string
+	if assetsDir := os.Getenv("KUBEBUILDER_ASSETS"); assetsDir != "" {
+		binaryAssetsDir = assetsDir
+	} else if assetsDir := os.Getenv("TEST_K8S_ASSETS"); assetsDir != "" {
+		binaryAssetsDir = assetsDir
+	} else {
+		binaryAssetsDir = filepath.Join("..", "..", "bin", "k8s",
+			fmt.Sprintf("%s-%s-%s", KubeTestVersion, runtime.GOOS, runtime.GOARCH))
+	}
+
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
@@ -73,8 +90,7 @@ var _ = BeforeSuite(func() {
 		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.30.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+		BinaryAssetsDirectory: binaryAssetsDir,
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
@@ -92,10 +108,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = admissionv1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Add core Kubernetes types (including Pod) to the scheme
-	err = corev1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -120,15 +132,15 @@ var _ = BeforeSuite(func() {
 	err = (&FusionAccessValidator{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&KMMPodMutator{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
 	// +kubebuilder:scaffold:webhook
 
 	go func() {
 		defer GinkgoRecover()
 		err = mgr.Start(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			// Log error but don't fail - context cancellation is expected during shutdown
+			GinkgoWriter.Printf("Manager stopped: %v\n", err)
+		}
 	}()
 
 	// wait for the webhook server to get ready
@@ -145,8 +157,15 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	cancel()
+	By("stopping manager and cleaning up")
+	if cancel != nil {
+		cancel()
+		// Give the manager time to shutdown gracefully
+		time.Sleep(2 * time.Second)
+	}
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 })

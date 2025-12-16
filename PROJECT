@@ -24,4 +24,13 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: storage.openshift.io
+  group: fusion
+  kind: FileSystemClaim
+  path: github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

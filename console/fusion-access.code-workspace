@@ -2,37 +2,115 @@
   "folders": [
     {
       "name": "Fusion Access for SAN - Console Plugin",
-      "path": ".",
-    },
+      "path": "."
+    }
   ],
   "settings": {
-    "window.title": "${folderName}",
-    "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
-    "typescript.preferences.preferTypeOnlyAutoImports": true,
-    "editor.formatOnSave": true,
-    "eslint.options": {
-      "overrideConfigFile": "./config/eslint.config.mjs",
+    "biome.enabled": true,
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.biome": "explicit",
+      "source.fixAll.biome": "explicit"
     },
+    "editor.formatOnSave": true,
+    "git.enableCommitSigning": true,
     "files.autoSave": "afterDelay",
+    "typescript.preferences.preferTypeOnlyAutoImports": true,
+    "typescript.tsdk": "Fusion Access for SAN - Console Plugin/node_modules/typescript/lib",
+    "window.title": "${folderName}",
+    "[typescript]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[javascript]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[javascriptreact]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[json]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[jsonc]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[json5]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    }
   },
   "extensions": {
     "recommendations": [
-      "dbaeumer.vscode-eslint",
-      "esbenp.prettier-vscode",
+      "biomejs.biome",
       "redhat.vscode-yaml",
-    ],
+      "styled-components.vscode-styled-components"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Log in to OpenShift cluster",
+        "type": "shell",
+        "command": "oc login -w",
+        "presentation": {
+          "close": true
+        }
+      },
+      {
+        "label": "Start dev server",
+        "type": "shell",
+        "command": "npm",
+        "args": ["run", "start"],
+        "dependsOn": ["Log in to OpenShift cluster"],
+        "isBackground": true,
+        "presentation": {
+          "panel": "new",
+          "close": false,
+          "showReuseMessage": true
+        },
+        "problemMatcher": [
+          {
+            "owner": "webpack",
+            "pattern": {
+              "regexp": "ERROR in (.*)\\n(.*)\\n(.*)\\n(.*)",
+              "file": 1,
+              "message": 2
+            },
+            "background": {
+              "activeOnStart": true,
+              "beginsPattern": ".*webpack serve --progress*",
+              "endsPattern": ".*webpack.*compiled.*successfully.*"
+            }
+          }
+        ]
+      },
+      {
+        "label": "Stop dev server",
+        "type": "shell",
+        "command": "pkill",
+        "args": ["-f", "npm run start:console"],
+        "presentation": {
+          "reveal": "never",
+          "close": true
+        }
+      }
+    ]
   },
   "launch": {
     "version": "0.2.0",
     "configurations": [
       {
+        "name": "Debug",
         "type": "chrome",
         "request": "launch",
-        "name": "Google Chrome",
         "url": "http://localhost:9000/fusion-access",
         "webRoot": "${workspaceFolder}/src",
-      },
-    ],
-    "compounds": [],
-  },
+        "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+        "preLaunchTask": "Start dev server",
+        "postDebugTask": "Stop dev server"
+      }
+    ]
+  }
 }

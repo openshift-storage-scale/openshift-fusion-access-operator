@@ -9,7 +9,7 @@ RUN make build-devicefinder
 RUN mkdir licenses
 COPY LICENSE licenses/
 
-FROM registry.redhat.io/ubi10/ubi:latest
+FROM registry.redhat.io/ubi10/ubi:10.0
 
 COPY --from=builder /workspace/_output/bin/devicefinder /usr/bin/
 RUN dnf install -y udev && dnf clean all

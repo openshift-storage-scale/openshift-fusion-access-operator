@@ -1,19 +1,22 @@
 import { type EncodedExtension } from "@openshift/dynamic-plugin-sdk-webpack";
 import { type ConsolePluginBuildMetadata } from "@openshift-console/dynamic-plugin-sdk-webpack";
-import packageJson from "../package.json";
+import pkg from "../package.json" with { type: "json" };
 
 export const pluginMetadata: ConsolePluginBuildMetadata = {
-  name: packageJson.name,
-  version: packageJson.version,
+  name: pkg.name,
+  version: pkg.version,
   displayName: "Fusion Access Plugin",
   exposedModules: {
-    FusionAccessHomePage: "./features/fusion-access/pages/FusionAccessHomePage.tsx",
-    StorageClusterHomePage:
-      "./features/storage-clusters/pages/StorageClusterHomePage.tsx",
-    StorageClusterCreatePage:
-      "./features/storage-clusters/pages/StorageClusterCreatePage.tsx",
-    FileSystemsHomePage: "./features/file-systems/pages/FileSystemsHomePage.tsx",
-    FileSystemsCreatePage: "./features/file-systems/pages/FileSystemsCreatePage.tsx",
+    FusionAccessHomeScreen:
+      "./ui/fusion-access/views/fusion_access_home_screen.tsx",
+    StorageClustersHomeScreen:
+      "./ui/storage-clusters/views/storage_clusters_home_screen.tsx",
+    StorageClustersCreateScreen:
+      "./ui/storage-clusters/views/storage_clusters_create_screen.tsx",
+    FileSystemClaimsHomeScreen:
+      "./ui/file-system-claims/views/file_system_claims_home_screen.tsx",
+    FileSystemClaimsCreateScreen:
+      "./ui/file-system-claims/views/file_system_claims_create_screen.tsx",
   },
   dependencies: {
     "@console/pluginAPI": ">=4.18.0-0",
@@ -25,7 +28,7 @@ export const extensions: EncodedExtension[] = [
     type: "console.navigation/href",
     properties: {
       id: "main",
-      name: `%plugin__${packageJson.name}~Fusion Access for SAN%`,
+      name: `%plugin__${pkg.name}~Fusion Access for SAN%`,
       href: "/fusion-access",
       perspective: "admin",
       section: "storage",
@@ -37,7 +40,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access",
-      component: { $codeRef: "FusionAccessHomePage" },
+      component: { $codeRef: "FusionAccessHomeScreen" },
     },
   },
   {
@@ -45,7 +48,7 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/storage-cluster/*",
-      component: { $codeRef: "StorageClusterHomePage" },
+      component: { $codeRef: "StorageClustersHomeScreen" },
     },
   },
   {
@@ -53,23 +56,23 @@ export const extensions: EncodedExtension[] = [
     properties: {
       exact: true,
       path: "/fusion-access/storage-cluster/create",
-      component: { $codeRef: "StorageClusterCreatePage" },
+      component: { $codeRef: "StorageClustersCreateScreen" },
     },
   },
   {
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/file-systems/*",
-      component: { $codeRef: "FileSystemsHomePage" },
+      path: "/fusion-access/file-system-claims/*",
+      component: { $codeRef: "FileSystemClaimsHomeScreen" },
     },
   },
   {
     type: "console.page/route",
     properties: {
       exact: true,
-      path: "/fusion-access/file-systems/create",
-      component: { $codeRef: "FileSystemsCreatePage" },
+      path: "/fusion-access/file-system-claims/create",
+      component: { $codeRef: "FileSystemClaimsCreateScreen" },
     },
   },
 ];

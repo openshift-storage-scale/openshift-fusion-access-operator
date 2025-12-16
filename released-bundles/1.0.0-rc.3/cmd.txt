@@ -1,0 +1,1 @@
+Command used: ./scripts/konflux-release.sh d94f762e3ec4f9e945453b51168ceddf87b56359

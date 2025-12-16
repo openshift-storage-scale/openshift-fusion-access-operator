@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - fusion_v1alpha1_fusionaccess.yaml
+- fusion_v1alpha1_filesystemclaim.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

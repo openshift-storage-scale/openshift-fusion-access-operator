@@ -20,10 +20,11 @@ LDFLAGS+="-X $REPO/version.BuildDate=${BUILD_DATE} "
 
 EXTRA=""
 case $1 in
-    "run") EXTRA="run";;
-    *)	EXTRA="build -o manager";;
+    "debug") CMD="dlv"; EXTRA="debug";;
+    "run")   CMD="go"; EXTRA="run";;
+    *)       CMD="go"; EXTRA="build -o manager";;
 esac
 
 go version
 
-GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go $EXTRA -ldflags="${LDFLAGS}" cmd/main.go
+GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH $CMD $EXTRA -ldflags="${LDFLAGS}" cmd/main.go

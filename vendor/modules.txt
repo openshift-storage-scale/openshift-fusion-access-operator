@@ -88,6 +88,9 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
+## explicit; go 1.22.0
+github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1
 # github.com/mailru/easyjson v0.9.0
 ## explicit; go 1.20
 github.com/mailru/easyjson/buffer
@@ -148,6 +151,7 @@ github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
 ## explicit; go 1.23.0
+github.com/openshift/api/build/v1
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/console/v1

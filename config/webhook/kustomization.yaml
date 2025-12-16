@@ -4,6 +4,3 @@ resources:
 
 configurations:
 - kustomizeconfig.yaml
-
-patches:
-- path: patches/webhook_patch.yaml

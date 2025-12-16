@@ -168,6 +168,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - build.openshift.io
+  resources:
+  - builds
+  verbs:
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
@@ -246,6 +255,7 @@ rules:
 - apiGroups:
   - fusion.storage.openshift.io
   resources:
+  - filesystemclaims
   - fusionaccesses
   - localvolumediscoveries
   - localvolumediscoveries/status
@@ -262,12 +272,14 @@ rules:
 - apiGroups:
   - fusion.storage.openshift.io
   resources:
+  - filesystemclaims/finalizers
   - fusionaccesses/finalizers
   verbs:
   - update
 - apiGroups:
   - fusion.storage.openshift.io
   resources:
+  - filesystemclaims/status
   - fusionaccesses/status
   verbs:
   - get
@@ -363,6 +375,7 @@ rules:
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -534,6 +547,18 @@ rules:
   - securitycontextconstraints
   verbs:
   - '*'
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - storage.k8s.io
   resources:

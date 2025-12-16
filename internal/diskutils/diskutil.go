@@ -29,7 +29,7 @@ type CmdExec struct {
 }
 
 func (c CmdExec) Execute(name string, args ...string) Command {
-	return exec.Command(name, args...)
+	return exec.Command(name, args...) //nolint:noctx
 }
 
 type Command interface {

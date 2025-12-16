@@ -21,15 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	mfc "github.com/manifestival/controller-runtime-client"
 	"github.com/manifestival/manifestival"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
+	policyv1 "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,6 +49,12 @@ import (
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/kernelmodule"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 	"github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/utils"
+)
+
+const (
+	podDisruptionBudgetName  = "kmm-pdb"
+	podDisruptionDeleteLabel = "fusion.storage.openshift.io/delete-me"
+	moduleBuildTimeLimit     = 30
 )
 
 type CanPullImageFunc func(ctx context.Context, client client.Client, ns, image, pullSecret string) (bool, error)
@@ -83,6 +93,9 @@ func NewFusionAccessReconciler(
 // Image repository (internal)
 //+kubebuilder:rbac:groups=imageregistry.operator.openshift.io,resources=configs,verbs=get;list;watch
 
+// Build resources (OpenShift)
+//+kubebuilder:rbac:groups=build.openshift.io,resources=builds,verbs=get;list;watch;delete
+
 // Below rules are inserted via `make rbac-generate` automatically
 // IBM_RBAC_MARKER_START
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=list;watch;delete;update;get;create;patch
@@ -117,7 +130,7 @@ func NewFusionAccessReconciler(
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies/status,verbs=get;patch;update
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;delete;get;list;patch;update;watch
 //+kubebuilder:rbac:groups=oauth.openshift.io,resources=oauthclients,verbs=create;get;list;patch;watch
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;patch;watch
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;patch;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=list;watch;delete;update;get;create;patch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -271,7 +284,6 @@ func (r *FusionAccessReconciler) Reconcile(
 ) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
 	fusionaccess := &fusionv1alpha1.FusionAccess{}
 	err := r.Get(ctx, req.NamespacedName, fusionaccess)
 	if err != nil {
@@ -281,54 +293,28 @@ func (r *FusionAccessReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	// // Check if the FusionAccess instance is marked to be deleted, which is
-	// // indicated by the deletion timestamp being set.
-	// isFusionAccessMarkedToBeDeleted := fusionaccess.GetDeletionTimestamp() != nil
-	// if isFusionAccessMarkedToBeDeleted {
-	// 	if controllerutil.ContainsFinalizer(fusionaccess, storageScaleFinalizer) {
-	// 		// Run finalization logic for storageScaleFinalizer. If the
-	// 		// finalization logic fails, don't remove the finalizer so
-	// 		// that we can retry during the next reconciliation.
-	// 		if err := r.finalizeFusionAccess(log.Log, fusionaccess); err != nil {
-	// 			return ctrl.Result{}, err
-	// 		}
-
-	// 		// Remove memcachedFinalizer. Once all finalizers have been
-	// 		// removed, the object will be deleted.
-	// 		controllerutil.RemoveFinalizer(fusionaccess, storageScaleFinalizer)
-	// 		err := r.Update(ctx, fusionaccess)
-	// 		if err != nil {
-	// 			return ctrl.Result{}, err
-	// 		}
-	// 	}
-	// 	return ctrl.Result{}, nil
-	// }
-	// // Add finalizer for this CR
-	// if !controllerutil.ContainsFinalizer(fusionaccess, storageScaleFinalizer) {
-	// 	controllerutil.AddFinalizer(fusionaccess, storageScaleFinalizer)
-	// 	err = r.Update(ctx, fusionaccess)
-	// 	if err != nil {
-	// 		return ctrl.Result{}, err
-	// 	}
-	// }
 	ns, err := utils.GetDeploymentNamespace()
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	install_path, err := getIbmManifest(fusionaccess.Spec)
+	cnsaVersion, installPath, err := getIbmManifest(fusionaccess.Spec)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	if cnsaVersion != "" && string(fusionaccess.Spec.StorageScaleVersion) != cnsaVersion {
+		return r.updateStorageScaleVersion(ctx, fusionaccess, cnsaVersion)
+	}
+
 	installManifest, err := manifestival.NewManifest(
-		install_path,
+		installPath,
 		manifestival.UseClient(mfc.NewClient(r.Client)),
 	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Log.Info(fmt.Sprintf("Applying manifest from %s", install_path))
+	log.Log.Info(fmt.Sprintf("Applying manifest from %s", installPath))
 
 	if err := installManifest.Apply(); err != nil {
 		log.Log.Error(err, "Error applying manifest")
@@ -341,12 +327,17 @@ func (r *FusionAccessReconciler) Reconcile(
 		}
 		return ctrl.Result{}, err
 	}
-	log.Log.Info(fmt.Sprintf("Applied manifest from %s", install_path))
+	log.Log.Info(fmt.Sprintf("Applied manifest from %s", installPath))
 	meta.SetStatusCondition(&fusionaccess.Status.Conditions,
 		v1.Condition{Type: "ManifestApply", Status: v1.ConditionTrue, Reason: "ReconcileCompleted", Message: "Storage Scale manifest was applied"})
 	serr := r.Status().Update(ctx, fusionaccess)
 	if serr != nil {
 		return ctrl.Result{}, serr
+	}
+
+	pdbreq, err := r.managePodDisruptionBudget(ctx, fusionaccess)
+	if pdbreq != nil || err != nil {
+		return *pdbreq, err
 	}
 
 	// We try and create the entitlement secrets only if we found the "fusion-pullsecret" in our namespace
@@ -362,7 +353,7 @@ func (r *FusionAccessReconciler) Reconcile(
 		err = updateEntitlementPullSecrets(secret, ctx, r.Client, ns)
 		if err != nil {
 			log.Log.Error(err, "Error creating entitlement secrets")
-			return reconcile.Result{}, err
+			return ctrl.Result{}, err
 		}
 		log.Log.Info("Entitlement secrets created")
 
@@ -417,11 +408,11 @@ func (r *FusionAccessReconciler) Reconcile(
 	// Check if can pull the image if we have not already or if it failed previously
 	// Only do this check if we have a set cnsa version
 	if fusionaccess.Spec.StorageScaleVersion != "" {
-		err = r.runPullImageCheck(ctx, ns, fusionaccess)
+		err = r.runPullImageCheck(ctx, ns)
 		if err != nil {
 			fusionaccess.Status.Status = "ErrImagePull"
 			meta.SetStatusCondition(&fusionaccess.Status.Conditions,
-				v1.Condition{Type: "ImagePull", Status: v1.ConditionFalse, Reason: "ImagePullDone", Message: "protected images can't be pulled"})
+				v1.Condition{Type: "ImagePull", Status: v1.ConditionFalse, Reason: "ImagePullDone", Message: "Protected images can't be pulled"})
 			serr := r.Status().Update(ctx, fusionaccess)
 			if serr != nil {
 				return ctrl.Result{}, errors.Join(serr, err)
@@ -429,7 +420,7 @@ func (r *FusionAccessReconciler) Reconcile(
 			return ctrl.Result{}, err
 		}
 		meta.SetStatusCondition(&fusionaccess.Status.Conditions,
-			v1.Condition{Type: "ImagePull", Status: v1.ConditionTrue, Reason: "ImagePullDone", Message: "protected images pulled successfully"})
+			v1.Condition{Type: "ImagePull", Status: v1.ConditionTrue, Reason: "ImagePullDone", Message: "Protected images pulled successfully"})
 		serr := r.Status().Update(ctx, fusionaccess)
 		if serr != nil {
 			return ctrl.Result{}, serr
@@ -454,6 +445,64 @@ func (r *FusionAccessReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
+func (r *FusionAccessReconciler) updateStorageScaleVersion(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess, version string) (reconcile.Result, error) {
+	log.Log.Info(fmt.Sprintf("Updating storageScaleVersion from %s to %s", fusionaccess.Spec.StorageScaleVersion, version))
+
+	err := r.createPodDisruptionBudget(ctx, fusionaccess, podDisruptionBudgetName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	fusionaccess.Spec.StorageScaleVersion = fusionv1alpha1.StorageScaleVersions(version)
+	err = r.Update(ctx, fusionaccess)
+	if err != nil {
+		log.Log.Error(err, "Failed to update FusionAccess storageScaleVersion")
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully updated FusionAccess storageScaleVersion")
+	// Requeue to apply the manifest with the updated version
+	return ctrl.Result{Requeue: true}, nil
+}
+
+func isBuildUpdateOrDelete() builder.WatchesOption {
+	return builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(_ event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			namespace, err := utils.GetDeploymentNamespace()
+			if err != nil {
+				return false
+			}
+			build, ok := e.ObjectNew.(*buildv1.Build)
+			if !ok {
+				return false
+			}
+			if namespace != build.Namespace {
+				return false
+			}
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			namespace, err := utils.GetDeploymentNamespace()
+			if err != nil {
+				return false
+			}
+			build, ok := e.Object.(*buildv1.Build)
+			if !ok {
+				return false
+			}
+			if namespace != build.Namespace {
+				return false
+			}
+			return true
+		},
+		GenericFunc: func(_ event.GenericEvent) bool {
+			return false
+		},
+	})
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -474,6 +523,11 @@ func (r *FusionAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
 			didTheKmmConfigMapChange(),
 			builder.OnlyMetadata,
+		).
+		Watches(
+			&buildv1.Build{},
+			handler.EnqueueRequestsFromMapFunc(r.fusionAccessHandler),
+			isBuildUpdateOrDelete(),
 		).
 		Complete(r)
 }
@@ -503,8 +557,8 @@ func (r *FusionAccessReconciler) fusionAccessHandler(
 	return []reconcile.Request{req}
 }
 
-func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns string, fusionaccess *fusionv1alpha1.FusionAccess) error {
-	testImage, err := utils.GetExternalTestImage(string(fusionaccess.Spec.StorageScaleVersion))
+func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns string) error {
+	testImage, err := utils.GetExternalTestImage()
 	if err != nil {
 		log.Log.Error(err, "Could not figure out test image", "testImage", testImage)
 		return err
@@ -519,24 +573,22 @@ func (r *FusionAccessReconciler) runPullImageCheck(ctx context.Context, ns strin
 	return nil
 }
 
-func getIbmManifest(fusionobj fusionv1alpha1.FusionAccessSpec) (string, error) {
+func getIbmManifest(fusionobj fusionv1alpha1.FusionAccessSpec) (ibmCnsaVersion, installPath string, err error) {
 	extManifestURL := fusionobj.ExternalManifestURL
-	ibmCnsaVersion := fusionobj.StorageScaleVersion
 	if extManifestURL != "" {
-		log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", extManifestURL))
 		if utils.IsExternalManifestURLAllowed(extManifestURL) {
-			return extManifestURL, nil
+			log.Log.Info(fmt.Sprintf("Using external manifest URL: %s", extManifestURL))
+			return "", extManifestURL, nil
 		}
-		return "", fmt.Errorf("disallowed URL for external manifest: %s", extManifestURL)
-	} else if ibmCnsaVersion != "" {
-		log.Log.Info(fmt.Sprintf("Using IBM repo manifest: %s", ibmCnsaVersion))
-		install_path, err := utils.GetInstallPath(string(ibmCnsaVersion))
-		if err != nil {
-			return "", err
-		}
-		return install_path, nil
+		return "", "", fmt.Errorf("disallowed URL for external manifest: %s", extManifestURL)
 	}
-	return "", fmt.Errorf("no Storage Scale manifest version and no external manifest specified")
+
+	ibmCnsaVersion, installPath, err = utils.GetStorageScaleVersion()
+	if err != nil {
+		return "", "", err
+	}
+	log.Log.Info(fmt.Sprintf("Using CNSA %s in %s", ibmCnsaVersion, installPath))
+	return ibmCnsaVersion, installPath, nil
 }
 
 // isItOurPullSecret returns true for Create or changed Update events
@@ -681,4 +733,115 @@ func didTheKmmConfigMapChange() builder.WatchesOption {
 		},
 		GenericFunc: func(_ event.GenericEvent) bool { return false },
 	})
+}
+
+func (r *FusionAccessReconciler) createPodDisruptionBudget(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess, name string) error {
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: fusionaccess.Namespace,
+		},
+	}
+
+	_, err := ctrl.CreateOrUpdate(ctx, r.Client, pdb, func() error {
+		pdb.Spec = policyv1.PodDisruptionBudgetSpec{
+			MinAvailable: &intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 1,
+			},
+			Selector: &v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "openshift.io/build.name",
+						Operator: v1.LabelSelectorOpExists,
+					},
+				},
+			},
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Log.Info("Created PodDisruptionBudget", "name", name, "namespace", fusionaccess.Namespace)
+	} else {
+		log.Log.Error(err, "Failed to create or update PodDisruptionBudget", "name", name, "namespace", fusionaccess.Namespace)
+	}
+	return err
+}
+
+func (r *FusionAccessReconciler) deletePodDisruptionBudget(ctx context.Context, name, namespace string) error {
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	err := r.Delete(ctx, pdb)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			log.Log.Info("PodDisruptionBudget not found, nothing to delete", "name", name, "namespace", namespace)
+			return nil
+		}
+		log.Log.Error(err, "Failed to delete PodDisruptionBudget", "name", name, "namespace", namespace)
+		return err
+	}
+
+	log.Log.Info("Successfully deleted PodDisruptionBudget", "name", name, "namespace", namespace)
+	return nil
+}
+
+func (r *FusionAccessReconciler) haveBuilds(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess) (bool, error) {
+	buildList := &buildv1.BuildList{}
+	if err := r.List(ctx, buildList, client.InNamespace(fusionaccess.Namespace)); err != nil {
+		log.Log.Error(err, "Failed to list Build resources")
+		return false, err
+	}
+	return len(buildList.Items) > 0, nil
+}
+
+// This routine manages the deletion of a PodDisruptionBudget (PDB) which is created just before an update of Spectrum Scale
+// is started. The PDB is created to prevent any node drains done during the update from terminating the GPFS module build pod.
+// The PDB is then deleted once the GPFS nodule build has completed, to avoid getting an alarm about there being a PDB with
+// minimum availability of one but no pods. To prevent the PDB from being deleted between the time it is created and the
+// GPFS build starting, a label is set on it once the GPFS build is detected and the PDB is only deleted once there is
+// no GPFS build and the label exists on the PDB. In case a transition is missed, as a fail-safe the PDB is also deleted
+// once it is older than moduleBuildTimeLimit minutes,
+func (r *FusionAccessReconciler) managePodDisruptionBudget(ctx context.Context, fusionaccess *fusionv1alpha1.FusionAccess) (*reconcile.Result, error) {
+	pdb := &policyv1.PodDisruptionBudget{}
+	if err := r.Get(ctx, client.ObjectKey{Name: podDisruptionBudgetName, Namespace: fusionaccess.Namespace}, pdb); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, nil
+		}
+		log.Log.Error(err, "Failed to get PodDisruptionBudget", "name", podDisruptionBudgetName, "namespace", fusionaccess.Namespace)
+		return &ctrl.Result{}, err
+	}
+
+	haveBuilds, err := r.haveBuilds(ctx, fusionaccess)
+	if err != nil {
+		return &ctrl.Result{}, err
+	}
+	if haveBuilds {
+		if pdb.Labels == nil {
+			pdb.Labels = make(map[string]string)
+		}
+		if _, labelExists := pdb.Labels[podDisruptionDeleteLabel]; !labelExists {
+			pdb.Labels[podDisruptionDeleteLabel] = ""
+			if err := r.Update(ctx, pdb); err != nil {
+				log.Log.Error(err, "Failed to label PodDisruptionBudget", "name", podDisruptionBudgetName, "namespace", fusionaccess.Namespace)
+				return &ctrl.Result{}, err
+			}
+			log.Log.Info("Labeled PodDisruptionBudget for deletion", "name", podDisruptionBudgetName, "namespace", fusionaccess.Namespace)
+			return &ctrl.Result{}, nil
+		}
+	} else {
+		_, deleteMe := pdb.Labels[podDisruptionDeleteLabel]
+		if deleteMe || pdb.CreationTimestamp.Time.Before(time.Now().Add(-moduleBuildTimeLimit*time.Minute)) {
+			if err := r.deletePodDisruptionBudget(ctx, podDisruptionBudgetName, fusionaccess.Namespace); err != nil {
+				return &ctrl.Result{}, err
+			}
+		}
+	}
+
+	return nil, nil
 }

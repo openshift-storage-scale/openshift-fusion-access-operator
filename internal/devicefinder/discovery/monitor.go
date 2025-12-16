@@ -56,7 +56,7 @@ func udevBlockMonitor(c chan string, period time.Duration) {
 func rawUdevBlockMonitor(c chan string, matches, exclusions []string) {
 	defer close(c)
 
-	cmd := exec.Command("udevadm", "monitor", "-u", "-k", "-s", "block")
+	cmd := exec.Command("udevadm", "monitor", "-u", "-k", "-s", "block") //nolint:noctx
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		klog.Warningf("Cannot open udevadm stdout: %v", err)

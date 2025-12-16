@@ -64,6 +64,7 @@ type LocalVolumeDiscoveryResultStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 // +kubebuilder:resource:path=localvolumediscoveryresults,scope=Namespaced
+// +kubebuilder:resource:shortName=lvdr
 
 // LocalVolumeDiscoveryResult is the Schema for the localvolumediscoveryresults API
 type LocalVolumeDiscoveryResult struct {

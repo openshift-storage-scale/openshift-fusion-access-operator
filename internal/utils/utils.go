@@ -41,6 +41,52 @@ const (
 	CheckPodContainerName       = "check"
 )
 
+// ValidateWWNs validates that all WWN identifiers meet basic requirements
+// and that there are no duplicates. Returns nil if valid.
+// This function is used by both the webhook and controller for defense-in-depth.
+//
+// Validation is intentionally kept simple and future-proof rather than using
+// strict regex patterns. While there are standard WWN/WWID patterns, production
+// SANs often include vendor-specific and kernel-generated formats that would be
+// difficult to comprehensively validate. The current validation ensures:
+// - Non-empty and no whitespace (basic sanity checks)
+// - Not a device path (e.g., /dev/sda, /dev/disk/by-id/)
+// - No duplicates
+// This approach remains compatible with various WWN formats while preventing
+// common user errors.
+func ValidateWWNs(devices []string) error {
+	// Check for empty slice
+	if len(devices) == 0 {
+		return fmt.Errorf("spec.devices cannot be empty, at least one WWN must be specified")
+	}
+
+	seen := make(map[string]bool)
+	for i, device := range devices {
+		// Check for blank/empty strings
+		if strings.TrimSpace(device) == "" {
+			return fmt.Errorf("spec.devices[%d] cannot be blank/empty, please provide a valid WWN (e.g., uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b)", i)
+		}
+		// Check for leading/trailing whitespace
+		if strings.TrimSpace(device) != device {
+			return fmt.Errorf("spec.devices[%d]: %q has leading or trailing whitespace. "+
+				"Please remove whitespace from the WWN", i, device)
+		}
+		// Check format - must NOT be a device path
+		if strings.HasPrefix(device, "/dev/") {
+			return fmt.Errorf("spec.devices[%d]: %q is invalid "+
+				"- use WWN identifiers (e.g., uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b, eui.0025388b21109b01, 0x5000c500deadbeef) "+
+				"not device paths like /dev/sda, /dev/nvme0n1, or /dev/disk/by-id/", i, device)
+		}
+		// Check for duplicates (O(n) with map)
+		if seen[device] {
+			return fmt.Errorf("spec.devices[%d]: duplicate WWN %q. "+
+				"Each WWN must be unique", i, device)
+		}
+		seen[device] = true
+	}
+	return nil
+}
+
 // Taken from https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=planning-software-requirements
 type FusionAccessData struct {
 	CSIVersion                string   `json:"csi_version"`
@@ -214,8 +260,8 @@ func ParseYAMLAndExtractTestImage(yamlContent string) (string, error) {
 
 // GetExternalTestImage returns the image to be used for testing external image pull.
 // FIXME(bandini): For now this is hardcoded, we should make sure this is
-func GetExternalTestImage(cnsaVersion string) (string, error) {
-	manifestFile, err := GetInstallPath(cnsaVersion)
+func GetExternalTestImage() (string, error) {
+	_, manifestFile, err := GetStorageScaleVersion()
 	if err != nil {
 		return "", err
 	}
@@ -331,32 +377,62 @@ func CanPullImage(
 	return pollStatusFunc(ctx, cl, namespace, podName)
 }
 
-func GetInstallPath(cnsaVersion string) (string, error) {
-	// Install path when running tests
-	var err error
-	install_path := path.Join("../../files/", cnsaVersion, "install.yaml")
-	if _, err := os.Stat(install_path); err == nil {
-		return install_path, nil
-	}
-	// Install path when running locally
-	install_path = path.Join("files/", cnsaVersion, "install.yaml")
-	if _, err := os.Stat(install_path); err == nil {
-		return install_path, nil
-	}
-	// Install path when running in container
-	install_path = path.Join("/files/", cnsaVersion, "install.yaml")
-	if _, err := os.Stat(install_path); err == nil {
-		return install_path, nil
+func getSingleSubdirectory(dirPath string) (string, error) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read directory %s: %w", dirPath, err)
 	}
 
-	return "", fmt.Errorf("could not find/open install file with version %s: %w", cnsaVersion, err)
+	var subdirs []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subdirs = append(subdirs, entry.Name())
+		}
+	}
+
+	if len(subdirs) == 0 {
+		return "", fmt.Errorf("no subdirectories found in %s", dirPath)
+	}
+
+	if len(subdirs) > 1 {
+		return "", fmt.Errorf("expected exactly one subdirectory in %s, found %d: %v", dirPath, len(subdirs), subdirs)
+	}
+
+	return subdirs[0], nil
+}
+
+// By convention there must be single subdirectory in directory 'files' (whose location is dependent on the execution environment)
+// containing the install manifests for CNSA in file install.yaml. The name of this directory is the CNSA version.
+// Returns the CNSA version and the path to the install.yaml file.
+func GetStorageScaleVersion() (cnsaVersion, installPath string, err error) {
+	// Install base path when running tests
+	if cnsaVersion, err := getSingleSubdirectory("../../files"); err == nil {
+		return cnsaVersion, path.Join("../../files", cnsaVersion, "install.yaml"), nil
+	}
+	// Install path when running locally
+	if cnsaVersion, err := getSingleSubdirectory("./files"); err == nil {
+		return cnsaVersion, path.Join("./files", cnsaVersion, "install.yaml"), nil
+	}
+	// Install path when running in container
+	if cnsaVersion, err := getSingleSubdirectory("/files"); err == nil {
+		return cnsaVersion, path.Join("/files", cnsaVersion, "install.yaml"), nil
+	}
+
+	return "", "", fmt.Errorf("could not determine the CNSA version: %w", err)
 }
 
 func IsExternalManifestURLAllowed(url string) bool {
-	const allowedPrefix = "https://raw.githubusercontent.com/openshift-storage-scale"
-	url = strings.TrimSpace(url)
-	url = strings.ToLower(url)
-	return strings.HasPrefix(url, allowedPrefix)
+	allowedPrefixes := []string{
+		"https://raw.githubusercontent.com/openshift-storage-scale",
+		"https://raw.github.ibm.com/ibmspectrumscale/ibm-spectrum-scale-container-native",
+	}
+	url = strings.ToLower(strings.TrimSpace(url))
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(url, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeDockerConfigJSON(destRaw, srcRaw []byte) ([]byte, error) {
@@ -455,4 +531,27 @@ func MergeDockerSecrets(dest, src *corev1.Secret) (*corev1.Secret, error) {
 		dest.Data[".dockerconfigjson"] = mergedJSON
 	}
 	return dest, nil
+}
+
+// UpdateCondition updates the condition in a resource's status
+// This is a generic utility function that can be used by any controller
+func UpdateCondition(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string, generation int64) []metav1.Condition {
+	condition := metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+		ObservedGeneration: generation,
+	}
+
+	// Find and update existing condition or append new one
+	for i, existingCondition := range conditions {
+		if existingCondition.Type == conditionType {
+			conditions[i] = condition
+			return conditions
+		}
+	}
+
+	return append(conditions, condition)
 }

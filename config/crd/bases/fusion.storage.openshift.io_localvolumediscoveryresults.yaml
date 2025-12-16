@@ -11,6 +11,8 @@ spec:
     kind: LocalVolumeDiscoveryResult
     listKind: LocalVolumeDiscoveryResultList
     plural: localvolumediscoveryresults
+    shortNames:
+    - lvdr
     singular: localvolumediscoveryresult
   scope: Namespaced
   versions:

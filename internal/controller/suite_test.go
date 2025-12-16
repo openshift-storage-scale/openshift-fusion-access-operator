@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	buildv1 "github.com/openshift/api/build/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	consolev1 "github.com/openshift/api/console/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -58,7 +59,9 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"), // Our CRDs
+		},
 		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -67,7 +70,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.29.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.32.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -76,14 +79,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	// err = fusionv1alpha.AddToScheme(scheme.Scheme)
-	// Expect(err).NotTo(HaveOccurred())
+	err = fusionv1alpha.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
-	// //+kubebuilder:scaffold:scheme
+	//+kubebuilder:scaffold:scheme
 
-	// k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	// Expect(err).NotTo(HaveOccurred())
-	// Expect(k8sClient).NotTo(BeNil())
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sClient).NotTo(BeNil())
 
 })
 
@@ -102,6 +105,7 @@ func createFakeScheme() *kruntime.Scheme {
 		consolev1.AddToScheme,
 		operatorv1.AddToScheme,
 		kmmv1beta1.AddToScheme,
+		buildv1.AddToScheme,
 	)
 	Expect(builder.AddToScheme(s)).To(Succeed())
 	return s

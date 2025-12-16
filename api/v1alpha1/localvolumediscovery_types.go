@@ -73,6 +73,8 @@ type LocalVolumeDiscoveryStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=localvolumediscoveries,scope=Namespaced
+// +kubebuilder:resource:shortName=lvd
+
 // LocalVolumeDiscovery is the Schema for the localvolumediscoveries API
 type LocalVolumeDiscovery struct {
 	metav1.TypeMeta   `json:",inline"`

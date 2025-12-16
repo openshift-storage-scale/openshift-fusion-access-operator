@@ -30,7 +30,7 @@ COPY LICENSE licenses/
 RUN hack/build.sh
 
 # UBI is larger (158Mb vs. 56Mb) but approved by RH
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
 WORKDIR /
 COPY --from=builder /workspace/files/ /files/
 COPY --from=builder /workspace/manager .

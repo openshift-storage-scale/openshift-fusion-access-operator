@@ -5,6 +5,7 @@ resources:
 - bases/fusion.storage.openshift.io_fusionaccesses.yaml
 - bases/fusion.storage.openshift.io_localvolumediscoveries.yaml
 - bases/fusion.storage.openshift.io_localvolumediscoveryresults.yaml
+- bases/fusion.storage.openshift.io_filesystemclaims.yaml
 
 #+kubebuilder:scaffold:crdkustomizeresource
 

@@ -11,6 +11,8 @@ spec:
     kind: FusionAccess
     listKind: FusionAccessList
     plural: fusionaccesses
+    shortNames:
+    - fa
     singular: fusionaccess
   scope: Namespaced
   versions:
@@ -51,7 +53,7 @@ spec:
               storageScaleVersion:
                 description: Version of IBM Fusion installation manifest
                 enum:
-                - v5.2.3.1
+                - v5.2.3.5
                 type: string
             type: object
           status:

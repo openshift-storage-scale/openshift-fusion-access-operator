@@ -1,0 +1,15 @@
+apiVersion: fusion.storage.openshift.io/v1alpha1
+kind: FileSystemClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: openshift-fusion-access-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: filesystemclaim-sample
+spec:
+  # Devices must be specified using WWN (World Wide Name) identifiers
+  # Examples: uuid.*, eui.*, naa.*, or 0x* formats
+  devices:
+    - uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b
+    - uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556
+    - eui.0025388b21109b01
+

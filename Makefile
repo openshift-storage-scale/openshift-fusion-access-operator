@@ -19,9 +19,6 @@ OPERATOR_DOCKERFILE ?= operator.Dockerfile
 DEVICEFINDER_DOCKERFILE ?= devicefinder.Dockerfile
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
-# Version of yaml file to generate rbacs from
-RBAC_VERSION ?= v5.2.3.1
-
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -43,12 +40,19 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL) $(USE_IMAGE_DIGESTS)
 
+#
+REGISTRY ?= quay.io/openshift-storage-scale
+
+#
+CHANNEL ?= alpha
+
+#
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # fusion.storage.openshift.io/openshift-fusion-access-operator-bundle:$VERSION and fusion.storage.openshift.io/openshift-fusion-access-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/openshift-storage-scale/openshift-fusion-access
+IMAGE_TAG_BASE ?= $(REGISTRY)/openshift-fusion-access
 
 
 # always release the console with the same tag as the operator and the other way around!
@@ -162,6 +166,25 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
+.PHONY: test-benchmark
+test-benchmark: test-benchmark-individual test-benchmark-strategies ## Run all benchmark and performance comparison tests for FileSystemClaim controller.
+
+.PHONY: test-benchmark-individual
+test-benchmark-individual: ## Run individual benchmark tests (0ms and 100ms delays).
+	@echo "=== Individual Benchmark Tests ==="
+	go test -bench="BenchmarkReconcile0ms|BenchmarkReconcile100ms" -benchmem -benchtime=5s -run="^$$" ./internal/controller/
+
+.PHONY: test-benchmark-simple
+test-benchmark-simple: ## Run simple requeue logic benchmark tests (no external dependencies).
+	@echo "=== Simple Requeue Logic Benchmark Tests ==="
+	go test -bench="BenchmarkRequeueLogic" -benchmem -benchtime=5s -run="^$$" ./internal/controller/
+
+# NOTE: This test can be removed once we find the best RequeueDelay value.
+.PHONY: test-benchmark-strategies
+test-benchmark-strategies: ## Run timeout simulation benchmark tests (0ms, 10ms, 100ms, 500ms delays with actual waiting).
+	@echo "=== Timeout Simulation Benchmark Tests ==="
+	go test -bench="BenchmarkReconcileWithTimeouts" -benchmem -benchtime=5s -run="^$$" ./internal/controller/
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
 	$(GOLANGCI_LINT) run
@@ -189,12 +212,39 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
 
+.PHONY: debug
+debug: manifests generate fmt vet ## Run and debug a controller from your host.
+	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh debug
+
+.PHONY: clean-docker
+clean-docker: ## Clean up all resources created by fusion-access-operator-build.sh script (handles finalizers)
+	@./scripts/cleanup-resources.sh
+
+# Centralized cleanup using shared utility script
+.PHONY: clean-images
+clean-images: ## Clean up dangling images only (preserves build cache for faster rebuilds)
+	@./scripts/image-cleanup.sh dangling
+
+.PHONY: clean-build-cache  
+clean-build-cache: ## Clean up container build cache only
+	@./scripts/image-cleanup.sh cache
+
+.PHONY: clean-all-images
+clean-all-images: ## Clean up ALL images and cache (WARNING: forces full rebuilds)
+	@./scripts/image-cleanup.sh all
+
+.PHONY: clean-all
+clean-all: clean clean-all-images clean-docker ## Complete cleanup: build artifacts, images, cache, and cluster resources
+
 .PHONY: clean
-clean: ## Remove build artifacts and downloaded tools
+clean: ## Remove build artifacts
 	rm -rf ./bundle
+	rm -f ./cover.out ./coverage.html ./config/samples/fusionaccess-catalog-*.yaml catalog-template.yaml
+
+.PHONY: clobber
+clobber: clean ## Remove build artifacts and downloaded tools
 	find bin/ -exec chmod +w "{}" \;
-	rm -rf ./manager ./bin/* ./cover.out ./coverage.html
-	rm -f ./config/samples/fusionaccess-catalog-*.yaml
+	rm -rf ./bin/*
 
 # Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
 .PHONY: generate-dockerfile-operator
@@ -212,12 +262,21 @@ generate-dockerfile-console-plugin:
 	envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
 
 
+.PHONY: validate-cnsa
+validate-cnsa:
+	$(eval CNSA_VERSION := $(shell cat CNSA_VERSION.txt))
+	@if [[ $(CNSA_VERSION) != v* ]]; then echo "the CNSA version $(CNSA_VERSION) does not begin with a 'v'"; false; fi
+	@if [[ ! -f "files/$(CNSA_VERSION)/install.yaml" ]]; then echo "install.yaml for $(CNSA_VERSION) does not exist"; false; fi
+	@if [[ $(shell ls files | wc -l) != 1 ]]; then echo "there must be only one directory in ./files"; false; fi
+
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 TARGETARCH ?= amd64
 .PHONY: docker-build
-docker-build: generate-dockerfile-operator ## Build docker image with the manager.
+docker-build: validate-cnsa generate-dockerfile-operator ## Build docker image with the manager.
+	@echo "Building operator image with cache optimization..."
+	@$(CONTAINER_TOOL) pull $(IMAGE_TAG_BASE)-operator:latest 2>/dev/null || true
 	$(CONTAINER_TOOL) build --build-arg TARGETARCH=$(TARGETARCH) -t $(OPERATOR_IMG) -f $(CURPATH)/$(OPERATOR_DOCKERFILE) .
 	$(CONTAINER_TOOL) tag $(OPERATOR_IMG) $(IMAGE_TAG_BASE)-operator:latest
 
@@ -228,14 +287,20 @@ docker-push: ## Push docker image with the manager.
 
 .PHONY: console-build
 console-build: generate-dockerfile-console-plugin ## Build the console image
+	@echo "Building console image with cache optimization..."
+	@$(CONTAINER_TOOL) pull $(CONSOLE_PLUGIN_IMAGE_BASE):latest 2>/dev/null || true
 	$(CONTAINER_TOOL) build -f $(CURPATH)/$(CONSOLE_PLUGIN_DOCKERFILE) -t ${CONSOLE_PLUGIN_IMAGE} .
+	$(CONTAINER_TOOL) tag ${CONSOLE_PLUGIN_IMAGE} $(CONSOLE_PLUGIN_IMAGE_BASE):latest
 .PHONY: console-push
 console-push: ## Push the console image
 	$(CONTAINER_TOOL) push $(CONSOLE_PLUGIN_IMAGE)
 
 .PHONY: devicefinder-docker-build
 devicefinder-docker-build: generate-dockerfile-devicefinder ## Build docker image of the devicefinder
+	@echo "Building devicefinder image with cache optimization..."
+	@$(CONTAINER_TOOL) pull $(IMAGE_TAG_BASE)-devicefinder:latest 2>/dev/null || true
 	$(CONTAINER_TOOL) build -t $(DEVICEFINDER_IMAGE) -f $(CURPATH)/${DEVICEFINDER_DOCKERFILE} .
+	$(CONTAINER_TOOL) tag $(DEVICEFINDER_IMAGE) $(IMAGE_TAG_BASE)-devicefinder:latest
 
 .PHONY: devicefinder-docker-push
 devicefinder-docker-push: ## Push docker image of the devicefinder
@@ -300,7 +365,7 @@ $(LOCALBIN):
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.17.3
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-GOLANGCI_LINT_VERSION ?= v2.2.2
+GOLANGCI_LINT_VERSION ?= v2.5.0
 # update for major version updates to YQ_VERSION!
 YQ_API_VERSION = v4
 YQ_VERSION = v4.45.4
@@ -384,6 +449,8 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
+	@echo "Building bundle image with cache optimization..."
+	@$(CONTAINER_TOOL) pull $(IMAGE_TAG_BASE)-bundle:latest 2>/dev/null || true
 	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 	$(CONTAINER_TOOL) tag $(BUNDLE_IMG) $(IMAGE_TAG_BASE)-bundle:latest
 
@@ -401,7 +468,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.60.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -447,8 +514,42 @@ config/samples/fusionaccess-catalog-$(VERSION).yaml:
 fetchyaml: ## Fetches install yaml files
 	./scripts/fetch-install-yamls.sh
 
-.PHONY: rbacs-generates
-rbacs-generate: ## Generates RBACs and injects them in .go file
-	CMD_OUTPUT=$$(go run scripts/create-rbacs.go "files/$(RBAC_VERSION)/install.yaml"); \
-	$(SED) -i '/IBM_RBAC_MARKER_START/,/IBM_RBAC_MARKER_END/{//!d}' internal/controller/fusionaccess_controller.go; \
-	$(SED) -i "/IBM_RBAC_MARKER_START/ r /dev/stdin" internal/controller/fusionaccess_controller.go <<< "$$CMD_OUTPUT"
+.PHONY: tool-versions
+tool-versions: opm
+	$(OPM) version
+
+.PHONY: release
+ifeq "$(origin VERSION)" "command line"
+release: manifests generate docker-build docker-push console-build console-push devicefinder-docker-build devicefinder-docker-push \
+         bundle bundle-build bundle-push
+else
+release:
+	@echo "VERSION must be specified on the command line" && false
+endif
+
+.PHONY: fbc
+fbc:
+	rm -rf catalog catalog.Dockerfile
+	mkdir -p catalog/openshift-fusion-access-operator
+	opm version
+	opm generate dockerfile catalog
+	$(eval DIGEST := $(shell skopeo inspect docker://${REGISTRY}/openshift-fusion-access-bundle:${VERSION} | jq -r .Digest))
+	test -n "${DIGEST}"
+	sed -e "s/DIGEST/$(DIGEST)/" -e "s/CHANNEL/$(CHANNEL)/" -e "s#REGISTRY#$(REGISTRY)#" catalog-templates/${VERSION}.yaml > catalog-template.yaml
+	opm alpha render-template basic catalog-template.yaml -o yaml > catalog/catalog.yaml
+	opm validate catalog
+	podman build . -f catalog.Dockerfile -t openshift-fusion-access-catalog:latest
+
+.PHONY: fbc-push
+ifeq "$(origin REGISTRY)" "command line"
+fbc-push:
+	podman tag openshift-fusion-access-catalog:latest ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
+	podman push ${REGISTRY}/openshift-fusion-access-catalog:${CHANNEL}
+else
+fbc-push:
+	@echo "REGISTRY must be specified on the command line" && false
+endif
+
+.PHONY: fbc-graph
+fbc-graph:
+	@opm alpha render-graph catalog

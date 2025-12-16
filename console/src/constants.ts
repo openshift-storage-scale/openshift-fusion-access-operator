@@ -1,8 +1,4 @@
-import { t } from "@/shared/hooks/useFusionAccessTranslations";
-
-// This link will need to be updated in-between versions 
-export const LEARN_MORE_LINK =
-  "https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/virtualization/virtualization-with-ibm-fusion-access-for-san";
+import { t } from "@/domain/services/use_localization_service";
 export const MINIMUM_AMOUNT_OF_NODES = 3;
 export const MINIMUM_AMOUNT_OF_NODES_LITERAL = t("three");
 export const MINIMUM_AMOUNT_OF_SHARED_DISKS = 1;
@@ -17,3 +13,7 @@ export const MASTER_NODE_ROLE_LABEL = "node-role.kubernetes.io/master=";
 export const CPLANE_NODE_ROLE_LABEL = "node-role.kubernetes.io/control-plane=";
 export const FS_ALLOW_DELETE_LABEL = "scale.spectrum.ibm.com/allowDelete";
 export const SC_PROVISIONER = "spectrumscale.csi.ibm.com";
+export const FUSION_ACCESS_NAMESPACE = "ibm-fusion-access";
+export const SPECTRUM_SCALE_NAMESPACE = "ibm-spectrum-scale";
+export const STORAGE_CLUSTER_NAME = "ibm-spectrum-scale";
+export const IN_FLIGHT_SLEEP_MS = 500;

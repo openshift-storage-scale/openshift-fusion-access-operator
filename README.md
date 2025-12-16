@@ -109,8 +109,8 @@ The operator is distributed through the OpenShift OperatorHub:
 
 The operator currently supports:
 - IBM Storage Scale v5.2.3.1
-- OpenShift 4.19 (Exclusively)
-- Architecture: x86_64, ppc64le, s390x
+- OpenShift 4.19 (exclusively)
+- Architecture: x86_64
 
 ## Security Considerations
 
@@ -130,13 +130,186 @@ Common issues and solutions:
 
 ## Development
 
-The operator is built using:
+### Prerequisites
+
 - Go 1.21+
+- `kubectl` or `oc` CLI
+- OpenShift/OCP cluster access (via kubeconfig)
 - Operator SDK
 - controller-runtime
 - OpenShift APIs
 
-For development setup and contribution guidelines, see the `console/README.md` for frontend development and standard Go development practices for the operator code.
+### Cluster Access Setup
+
+**Important**: You don't need a separate token! Your `kubeconfig` file already contains all the authentication credentials (certificates and tokens) needed to access your OpenShift cluster.
+
+To set up cluster access:
+
+```bash
+# Option 1: Set KUBECONFIG environment variable
+export KUBECONFIG=/path/to/your/kubeconfig
+
+# Option 2: Use default location (~/.kube/config)
+# If kubeconfig is in default location, no export needed
+
+# Option 3: Login with oc CLI (creates/updates ~/.kube/config)
+oc login --server=https://your-cluster:6443 --token=your-token
+# OR
+oc login --server=https://your-cluster:6443  # Interactive login
+```
+
+Verify your connection:
+```bash
+kubectl cluster-info
+# OR
+oc cluster-info
+```
+
+### Running the Operator Locally (Development Mode)
+
+Running the operator locally allows you to develop and debug without building container images. The operator runs as a local process on your machine but connects to your OpenShift cluster.
+
+#### Quick Start
+
+```bash
+DEPLOYMENT_NAMESPACE=ibm-fusion-access \
+RELATED_IMAGE_OPENSHIFT_STORAGE_SCALE_OPERATOR_DEVICEFINDER=quay.io/sughosh/openshift-fusion-access-devicefinder:6.6.7 \
+ENABLE_WEBHOOKS=false \
+make install run
+```
+
+#### Step-by-Step Explanation
+
+1. **Install CRDs** (`make install`):
+   - Installs Custom Resource Definitions to your cluster
+   - Required before the operator can reconcile resources
+   - Includes: `FusionAccess`, `FileSystemClaim`, `LocalVolumeDiscovery`, etc.
+
+2. **Run Operator Locally** (`make run`):
+   - Compiles and runs the operator using `go run`
+   - No container image needed
+   - Connects to cluster using your `kubeconfig`
+   - Changes to code take effect immediately (restart required)
+
+#### Environment Variables
+
+- **`DEPLOYMENT_NAMESPACE`** (Required): 
+  - Namespace where the operator will create resources
+  - Example: `ibm-fusion-access`
+  - The operator reads this to know where to deploy components
+
+- **`RELATED_IMAGE_OPENSHIFT_STORAGE_SCALE_OPERATOR_DEVICEFINDER`** (Optional):
+  - Image URL for the devicefinder daemonset
+  - If not set, defaults to: `quay.io/openshift-storage-scale/openshift-fusion-access-devicefinder`
+  - Example: `quay.io/sughosh/openshift-fusion-access-devicefinder:6.6.7`
+
+- **`ENABLE_WEBHOOKS`** (Optional):
+  - Set to `false` to disable webhook registration
+  - Recommended for local development to avoid TLS certificate issues
+  - Default: `true` (webhooks enabled)
+
+#### Complete Example
+
+```bash
+# 1. Ensure you're connected to your cluster
+export KUBECONFIG=/path/to/your/kubeconfig
+kubectl cluster-info  # Verify connection
+
+# 2. Create namespace if it doesn't exist
+oc create namespace ibm-fusion-access
+
+# 3. Install CRDs and run operator locally
+DEPLOYMENT_NAMESPACE=ibm-fusion-access \
+RELATED_IMAGE_OPENSHIFT_STORAGE_SCALE_OPERATOR_DEVICEFINDER=quay.io/sughosh/openshift-fusion-access-devicefinder:6.6.7 \
+ENABLE_WEBHOOKS=false \
+make install run
+
+# 4. In another terminal, verify it's running
+oc get pods -n ibm-fusion-access
+kubectl get crds | grep fusion.storage.openshift.io
+```
+
+#### VS Code Debugging
+
+For debugging with breakpoints in VS Code, use the pre-configured launch configurations in `.vscode/launch.json`:
+
+1. **Install CRDs first** (required before debugging):
+   ```bash
+   make install
+   ```
+
+2. **Select a debug configuration** from the VS Code debug panel:
+   - `Launch Operator (gpfs-nick)` - Uses specific kubeconfig path
+   - `Launch Operator (Default Kubeconfig)` - Uses default `~/.kube/config`
+   - `Launch Operator (Custom Kubeconfig)` - Uses `KUBECONFIG` environment variable
+
+3. **Set breakpoints** in your Go code
+
+4. **Press F5** to start debugging
+
+The launch configurations include all required environment variables:
+- `DEPLOYMENT_NAMESPACE`
+- `RELATED_IMAGE_OPENSHIFT_STORAGE_SCALE_OPERATOR_DEVICEFINDER`
+- `ENABLE_WEBHOOKS=false`
+- `KUBECONFIG` (where applicable)
+
+You can customize the configurations in `.vscode/launch.json` to match your environment.
+
+### Building and Deploying Operator
+
+For building container images and deploying the operator to your cluster:
+
+**📖 See [docs/BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) for complete instructions**
+
+The build documentation covers:
+- Automated build and deployment with `fusion-access-operator-build.sh`
+- Manual build process step-by-step
+- Image registry configuration
+- Pull secret setup
+- Troubleshooting common build issues
+- Build stability improvements and fixes
+
+### Troubleshooting
+
+#### Cannot Connect to Cluster
+
+```bash
+# Check kubeconfig
+echo $KUBECONFIG
+kubectl cluster-info
+
+# Verify permissions
+kubectl auth can-i create crds --all-namespaces
+```
+
+#### Webhook Certificate Errors
+
+If you see webhook certificate errors:
+- Set `ENABLE_WEBHOOKS=false` for local development (recommended)
+- Or ensure certificates exist at `/tmp/k8s-webhook-server/serving-certs/`
+
+#### CRDs Not Found
+
+```bash
+# Reinstall CRDs
+make install
+
+# Verify CRDs are installed
+kubectl get crds | grep fusion.storage.openshift.io
+```
+
+#### Missing Permissions
+
+Ensure you have cluster-admin or appropriate RBAC permissions:
+```bash
+oc adm policy who-can create crds
+```
+
+### Additional Resources
+
+- Frontend development: See `console/README.md`
+- Operator SDK documentation: https://sdk.operatorframework.io/
+- controller-runtime: https://pkg.go.dev/sigs.k8s.io/controller-runtime
 
 ## Support
 

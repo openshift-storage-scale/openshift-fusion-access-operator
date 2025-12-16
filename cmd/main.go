@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -31,16 +32,23 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/go-logr/logr"
 	kmmv1beta1 "github.com/rh-ecosystem-edge/kernel-module-management/api/v1beta1"
 
+	buildv1 "github.com/openshift/api/build/v1"
 	consolev1 "github.com/openshift/api/console/v1"
 	imageregistryv1 "github.com/openshift/api/imageregistry/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+
+	fsccontroller "github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/filesystemclaim"
 	lvdcontroller "github.com/openshift-storage-scale/openshift-fusion-access-operator/internal/controller/localvolumediscovery"
 
 	fusionv1alpha "github.com/openshift-storage-scale/openshift-fusion-access-operator/api/v1alpha1"
@@ -59,6 +67,8 @@ func init() {
 
 	utilruntime.Must(fusionv1alpha.AddToScheme(scheme))
 
+	utilruntime.Must(buildv1.AddToScheme(scheme))
+
 	utilruntime.Must(consolev1.AddToScheme(scheme))
 
 	utilruntime.Must(imageregistryv1.AddToScheme(scheme))
@@ -66,6 +76,9 @@ func init() {
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 
 	utilruntime.Must(kmmv1beta1.AddToScheme(scheme))
+
+	// Register VolumeSnapshotClass types for typed API usage
+	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
@@ -149,12 +162,30 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "FusionAccess")
 			os.Exit(1)
 		}
-		if err = (&fusionv1alpha.KMMPodMutator{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "KMMPod")
+		if err = (&fusionv1alpha.FileSystemClaim{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FileSystemClaim")
 			os.Exit(1)
 		}
 	}
+	if err = (&fsccontroller.FileSystemClaimReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FileSystemClaim")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
+
+	// Add migration as a pre-start runnable that blocks until complete
+	// This ensures migration runs AFTER cache sync but BEFORE controllers start processing
+	if err := mgr.Add(&migrationRunnable{
+		client:   mgr.GetClient(),
+		cache:    mgr.GetCache(),
+		setupLog: setupLog,
+	}); err != nil {
+		setupLog.Error(err, "unable to add migration runnable")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -178,4 +209,42 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	setupLog.Info(fmt.Sprintf("Git Commit: %s", version.GitCommit))
 	setupLog.Info(fmt.Sprintf("Build Date: %s", version.BuildDate))
+}
+
+// migrationRunnable is a manager.Runnable that executes migration
+// It implements NeedLeaderElection to run only on the leader
+type migrationRunnable struct {
+	client   client.Client
+	cache    cache.Cache
+	setupLog logr.Logger
+}
+
+// Start implements manager.Runnable
+// It runs migration after cache sync and then exits immediately
+// This ensures migration completes before controllers start processing
+func (m *migrationRunnable) Start(ctx context.Context) error {
+	m.setupLog.Info("Migration runnable started, waiting for cache to sync")
+
+	// Wait for cache to sync before running migration
+	if !m.cache.WaitForCacheSync(ctx) {
+		return fmt.Errorf("cache sync failed")
+	}
+	m.setupLog.Info("Cache synced, running v1.0 to v1.1 migration check")
+
+	// Run migration
+	if err := fsccontroller.RunMigration(ctx, m.client); err != nil {
+		m.setupLog.Error(err, "migration encountered errors but will continue")
+		// Don't return error - migration is best-effort
+	}
+	m.setupLog.Info("Migration check complete")
+
+	// Return nil immediately - this runnable is done
+	// Controllers can now safely start processing
+	return nil
+}
+
+// NeedLeaderElection implements manager.LeaderElectionRunnable
+// Migration should only run on the leader to avoid duplicate migrations
+func (m *migrationRunnable) NeedLeaderElection() bool {
+	return true
 }
