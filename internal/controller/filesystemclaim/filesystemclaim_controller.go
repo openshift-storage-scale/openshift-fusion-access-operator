@@ -133,7 +133,6 @@ const (
 	// Labels
 	FileSystemClaimOwnedByNameLabel      = "fusion.storage.openshift.io/owned-by-fsc-name"
 	FileSystemClaimOwnedByNamespaceLabel = "fusion.storage.openshift.io/owned-by-fsc-namespace"
-	StorageClassDefaultAnnotation        = "storageclass.kubevirt.io/is-default-virt-class"
 	FileSystemDeletionLabel              = "scale.spectrum.ibm.com/allowDelete"
 )
 
@@ -1599,9 +1598,6 @@ func buildStorageClass(fsc *fusionv1alpha1.FileSystemClaim, scName, fsName strin
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: scName,
-			Annotations: map[string]string{
-				StorageClassDefaultAnnotation: "true",
-			},
 			Labels: map[string]string{
 				FileSystemClaimOwnedByNameLabel:      fsc.Name,
 				FileSystemClaimOwnedByNamespaceLabel: fsc.Namespace,
@@ -1647,8 +1643,7 @@ func buildVolumeSnapshotClass(ctx context.Context, fsc *fusionv1alpha1.FileSyste
 func storageClassRelevantFields(sc *storagev1.StorageClass) *storagev1.StorageClass {
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: sc.Annotations,
-			Labels:      sc.Labels,
+			Labels: sc.Labels,
 		},
 		Provisioner:          sc.Provisioner,
 		AllowVolumeExpansion: sc.AllowVolumeExpansion,
@@ -1701,7 +1696,6 @@ func (r *FileSystemClaimReconciler) reconcileExistingStorageClass(
 		}
 
 		fields := storageClassRelevantFields(desired)
-		sc.Annotations = fields.Annotations
 		sc.Provisioner = fields.Provisioner
 		sc.AllowVolumeExpansion = fields.AllowVolumeExpansion
 		sc.ReclaimPolicy = fields.ReclaimPolicy
