@@ -60,3 +60,6 @@ test/e2e/volumesnapshotclass
 test/logs/
 
 .envrc
+# Local validation scripts
+check-digests.sh
+validate-tekton-local.sh
