@@ -1010,3 +1010,137 @@ var _ = Describe("ValidateWWNs", func() {
 		})
 	})
 })
+
+var _ = Describe("MergeStringMaps", func() {
+	Context("when merging maps", func() {
+		It("should merge two non-overlapping maps", func() {
+			base := map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			}
+			overlay := map[string]string{
+				"key3": "value3",
+				"key4": "value4",
+			}
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).To(HaveLen(4))
+			Expect(result["key1"]).To(Equal("value1"))
+			Expect(result["key2"]).To(Equal("value2"))
+			Expect(result["key3"]).To(Equal("value3"))
+			Expect(result["key4"]).To(Equal("value4"))
+		})
+
+		It("should overlay values for duplicate keys", func() {
+			base := map[string]string{
+				"key1": "base-value",
+				"key2": "value2",
+			}
+			overlay := map[string]string{
+				"key1": "overlay-value",
+				"key3": "value3",
+			}
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).To(HaveLen(3))
+			Expect(result["key1"]).To(Equal("overlay-value")) // overlay takes precedence
+			Expect(result["key2"]).To(Equal("value2"))
+			Expect(result["key3"]).To(Equal("value3"))
+		})
+
+		It("should preserve user labels while enforcing operator labels", func() {
+			// Simulates current labels (with user-added labels)
+			current := map[string]string{
+				"fusion.storage.openshift.io/owned-by-fsc-name":      "my-fsc",
+				"fusion.storage.openshift.io/owned-by-fsc-namespace": "default",
+				"user-label":  "user-value",
+				"environment": "production",
+			}
+
+			// Simulates desired labels (only operator labels)
+			desired := map[string]string{
+				"fusion.storage.openshift.io/owned-by-fsc-name":      "my-fsc",
+				"fusion.storage.openshift.io/owned-by-fsc-namespace": "default",
+			}
+
+			result := MergeStringMaps(current, desired)
+
+			// Operator labels should be present
+			Expect(result["fusion.storage.openshift.io/owned-by-fsc-name"]).To(Equal("my-fsc"))
+			Expect(result["fusion.storage.openshift.io/owned-by-fsc-namespace"]).To(Equal("default"))
+
+			// User labels should be preserved
+			Expect(result["user-label"]).To(Equal("user-value"))
+			Expect(result["environment"]).To(Equal("production"))
+
+			Expect(result).To(HaveLen(4))
+		})
+
+		It("should handle nil base map", func() {
+			var base map[string]string
+			overlay := map[string]string{
+				"key1": "value1",
+			}
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).To(HaveLen(1))
+			Expect(result["key1"]).To(Equal("value1"))
+		})
+
+		It("should handle nil overlay map", func() {
+			base := map[string]string{
+				"key1": "value1",
+			}
+			var overlay map[string]string
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).To(HaveLen(1))
+			Expect(result["key1"]).To(Equal("value1"))
+		})
+
+		It("should handle both maps nil", func() {
+			var base map[string]string
+			var overlay map[string]string
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).ToNot(BeNil())
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should handle empty maps", func() {
+			base := map[string]string{}
+			overlay := map[string]string{}
+
+			result := MergeStringMaps(base, overlay)
+
+			Expect(result).ToNot(BeNil())
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should not modify input maps", func() {
+			base := map[string]string{
+				"key1": "value1",
+			}
+			overlay := map[string]string{
+				"key2": "value2",
+			}
+
+			result := MergeStringMaps(base, overlay)
+
+			// Modify result
+			result["key3"] = "value3"
+			result["key1"] = "modified"
+
+			// Original maps should be unchanged
+			Expect(base).To(HaveLen(1))
+			Expect(base["key1"]).To(Equal("value1"))
+			Expect(overlay).To(HaveLen(1))
+			Expect(overlay["key2"]).To(Equal("value2"))
+		})
+	})
+})

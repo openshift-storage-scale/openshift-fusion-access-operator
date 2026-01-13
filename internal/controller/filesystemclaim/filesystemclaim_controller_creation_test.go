@@ -209,6 +209,76 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 		})
 
+		It("should preserve existing annotations when reconciling StorageClass", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual Filesystem resource
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
+
+			// SC already exists with the old annotation (from v1.1) and additional labels
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Annotations = map[string]string{
+				"storageclass.kubevirt.io/is-default-virt-class": "true",
+				"some-other-annotation":                          "preserved",
+			}
+			existingSC.Labels["some-existing-label"] = "preserved"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue()) // should be true because labels will be added
+
+			// Verify SC still has the old annotation (we don't remove it since we no longer manage annotations)
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("storageclass.kubevirt.io/is-default-virt-class", "true"))
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("some-other-annotation", "preserved"))
+
+			// Verify our required labels are present
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+		})
+
 		It("should skip StorageClass creation when Filesystem is not owned by this FSC", func() {
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -251,6 +321,176 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			sc := &storagev1.StorageClass{}
 			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "StorageClass should not be created when condition is False")
+		})
+
+		It("should preserve user-added labels while reconciling operator labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// SC already exists with user-added labels
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels["user-custom-label"] = "user-value"
+			existingSC.Labels["environment"] = "production"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			_, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify user labels are preserved
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator labels should be present
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User labels should be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-custom-label", "user-value"))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("environment", "production"))
+		})
+
+		It("should correct modified operator label values while preserving user labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual Filesystem resource
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
+
+			// SC exists but operator label values have been tampered with
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels[FileSystemClaimOwnedByNameLabel] = "tampered-name"
+			existingSC.Labels[FileSystemClaimOwnedByNamespaceLabel] = "tampered-namespace"
+			existingSC.Labels["user-label"] = "user-value"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator label values are incorrect")
+
+			// Verify operator label values are corrected
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator-managed labels restored to correct values
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
+		})
+
+		It("should restore operator labels if they are removed by user", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// SC exists but operator labels have been removed
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels = map[string]string{
+				"user-label": "user-value",
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator labels are missing")
+
+			// Verify operator labels are restored
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator labels should be restored
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
 		})
 	})
 
@@ -414,6 +654,105 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+		})
+
+		It("should preserve user-added labels while reconciling operator labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// VSC already exists with user-added labels
+			existingVSC := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+			existingVSC.Labels["user-custom-label"] = "user-value"
+			existingVSC.Labels["team"] = "platform-team"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingVSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			_, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify user labels are preserved
+			updatedVSC := &snapshotv1.VolumeSnapshotClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedVSC)).To(Succeed())
+
+			// Operator labels should be present
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User labels should be preserved
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("user-custom-label", "user-value"))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("team", "platform-team"))
+		})
+
+		It("should restore operator labels if they are removed by user", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// VSC exists but operator labels have been removed
+			existingVSC := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+			existingVSC.Labels = map[string]string{
+				"user-label": "user-value",
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingVSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator labels are missing")
+
+			// Verify operator labels are restored
+			updatedVSC := &snapshotv1.VolumeSnapshotClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedVSC)).To(Succeed())
+
+			// Operator labels should be restored
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
 		})
 	})
 
