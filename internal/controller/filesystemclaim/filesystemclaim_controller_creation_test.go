@@ -209,6 +209,76 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 		})
 
+		It("should preserve existing annotations when reconciling StorageClass", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual Filesystem resource
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
+
+			// SC already exists with the old annotation (from v1.1) and additional labels
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Annotations = map[string]string{
+				"storageclass.kubevirt.io/is-default-virt-class": "true",
+				"some-other-annotation":                          "preserved",
+			}
+			existingSC.Labels["some-existing-label"] = "preserved"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue())
+
+			// Verify SC still has the old annotation (we don't remove it since we no longer manage annotations)
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("storageclass.kubevirt.io/is-default-virt-class", "true"))
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("some-other-annotation", "preserved"))
+
+			// Verify our required labels are present
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+		})
+
 		It("should skip StorageClass creation when Filesystem is not owned by this FSC", func() {
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
