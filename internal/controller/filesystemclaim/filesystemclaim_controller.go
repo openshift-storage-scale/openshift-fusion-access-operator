@@ -1664,11 +1664,14 @@ func (r *FileSystemClaimReconciler) reconcileExistingVolumeSnapshotClass(
 	return r.detectAndPatchDrift(ctx, current, func(obj client.Object) bool {
 		vsc := obj.(*snapshotv1.VolumeSnapshotClass)
 
+		// Merge labels: preserve user-added labels while ensuring operator labels are present
+		mergedLabels := utils.MergeStringMaps(vsc.Labels, desired.Labels)
+
 		// Check for drift in relevant fields
 		if vsc.Driver == desired.Driver &&
 			vsc.DeletionPolicy == desired.DeletionPolicy &&
 			reflect.DeepEqual(vsc.Parameters, desired.Parameters) &&
-			reflect.DeepEqual(vsc.Labels, desired.Labels) {
+			reflect.DeepEqual(vsc.Labels, mergedLabels) {
 			return false // No drift
 		}
 
@@ -1676,7 +1679,7 @@ func (r *FileSystemClaimReconciler) reconcileExistingVolumeSnapshotClass(
 		vsc.Driver = desired.Driver
 		vsc.DeletionPolicy = desired.DeletionPolicy
 		vsc.Parameters = desired.Parameters
-		vsc.Labels = desired.Labels
+		vsc.Labels = mergedLabels // Use merged labels
 
 		logger.Info("Detected VolumeSnapshotClass drift; patching to desired state", "name", vsc.GetName())
 		return true
@@ -1691,17 +1694,25 @@ func (r *FileSystemClaimReconciler) reconcileExistingStorageClass(
 	logger := log.FromContext(ctx)
 	return r.detectAndPatchDrift(ctx, current, func(obj client.Object) bool {
 		sc := obj.(*storagev1.StorageClass)
-		if reflect.DeepEqual(storageClassRelevantFields(sc), storageClassRelevantFields(desired)) {
+
+		// Merge labels: preserve user-added labels while ensuring operator labels are present
+		mergedLabels := utils.MergeStringMaps(sc.Labels, desired.Labels)
+
+		// Create comparison: current state vs desired state with merged labels
+		currentFields := storageClassRelevantFields(sc)
+		desiredFields := storageClassRelevantFields(desired)
+		desiredFields.Labels = mergedLabels
+
+		if reflect.DeepEqual(currentFields, desiredFields) {
 			return false
 		}
 
-		fields := storageClassRelevantFields(desired)
-		sc.Provisioner = fields.Provisioner
-		sc.AllowVolumeExpansion = fields.AllowVolumeExpansion
-		sc.ReclaimPolicy = fields.ReclaimPolicy
-		sc.VolumeBindingMode = fields.VolumeBindingMode
-		sc.Parameters = fields.Parameters
-		sc.Labels = fields.Labels
+		sc.Provisioner = desiredFields.Provisioner
+		sc.AllowVolumeExpansion = desiredFields.AllowVolumeExpansion
+		sc.ReclaimPolicy = desiredFields.ReclaimPolicy
+		sc.VolumeBindingMode = desiredFields.VolumeBindingMode
+		sc.Parameters = desiredFields.Parameters
+		sc.Labels = mergedLabels // Use merged labels, not just desired
 		logger.Info("Detected StorageClass drift; patching to desired state", "name", sc.Name)
 		return true
 	})
@@ -2146,10 +2157,12 @@ func hasOwnershipLabels(labels map[string]string) bool {
 //   - Use didResourceStatusChange() instead for IBM Spectrum Scale CRs (LocalDisk, Filesystem)
 //
 // Watch behavior:
-// - CreateFunc: false - StorageClass/VolumeSnapshotClass creation is managed by controller, no need to watch
-// - UpdateFunc: true if owned - detects drift/external modifications to these resources
-// - DeleteFunc: true if owned - detects when StorageClass/VolumeSnapshotClass is deleted externally
-// - GenericFunc: false - no generic events expected
+//   - CreateFunc: false - StorageClass/VolumeSnapshotClass creation is managed by controller, no need to watch
+//   - UpdateFunc: true if resource was previously owned (old object has labels) - reconciles any changes
+//     including label removal, false if resource was never owned - ignores resources that were not created
+//     by this controller. This is because we want to reconcile any changes to the resource, including label removal.
+//   - DeleteFunc: true if owned - detects when StorageClass/VolumeSnapshotClass is deleted externally
+//   - GenericFunc: false - no generic events expected
 //
 // Used for: StorageClass, VolumeSnapshotClass (Kubernetes-native resources with ownership labels)
 func didWatchedResourceChange() builder.WatchesOption {
@@ -2158,10 +2171,8 @@ func didWatchedResourceChange() builder.WatchesOption {
 			return false
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			if e.ObjectNew == nil {
-				return false
-			}
-			return hasOwnershipLabels(e.ObjectNew.GetLabels())
+			oldHasLabels := e.ObjectOld != nil && hasOwnershipLabels(e.ObjectOld.GetLabels())
+			return oldHasLabels
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			if e.Object == nil {

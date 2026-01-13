@@ -555,3 +555,23 @@ func UpdateCondition(conditions []metav1.Condition, conditionType string, status
 
 	return append(conditions, condition)
 }
+
+// MergeStringMaps merges two string maps with overlay taking precedence for duplicate keys.
+// This preserves keys from base while ensuring overlay keys are present.
+// Returns a new map without modifying the inputs.
+// Useful for preserving user-added labels while enforcing operator-managed labels.
+func MergeStringMaps(base, overlay map[string]string) map[string]string {
+	result := make(map[string]string, len(base)+len(overlay))
+
+	// Copy all base entries
+	for k, v := range base {
+		result[k] = v
+	}
+
+	// Overlay entries (overwrites on conflict)
+	for k, v := range overlay {
+		result[k] = v
+	}
+
+	return result
+}
