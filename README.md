@@ -321,3 +321,4 @@ This operator requires an IBM Fusion Entitlement. For support and additional inf
 ## License
 
 Licensed under the Apache License, Version 2.0. See LICENSE file for details.
+# Trigger pipeline with updated digests
