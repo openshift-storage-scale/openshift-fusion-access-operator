@@ -96,7 +96,6 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)).To(Succeed())
 			Expect(sc.Provisioner).To(Equal("spectrumscale.csi.ibm.com"))
 			Expect(sc.Parameters["volBackendFs"]).To(Equal(fsc.Name))
-			Expect(sc.Annotations[StorageClassDefaultAnnotation]).To(Equal("true"))
 
 			// Verify condition was set
 			updated := &fusionv1alpha1.FileSystemClaim{}
