@@ -314,7 +314,7 @@ func (r *FusionAccessReconciler) Reconcile(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Log.Info(fmt.Sprintf("Applying manifest from %s", installPath))
+	log.Log.Info(fmt.Sprintf("Applying manifests from %s", installPath))
 
 	if err := installManifest.Apply(); err != nil {
 		log.Log.Error(err, "Error applying manifest")
