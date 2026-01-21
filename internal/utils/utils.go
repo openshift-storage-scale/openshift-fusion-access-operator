@@ -87,6 +87,23 @@ func ValidateWWNs(devices []string) error {
 	return nil
 }
 
+// IsSuperset checks if newDevices contains all devices from oldDevices (newDevices is a superset of oldDevices).
+// Returns true if newDevices contains ALL devices in oldDevices, allowing for additional devices in newDevices.
+// Returns false if any device from oldDevices is missing in newDevices (indicating removal or replacement).
+// This function is used by both the webhook and controller to detect device additions vs removals.
+func IsSuperset(newDevices, oldDevices []string) bool {
+	newSet := make(map[string]struct{})
+	for _, d := range newDevices {
+		newSet[d] = struct{}{}
+	}
+	for _, d := range oldDevices {
+		if _, exists := newSet[d]; !exists {
+			return false // old device not found in new set - indicates removal
+		}
+	}
+	return true
+}
+
 // Taken from https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=planning-software-requirements
 type FusionAccessData struct {
 	CSIVersion                string   `json:"csi_version"`
