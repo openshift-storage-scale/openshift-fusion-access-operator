@@ -370,6 +370,18 @@ func (r *FileSystemClaimReconciler) ensureLocalDisks(ctx context.Context, fsc *f
 		// Check if devices match exactly
 		if reflect.DeepEqual(ownedDevices, specDevices) {
 			// No changes, devices match exactly
+			// Clear any stale DeviceValidated errors from previous failed generations
+			// But only if DeviceValidated is not already True
+			deviceValidatedCond := apimeta.FindStatusCondition(fsc.Status.Conditions, fusionv1alpha1.ConditionTypeDeviceValidated)
+			if deviceValidatedCond == nil || deviceValidatedCond.Status != metav1.ConditionTrue {
+				// DeviceValidated is False or missing, update it to True
+				changed, err := r.updateConditionIfChanged(ctx, fsc, fusionv1alpha1.ConditionTypeDeviceValidated, metav1.ConditionTrue, ReasonDeviceValidationSucceeded, "Device(s) validation succeeded")
+				if err != nil {
+					return false, err
+				}
+				return changed, nil
+			}
+			// DeviceValidated is already True, no change needed
 			return false, nil
 		}
 
