@@ -1511,14 +1511,20 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 	})
 
 	Describe("ensureLocalDisks", func() {
-		It("should skip when LocalDiskCreated is already True", func() {
+		It("should skip when LocalDiskCreated is already True and devices match", func() {
 			fsc := createTestFSC("test-fsc", namespace, nil, []metav1.Condition{
 				localDiskCreatedCondition(metav1.ConditionTrue, ReasonLocalDiskCreationSucceeded),
+				{
+					Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
+					Status: metav1.ConditionTrue,
+					Reason: ReasonDeviceValidationSucceeded,
+				},
 			})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(fsc).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
 			reconciler := &FileSystemClaimReconciler{
@@ -2932,6 +2938,11 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 								Status: metav1.ConditionTrue,
 								Reason: ReasonLocalDiskCreationSucceeded,
 							},
+							{
+								Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonDeviceValidationSucceeded,
+							},
 						},
 					},
 				}
@@ -2954,7 +2965,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				// Controller should allow - WWNs match LocalDisk names
 				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(changed).To(BeFalse()) // No change needed - devices match
+				Expect(changed).To(BeFalse()) // No change needed - devices match and DeviceValidated already True
 			})
 
 			It("should detect when WWN is removed from spec.devices", func() {
