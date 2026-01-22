@@ -1,6 +1,6 @@
 module github.com/openshift-storage-scale/openshift-fusion-access-operator
 
-go 1.23.6
+go 1.25
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0

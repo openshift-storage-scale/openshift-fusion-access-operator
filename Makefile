@@ -365,7 +365,7 @@ $(LOCALBIN):
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.17.3
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-GOLANGCI_LINT_VERSION ?= v2.5.0
+GOLANGCI_LINT_VERSION ?= v2.8.0
 # update for major version updates to YQ_VERSION!
 YQ_API_VERSION = v4
 YQ_VERSION = v4.45.4
