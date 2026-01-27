@@ -96,7 +96,6 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)).To(Succeed())
 			Expect(sc.Provisioner).To(Equal("spectrumscale.csi.ibm.com"))
 			Expect(sc.Parameters["volBackendFs"]).To(Equal(fsc.Name))
-			Expect(sc.Annotations[StorageClassDefaultAnnotation]).To(Equal("true"))
 
 			// Verify condition was set
 			updated := &fusionv1alpha1.FileSystemClaim{}
@@ -210,6 +209,76 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
 		})
 
+		It("should preserve existing annotations when reconciling StorageClass", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual Filesystem resource
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
+
+			// SC already exists with the old annotation (from v1.1) and additional labels
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Annotations = map[string]string{
+				"storageclass.kubevirt.io/is-default-virt-class": "true",
+				"some-other-annotation":                          "preserved",
+			}
+			existingSC.Labels["some-existing-label"] = "preserved"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue()) // should be true because labels will be added
+
+			// Verify SC still has the old annotation (we don't remove it since we no longer manage annotations)
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("storageclass.kubevirt.io/is-default-virt-class", "true"))
+			Expect(updatedSC.Annotations).To(HaveKeyWithValue("some-other-annotation", "preserved"))
+
+			// Verify our required labels are present
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+		})
+
 		It("should skip StorageClass creation when Filesystem is not owned by this FSC", func() {
 			fsc := &fusionv1alpha1.FileSystemClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -252,6 +321,176 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			sc := &storagev1.StorageClass{}
 			err = fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, sc)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "StorageClass should not be created when condition is False")
+		})
+
+		It("should preserve user-added labels while reconciling operator labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// SC already exists with user-added labels
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels["user-custom-label"] = "user-value"
+			existingSC.Labels["environment"] = "production"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			_, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify user labels are preserved
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator labels should be present
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User labels should be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-custom-label", "user-value"))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("environment", "production"))
+		})
+
+		It("should correct modified operator label values while preserving user labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// Create actual Filesystem resource
+			fs := &unstructured.Unstructured{}
+			fs.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   FileSystemGroup,
+				Version: FileSystemVersion,
+				Kind:    FileSystemKind,
+			})
+			fs.SetName("test-fsc")
+			fs.SetNamespace(namespace)
+			fs.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "fusion.storage.openshift.io/v1alpha1",
+					Kind:       "FileSystemClaim",
+					Name:       "test-fsc",
+					UID:        "test-fsc-uid",
+				},
+			})
+
+			// SC exists but operator label values have been tampered with
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels[FileSystemClaimOwnedByNameLabel] = "tampered-name"
+			existingSC.Labels[FileSystemClaimOwnedByNamespaceLabel] = "tampered-namespace"
+			existingSC.Labels["user-label"] = "user-value"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, fs, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator label values are incorrect")
+
+			// Verify operator label values are corrected
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator-managed labels restored to correct values
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
+		})
+
+		It("should restore operator labels if they are removed by user", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+					UID:       "test-fsc-uid",
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeFileSystemCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonFileSystemCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// SC exists but operator labels have been removed
+			existingSC := buildStorageClass(fsc, fsc.Name, fsc.Name)
+			existingSC.Labels = map[string]string{
+				"user-label": "user-value",
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureStorageClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator labels are missing")
+
+			// Verify operator labels are restored
+			updatedSC := &storagev1.StorageClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedSC)).To(Succeed())
+
+			// Operator labels should be restored
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
 		})
 	})
 
@@ -415,6 +654,105 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 			cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeVolumeSnapshotClassCreated)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+		})
+
+		It("should preserve user-added labels while reconciling operator labels", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// VSC already exists with user-added labels
+			existingVSC := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+			existingVSC.Labels["user-custom-label"] = "user-value"
+			existingVSC.Labels["team"] = "platform-team"
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingVSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			_, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify user labels are preserved
+			updatedVSC := &snapshotv1.VolumeSnapshotClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedVSC)).To(Succeed())
+
+			// Operator labels should be present
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User labels should be preserved
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("user-custom-label", "user-value"))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("team", "platform-team"))
+		})
+
+		It("should restore operator labels if they are removed by user", func() {
+			fsc := &fusionv1alpha1.FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-fsc",
+					Namespace: namespace,
+				},
+				Status: fusionv1alpha1.FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   fusionv1alpha1.ConditionTypeStorageClassCreated,
+							Status: metav1.ConditionTrue,
+							Reason: ReasonStorageClassCreationSucceeded,
+						},
+					},
+				},
+			}
+
+			// VSC exists but operator labels have been removed
+			existingVSC := buildVolumeSnapshotClass(ctx, fsc, fsc.Name)
+			existingVSC.Labels = map[string]string{
+				"user-label": "user-value",
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(fsc, existingVSC).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+				Build()
+
+			reconciler := &FileSystemClaimReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			changed, err := reconciler.ensureVolumeSnapshotClass(ctx, fsc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(BeTrue(), "should detect drift when operator labels are missing")
+
+			// Verify operator labels are restored
+			updatedVSC := &snapshotv1.VolumeSnapshotClass{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name}, updatedVSC)).To(Succeed())
+
+			// Operator labels should be restored
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNameLabel, fsc.Name))
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue(FileSystemClaimOwnedByNamespaceLabel, fsc.Namespace))
+
+			// User label should still be preserved
+			Expect(updatedVSC.Labels).To(HaveKeyWithValue("user-label", "user-value"))
 		})
 	})
 
@@ -1173,14 +1511,20 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 	})
 
 	Describe("ensureLocalDisks", func() {
-		It("should skip when LocalDiskCreated is already True", func() {
+		It("should skip when LocalDiskCreated is already True and devices match", func() {
 			fsc := createTestFSC("test-fsc", namespace, nil, []metav1.Condition{
 				localDiskCreatedCondition(metav1.ConditionTrue, ReasonLocalDiskCreationSucceeded),
+				{
+					Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
+					Status: metav1.ConditionTrue,
+					Reason: ReasonDeviceValidationSucceeded,
+				},
 			})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(fsc).
+				WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
 				Build()
 
 			reconciler := &FileSystemClaimReconciler{
@@ -2594,6 +2938,11 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 								Status: metav1.ConditionTrue,
 								Reason: ReasonLocalDiskCreationSucceeded,
 							},
+							{
+								Type:   fusionv1alpha1.ConditionTypeDeviceValidated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonDeviceValidationSucceeded,
+							},
 						},
 					},
 				}
@@ -2616,7 +2965,7 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				// Controller should allow - WWNs match LocalDisk names
 				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(changed).To(BeFalse()) // No change needed - devices match
+				Expect(changed).To(BeFalse()) // No change needed - devices match and DeviceValidated already True
 			})
 
 			It("should detect when WWN is removed from spec.devices", func() {
@@ -2676,8 +3025,12 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Expect(cond.Message).To(ContainSubstring(wwn2), "should mention the removed WWN")
 			})
 
-			It("should detect when WWN is added to spec.devices", func() {
+			It("should allow and create new LocalDisk when WWN is added to spec.devices", func() {
 				// Scenario: FSC originally had 1 WWN, but another was added
+				// This should now be ALLOWED and create the new LocalDisk
+				operatorNS := "test-operator-ns"
+				GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
+
 				wwn1 := "uuid.12345678-1234-1234-1234-123456789abc"
 				wwn2 := "eui.0025388b21109b03"
 
@@ -2701,13 +3054,28 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					},
 				}
 
-				// Only one LocalDisk exists (original state)
-				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "node1", fsc)
+				// Only one LocalDisk exists (original state) with node info
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "storage-node-1", fsc)
+
+				// Create storage node and LVDR with both devices
+				node := createStorageNode("storage-node-1")
+				lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-1",
+						Path:     "/dev/nvme1n1",
+						WWN:      wwn1,
+					},
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-2",
+						Path:     "/dev/nvme2n1",
+						WWN:      wwn2,
+					},
+				})
 
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(fsc, ld1).
-					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}).
+					WithObjects(fsc, ld1, node, lvdr).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}, &fusionv1alpha1.LocalVolumeDiscoveryResult{}).
 					Build()
 
 				reconciler := &FileSystemClaimReconciler{
@@ -2715,21 +3083,36 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 					Scheme: scheme,
 				}
 
-				// Controller should detect mismatch (1 LD exists, but 2 WWNs in spec)
+				// Controller should allow addition and proceed to create new LocalDisk
 				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(changed).To(BeTrue())
 
-				// Verify error condition
+				// Verify new LocalDisk was created for wwn2
+				newLD := &unstructured.Unstructured{}
+				newLD.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   LocalDiskGroup,
+					Version: LocalDiskVersion,
+					Kind:    LocalDiskKind,
+				})
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: wwn2, Namespace: namespace}, newLD)).To(Succeed())
+
+				// Verify the new LocalDisk has correct spec
+				spec, found, err := unstructured.NestedMap(newLD.Object, "spec")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+				Expect(spec["device"]).To(Equal("/dev/nvme2n1"))
+				Expect(spec["node"]).To(Equal("storage-node-1"))
+
+				// Verify no error condition was set
 				updated := &fusionv1alpha1.FileSystemClaim{}
 				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
 
-				cond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
-				Expect(cond).NotTo(BeNil())
-				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
-				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
-				Expect(cond.Message).To(ContainSubstring("spec.devices was modified"))
-				Expect(cond.Message).To(ContainSubstring(wwn2), "should mention the added WWN")
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				// Ready condition should either not exist or not be False with ImmutableFieldModified
+				if readyCond != nil {
+					Expect(readyCond.Reason).NotTo(Equal(ReasonImmutableFieldModified), "should not set ImmutableFieldModified for additions")
+				}
 			})
 
 			It("should detect when all WWNs are replaced with different ones", func() {
@@ -2786,6 +3169,190 @@ var _ = Describe("FileSystemClaim Creation Flow", func() {
 				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).To(Equal(ReasonImmutableFieldModified))
 				Expect(cond.Message).To(ContainSubstring("spec.devices was modified"))
+				Expect(cond.Message).To(ContainSubstring("cannot be removed or replaced"))
+				Expect(cond.Message).To(ContainSubstring("You can only ADD new devices"))
+			})
+
+			It("should reject when new device is on a different node than existing LocalDisks", func() {
+				// Scenario: Adding a device that exists on a different node
+				operatorNS := "test-operator-ns"
+				GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
+
+				wwn1 := "uuid.12345678-1234-1234-1234-123456789abc"
+				wwn2 := "eui.0025388b21109b04"
+
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+						UID:       "test-fsc-uid",
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{wwn1, wwn2}, // wwn2 added, but on different node
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Existing LocalDisk on node1
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "storage-node-1", fsc)
+
+				// Create nodes and LVDRs - wwn2 is on a DIFFERENT node
+				node1 := createStorageNode("storage-node-1")
+				node2 := createStorageNode("storage-node-2")
+				lvdr1 := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-1",
+						Path:     "/dev/nvme1n1",
+						WWN:      wwn1,
+					},
+				})
+				lvdr2 := createLVDR("storage-node-2", operatorNS, []fusionv1alpha1.DiscoveredDevice{
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-2",
+						Path:     "/dev/nvme2n1",
+						WWN:      wwn2,
+					},
+				})
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1, node1, node2, lvdr1, lvdr2).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}, &fusionv1alpha1.LocalVolumeDiscoveryResult{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should reject - new device on different node
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify error condition - getDevicePathFromWWN will fail since wwn2 is not on storage-node-1
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				// Should have LocalDiskCreated=False with creation error (device not found on the node)
+				ldCreatedCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeLocalDiskCreated)
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+
+				// Either LocalDiskCreated or Ready should indicate the error
+				errorFound := false
+				if ldCreatedCond != nil && ldCreatedCond.Status == metav1.ConditionFalse {
+					if ldCreatedCond.Reason == ReasonLocalDiskCreationFailed {
+						errorFound = true
+					}
+				}
+				if readyCond != nil && readyCond.Status == metav1.ConditionFalse {
+					errorFound = true
+				}
+
+				Expect(errorFound).To(BeTrue(), "should set error condition when device not found on the expected node")
+			})
+
+			It("should allow adding multiple devices at once", func() {
+				// Scenario: Adding 2 new devices to an existing device
+				operatorNS := "test-operator-ns"
+				GinkgoT().Setenv("DEPLOYMENT_NAMESPACE", operatorNS)
+
+				wwn1 := "uuid.11111111-1111-1111-1111-111111111111"
+				wwn2 := "uuid.22222222-2222-2222-2222-222222222222"
+				wwn3 := "uuid.33333333-3333-3333-3333-333333333333"
+
+				fsc := &fusionv1alpha1.FileSystemClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-fsc",
+						Namespace: namespace,
+						UID:       "test-fsc-uid",
+					},
+					Spec: fusionv1alpha1.FileSystemClaimSpec{
+						Devices: []string{wwn1, wwn2, wwn3}, // wwn2 and wwn3 added
+					},
+					Status: fusionv1alpha1.FileSystemClaimStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   fusionv1alpha1.ConditionTypeLocalDiskCreated,
+								Status: metav1.ConditionTrue,
+								Reason: ReasonLocalDiskCreationSucceeded,
+							},
+						},
+					},
+				}
+
+				// Only one LocalDisk exists initially
+				ld1 := createLocalDiskWithOwner(wwn1, fsc.Namespace, "/dev/disk/by-id/nvme-device-1", "storage-node-1", fsc)
+
+				// Create storage node and LVDR with all three devices
+				node := createStorageNode("storage-node-1")
+				lvdr := createLVDR("storage-node-1", operatorNS, []fusionv1alpha1.DiscoveredDevice{
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-1",
+						Path:     "/dev/nvme1n1",
+						WWN:      wwn1,
+					},
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-2",
+						Path:     "/dev/nvme2n1",
+						WWN:      wwn2,
+					},
+					{
+						DeviceID: "/dev/disk/by-id/nvme-device-3",
+						Path:     "/dev/nvme3n1",
+						WWN:      wwn3,
+					},
+				})
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(fsc, ld1, node, lvdr).
+					WithStatusSubresource(&fusionv1alpha1.FileSystemClaim{}, &fusionv1alpha1.LocalVolumeDiscoveryResult{}).
+					Build()
+
+				reconciler := &FileSystemClaimReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				}
+
+				// Controller should allow and create both new LocalDisks
+				changed, err := reconciler.ensureLocalDisks(ctx, fsc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(changed).To(BeTrue())
+
+				// Verify both new LocalDisks were created
+				ld2 := &unstructured.Unstructured{}
+				ld2.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   LocalDiskGroup,
+					Version: LocalDiskVersion,
+					Kind:    LocalDiskKind,
+				})
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: wwn2, Namespace: namespace}, ld2)).To(Succeed())
+
+				ld3 := &unstructured.Unstructured{}
+				ld3.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   LocalDiskGroup,
+					Version: LocalDiskVersion,
+					Kind:    LocalDiskKind,
+				})
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: wwn3, Namespace: namespace}, ld3)).To(Succeed())
+
+				// Verify no error condition
+				updated := &fusionv1alpha1.FileSystemClaim{}
+				Expect(fakeClient.Get(ctx, types.NamespacedName{Name: fsc.Name, Namespace: fsc.Namespace}, updated)).To(Succeed())
+
+				readyCond := findCondition(updated.Status.Conditions, fusionv1alpha1.ConditionTypeReady)
+				if readyCond != nil {
+					Expect(readyCond.Reason).NotTo(Equal(ReasonImmutableFieldModified))
+				}
 			})
 		})
 	})
