@@ -433,10 +433,10 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				},
 			),
 
-			// Block updates when LocalDiskCreated=True
-			Entry("reject device value change when LocalDiskCreated=True",
+			// Device modification behavior when LocalDiskCreated=True
+			Entry("reject device replacement when LocalDiskCreated=True",
 				updateTestCase{
-					description: "should reject device value change when LocalDiskCreated=True",
+					description: "should reject device replacement when LocalDiskCreated=True",
 					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:  []string{"uuid.different-wwn-value"},
 					oldConditions: []metav1.Condition{
@@ -448,12 +448,12 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 						},
 					},
 					expectError:     true,
-					errorSubstrings: []string{"spec.devices cannot be modified", "LocalDisks were created"},
+					errorSubstrings: []string{"spec.devices cannot have devices removed or replaced", "You can only ADD new devices"},
 				},
 			),
-			Entry("reject device order change when LocalDiskCreated=True",
+			Entry("allow device order change when LocalDiskCreated=True",
 				updateTestCase{
-					description: "should reject device order change when LocalDiskCreated=True",
+					description: "should allow device order change when LocalDiskCreated=True (reordering is safe)",
 					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					newDevices:  []string{"uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556", "uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					oldConditions: []metav1.Condition{
@@ -464,13 +464,12 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					expectError:     true,
-					errorSubstrings: []string{"spec.devices cannot be modified"},
+					expectError: false,
 				},
 			),
-			Entry("reject adding device when LocalDiskCreated=True",
+			Entry("allow adding device when LocalDiskCreated=True",
 				updateTestCase{
-					description: "should reject adding device when LocalDiskCreated=True",
+					description: "should allow adding device when LocalDiskCreated=True (additions are allowed)",
 					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
 					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
 					oldConditions: []metav1.Condition{
@@ -481,8 +480,23 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 							LastTransitionTime: metav1.Now(),
 						},
 					},
-					expectError:     true,
-					errorSubstrings: []string{"spec.devices cannot be modified"},
+					expectError: false,
+				},
+			),
+			Entry("allow adding multiple devices when LocalDiskCreated=True",
+				updateTestCase{
+					description: "should allow adding multiple devices when LocalDiskCreated=True",
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556", "uuid.aaaa1111-bbbb-2222-cccc-333344445555"},
+					oldConditions: []metav1.Condition{
+						{
+							Type:               "LocalDiskCreated",
+							Status:             metav1.ConditionTrue,
+							Reason:             "LocalDiskCreationSucceeded",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+					expectError: false,
 				},
 			),
 			Entry("reject removing device when LocalDiskCreated=True",
@@ -499,7 +513,24 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 						},
 					},
 					expectError:     true,
-					errorSubstrings: []string{"spec.devices cannot be modified"},
+					errorSubstrings: []string{"spec.devices cannot have devices removed or replaced", "You can only ADD new devices"},
+				},
+			),
+			Entry("reject replacing device (remove one, add another) when LocalDiskCreated=True",
+				updateTestCase{
+					description: "should reject replacing device (remove one, add another) when LocalDiskCreated=True",
+					oldDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+					newDevices:  []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.aaaa1111-bbbb-2222-cccc-333344445555"},
+					oldConditions: []metav1.Condition{
+						{
+							Type:               "LocalDiskCreated",
+							Status:             metav1.ConditionTrue,
+							Reason:             "LocalDiskCreationSucceeded",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+					expectError:     true,
+					errorSubstrings: []string{"spec.devices cannot have devices removed or replaced", "You can only ADD new devices"},
 				},
 			),
 
@@ -529,6 +560,95 @@ var _ = Describe("FileSystemClaim Webhook", func() {
 				},
 			),
 		)
+
+		It("should allow removing invalid device when LocalDiskCreated is stale", func() {
+			// Scenario: User added invalid device "funn" in generation 2, now fixing it in generation 3
+			// LocalDiskCreated=True.ObservedGeneration=1 < oldFSC.Generation=2 (stale)
+			oldFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-fsc",
+					Namespace:  "ibm-spectrum-scale",
+					Generation: 2, // Generation where invalid device was added
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "funn"},
+				},
+				Status: FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "LocalDiskCreated",
+							Status:             metav1.ConditionTrue,
+							Reason:             "LocalDiskCreationSucceeded",
+							ObservedGeneration: 1, // Condition from generation 1 (< oldFSC.Generation)
+							LastTransitionTime: metav1.Now(),
+						},
+						{
+							Type:               "DeviceValidated",
+							Status:             metav1.ConditionFalse,
+							Reason:             "DeviceValidationFailed",
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			}
+
+			newFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-fsc",
+					Namespace:  "ibm-spectrum-scale",
+					Generation: 3, // New generation where user fixes mistake
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}, // Removed "funn"
+				},
+			}
+
+			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
+			Expect(err).NotTo(HaveOccurred(), "should allow removal when LocalDiskCreated is stale (observedGen < oldFSC.Generation)")
+			Expect(warnings).To(BeNil())
+		})
+
+		It("should block removing working device when LocalDiskCreated is current", func() {
+			// Scenario: LocalDiskCreated.ObservedGeneration == oldFSC.Generation (current)
+			// User tries to remove a working device - should be blocked
+			oldFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-fsc",
+					Namespace:  "ibm-spectrum-scale",
+					Generation: 5, // Current generation
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b", "uuid.e9751ba1-37d2-53b2-82e7-6a9b661c9556"},
+				},
+				Status: FileSystemClaimStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "LocalDiskCreated",
+							Status:             metav1.ConditionTrue,
+							Reason:             "LocalDiskCreationSucceeded",
+							ObservedGeneration: 5, // Same as oldFSC.Generation (current)
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			}
+
+			newFSC := &FileSystemClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-fsc",
+					Namespace:  "ibm-spectrum-scale",
+					Generation: 6,
+				},
+				Spec: FileSystemClaimSpec{
+					Devices: []string{"uuid.58d49490-25b4-56a2-a78f-bcdb9112f72b"}, // Removed working device
+				},
+			}
+
+			warnings, err := validator.ValidateUpdate(ctx, oldFSC, newFSC)
+			Expect(err).To(HaveOccurred(), "should block removal when LocalDiskCreated is current")
+			Expect(err.Error()).To(ContainSubstring("cannot have devices removed or replaced"))
+			Expect(warnings).To(BeNil())
+		})
 
 		It("should allow update with blank devices during deletion (finalizer removal)", func() {
 			now := metav1.Now()

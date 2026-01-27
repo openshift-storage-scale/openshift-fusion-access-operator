@@ -131,18 +131,41 @@ func (v *FileSystemClaimValidator) ValidateUpdate(_ context.Context, oldObj, new
 		return nil, nil
 	}
 
-	// LocalDiskCreated is True - block the update
+	// LocalDiskCreated is True - check if it's from the old FSC's generation
+	// If the condition is stale (older than oldFSC), allow the update (user fixing mistakes)
+	if localDiskCreatedCond.ObservedGeneration < oldFSC.Generation {
+		logger.Info("allowing device change - LocalDiskCreated is stale, user may be fixing errors from newer generation",
+			"name", newFSC.Name,
+			"conditionGeneration", localDiskCreatedCond.ObservedGeneration,
+			"oldFSCGeneration", oldFSC.Generation)
+		return nil, nil
+	}
+
+	// LocalDiskCreated is True for current generation - check if the change is only additions (superset)
+	// Allow additions: new devices added while all old devices are preserved
+	// Block removals/replacements: any old device removed
+	if utils.IsSuperset(newFSC.Spec.Devices, oldFSC.Spec.Devices) {
+		// New devices is a superset of old devices - only additions, allow
+		logger.Info("allowing device addition", "name", newFSC.Name, "oldDevices", oldFSC.Spec.Devices, "newDevices", newFSC.Spec.Devices)
+		return nil, nil
+	}
+
+	// Not a superset - some devices were removed or replaced, block the update
 	timestamp := localDiskCreatedCond.LastTransitionTime.Format("2006-01-02 15:04:05 MST")
 	errMsg := fmt.Sprintf(
-		"spec.devices cannot be modified after LocalDisks are successfully created. "+
+		"spec.devices cannot have devices removed or replaced after LocalDisks are successfully created. "+
 			"Current devices: %v. "+
-			"LocalDisks were created at %s. "+
-			"To use different devices, delete this FileSystemClaim and create a new one.",
+			"Attempted devices: %v. "+
+			"LocalDisks were created at %s (generation %d). "+
+			"You can only ADD new devices to spec.devices. "+
+			"To remove or replace devices, delete this FileSystemClaim and create a new one.",
 		oldFSC.Spec.Devices,
+		newFSC.Spec.Devices,
 		timestamp,
+		localDiskCreatedCond.ObservedGeneration,
 	)
 
-	logger.Info("blocking device update", "name", newFSC.Name, "reason", "LocalDiskCreated=True")
+	logger.Info("blocking device removal/replacement", "name", newFSC.Name, "reason", "LocalDiskCreated=True for current generation, devices removed or replaced")
 	return nil, fmt.Errorf("%s", errMsg)
 }
 
