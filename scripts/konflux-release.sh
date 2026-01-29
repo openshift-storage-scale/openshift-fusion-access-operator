@@ -17,10 +17,14 @@ check_image_exists() {
   fi
 }
 
+dryrun=n
+if [[ $1 = -n ]]; then
+    dryrun=y
+    shift
+fi
+
 if [ -z "$1" ]; then
-  # COMMIT=$(get_last_git_merge_commit)
-  # echo "Using the last merge commit automatically: ${COMMIT}"
-  echo "Please pass the merge commit you want to use: ./$0 <mergecommit>"
+  echo "Please pass the merge commit you want to use: ./$0 [-n] <mergecommit>"
   exit 1
 fi
 
@@ -115,6 +119,8 @@ else
   exit 1
 fi
 
+[[ $dryrun = y ]] && exit 0
+
 echo "Copying images to new location:"
 
 for genericName in "${!components[@]}"; do
@@ -168,7 +174,7 @@ echo "Command used: ${0} ${COMMIT}" > "${BUNDLE_DIR}/cmd.txt"
 
 export BUNDLE_IMGS=$(skopeo list-tags docker://${DEST_REGISTRY}/openshift-fusion-access-bundle | jq -r '[.Tags[] | select(test("^([0-9]+)\\.([0-9]+)\\.([0-9]+)($|-).*"))| "'${DEST_REGISTRY}'/openshift-fusion-access-bundle:\(.)"] | join(",")')
 export CATALOG_IMG="${DEST_REGISTRY}/openshift-fusion-access-catalog:latest"
-make catalog-build 
+make catalog-build
 echo "Catalog built: ${CATALOG_IMG}"
 make catalog-push
 
@@ -192,5 +198,7 @@ echo ""
 echo "The catalog has been pushed to: ${CATALOG_IMG}"
 echo ""
 echo "If you are happy about the changes you can run:"
-echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:${VERSION} ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:latest ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
 echo "podman push ${DEST_REGISTRY}/openshift-fusion-access-catalog:stable"
+echo "podman tag ${DEST_REGISTRY}/openshift-fusion-access-catalog:latest ${DEST_REGISTRY}/openshift-fusion-access-catalog:${VERSION}"
+echo "podman push ${DEST_REGISTRY}/openshift-fusion-access-catalog:${VERSION}"
