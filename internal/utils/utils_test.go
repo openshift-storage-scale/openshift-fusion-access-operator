@@ -1011,6 +1011,121 @@ var _ = Describe("ValidateWWNs", func() {
 	})
 })
 
+var _ = Describe("UpdateCondition", func() {
+	Context("when adding a new condition", func() {
+		It("should append the condition with current time", func() {
+			conditions := []metav1.Condition{}
+
+			result := UpdateCondition(conditions, "Ready", metav1.ConditionTrue, "AllGood", "everything is fine", 1)
+
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Type).To(Equal("Ready"))
+			Expect(result[0].Status).To(Equal(metav1.ConditionTrue))
+			Expect(result[0].Reason).To(Equal("AllGood"))
+			Expect(result[0].Message).To(Equal("everything is fine"))
+			Expect(result[0].ObservedGeneration).To(Equal(int64(1)))
+			Expect(result[0].LastTransitionTime.IsZero()).To(BeFalse())
+		})
+	})
+
+	DescribeTable("LastTransitionTime behavior on status change",
+		func(oldStatus, newStatus metav1.ConditionStatus, expectTimePreserved bool) {
+			oldTime := metav1.NewTime(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+			conditions := []metav1.Condition{
+				{
+					Type:               "Ready",
+					Status:             oldStatus,
+					Reason:             "OldReason",
+					Message:            "old message",
+					LastTransitionTime: oldTime,
+					ObservedGeneration: 1,
+				},
+			}
+
+			result := UpdateCondition(conditions, "Ready", newStatus, "NewReason", "new message", 2)
+
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Status).To(Equal(newStatus))
+			Expect(result[0].Reason).To(Equal("NewReason"))
+			Expect(result[0].Message).To(Equal("new message"))
+			Expect(result[0].ObservedGeneration).To(Equal(int64(2)))
+			if expectTimePreserved {
+				Expect(result[0].LastTransitionTime.Time).To(Equal(oldTime.Time))
+			} else {
+				Expect(result[0].LastTransitionTime.Time).NotTo(Equal(oldTime.Time))
+			}
+		},
+		Entry("status changed (True->False): should update LastTransitionTime",
+			metav1.ConditionTrue, metav1.ConditionFalse, false),
+		Entry("status unchanged (False->False): should preserve LastTransitionTime",
+			metav1.ConditionFalse, metav1.ConditionFalse, true),
+		Entry("status changed (False->True): should update LastTransitionTime",
+			metav1.ConditionFalse, metav1.ConditionTrue, false),
+		Entry("status unchanged (True->True): should preserve LastTransitionTime",
+			metav1.ConditionTrue, metav1.ConditionTrue, true),
+	)
+
+	Context("when updating only reason/message without status change", func() {
+		It("should update reason and message but preserve LastTransitionTime", func() {
+			oldTime := metav1.NewTime(time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC))
+			conditions := []metav1.Condition{
+				{
+					Type:               "DeviceValidated",
+					Status:             metav1.ConditionFalse,
+					Reason:             "DeviceValidationFailed",
+					Message:            "LVDR not found for node: worker1",
+					LastTransitionTime: oldTime,
+					ObservedGeneration: 1,
+				},
+			}
+
+			// Same status (False), different message
+			result := UpdateCondition(conditions, "DeviceValidated", metav1.ConditionFalse, "DeviceValidationFailed", "LVDR not found for node: worker2", 1)
+
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Message).To(Equal("LVDR not found for node: worker2"))
+			// LastTransitionTime preserved because status is still False
+			Expect(result[0].LastTransitionTime.Time).To(Equal(oldTime.Time))
+		})
+	})
+
+	Context("when multiple conditions exist", func() {
+		It("should only update the matching condition", func() {
+			oldTime := metav1.NewTime(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+			conditions := []metav1.Condition{
+				{
+					Type:               "DeviceValidated",
+					Status:             metav1.ConditionTrue,
+					Reason:             "OK",
+					Message:            "validated",
+					LastTransitionTime: oldTime,
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               "Ready",
+					Status:             metav1.ConditionTrue,
+					Reason:             "AllGood",
+					Message:            "ready",
+					LastTransitionTime: oldTime,
+					ObservedGeneration: 1,
+				},
+			}
+
+			result := UpdateCondition(conditions, "Ready", metav1.ConditionFalse, "NotReady", "broke", 2)
+
+			Expect(result).To(HaveLen(2))
+			// DeviceValidated should be unchanged
+			Expect(result[0].Type).To(Equal("DeviceValidated"))
+			Expect(result[0].Status).To(Equal(metav1.ConditionTrue))
+			Expect(result[0].LastTransitionTime.Time).To(Equal(oldTime.Time))
+			// Ready should be updated with new LastTransitionTime
+			Expect(result[1].Type).To(Equal("Ready"))
+			Expect(result[1].Status).To(Equal(metav1.ConditionFalse))
+			Expect(result[1].LastTransitionTime.Time).NotTo(Equal(oldTime.Time))
+		})
+	})
+})
+
 var _ = Describe("MergeStringMaps", func() {
 	Context("when merging maps", func() {
 		It("should merge two non-overlapping maps", func() {

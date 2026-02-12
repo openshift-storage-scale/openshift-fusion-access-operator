@@ -370,8 +370,8 @@ EOF
       sourceNamespace: openshift-marketplace
 EOF
 }
-
-if [[ -n $(git status --porcelain) ]]; then
+# ignore untracked files
+if [[ -n $(git status --porcelain -uno) ]]; then
     echo "Uncommitted changes detected."
     exit 1
 fi
