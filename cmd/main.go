@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -168,8 +169,9 @@ func main() {
 		}
 	}
 	if err = (&fsccontroller.FileSystemClaimReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		RequeueDelay: 5 * time.Second,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FileSystemClaim")
 		os.Exit(1)

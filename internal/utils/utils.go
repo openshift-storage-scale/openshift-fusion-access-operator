@@ -565,6 +565,10 @@ func UpdateCondition(conditions []metav1.Condition, conditionType string, status
 	// Find and update existing condition or append new one
 	for i, existingCondition := range conditions {
 		if existingCondition.Type == conditionType {
+			// Preserve LastTransitionTime if status hasn't changed (Kubernetes convention)
+			if existingCondition.Status == status {
+				condition.LastTransitionTime = existingCondition.LastTransitionTime
+			}
 			conditions[i] = condition
 			return conditions
 		}
