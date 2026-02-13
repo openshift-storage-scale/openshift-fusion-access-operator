@@ -8,7 +8,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
 	github.com/manifestival/controller-runtime-client v0.4.0
 	github.com/manifestival/manifestival v0.7.2
-	github.com/onsi/ginkgo/v2 v2.28.0
+	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
