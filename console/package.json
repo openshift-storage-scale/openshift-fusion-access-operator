@@ -34,7 +34,7 @@
     "@emotion/css": "^11.13.5",
     "@patternfly/react-table": "^6.2.2",
     "@patternfly/react-tokens": "^6.2.2",
-    "convert": "^5.9.0",
+    "convert": "^7.0.0",
     "immer": "^10.1.1",
     "use-immer": "^0.11.0"
   },
