@@ -12,7 +12,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
-	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20260219084803-5efc53951e1f
+	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20260308105515-f8bf38859ca6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
@@ -52,7 +52,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
