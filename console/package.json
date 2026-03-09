@@ -45,7 +45,7 @@
     "@cypress/webpack-preprocessor": "^5.15.5",
     "@openapitools/openapi-generator-cli": "~2.25.0",
     "@openshift-console/dynamic-plugin-sdk": "~4.20.0",
-    "@openshift-console/dynamic-plugin-sdk-webpack": "~4.20.0",
+    "@openshift-console/dynamic-plugin-sdk-webpack": "~4.21.0",
     "@patternfly/react-core": "^6.2.2",
     "@patternfly/react-icons": "^6.2.2",
     "@patternfly/react-styles": "^6.2.2",
