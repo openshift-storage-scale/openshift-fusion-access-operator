@@ -11,7 +11,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v0.0.0-20260309155933-45fd88d185dd
-	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
+	github.com/openshift/client-go v0.0.0-20260306160707-3935d929fc7d
 	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20260308105515-f8bf38859ca6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.2
@@ -85,7 +85,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
