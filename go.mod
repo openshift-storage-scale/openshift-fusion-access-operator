@@ -10,7 +10,7 @@ require (
 	github.com/manifestival/manifestival v0.7.2
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20250613225054-29b831646a5f
+	github.com/openshift/api v0.0.0-20260309155933-45fd88d185dd
 	github.com/openshift/client-go v0.0.0-20250425165505-5f55ff6979a1
 	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20260308105515-f8bf38859ca6
 	gopkg.in/yaml.v3 v3.0.1
@@ -48,7 +48,6 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
