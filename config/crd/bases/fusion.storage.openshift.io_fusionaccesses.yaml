@@ -53,7 +53,7 @@ spec:
               storageScaleVersion:
                 description: Version of IBM Fusion installation manifest
                 enum:
-                - v6.0.0.2-2026.02.10.11.02.16
+                - v6.0.0.2.1
                 type: string
             type: object
           status:

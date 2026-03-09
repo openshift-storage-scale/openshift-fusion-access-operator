@@ -2312,7 +2312,7 @@ spec:
                   accept:
                     description: |-
                       Read the license and specify "true" to accept or "false" to not accept.
-                      https://www.ibm.com/support/customer/csol/terms/?id=L-AASY-XH7PKC
+                      https://www.ibm.com/support/customer/csol/terms/?id=L-VSLK-BKKG3D
                       BY DOWNLOADING, INSTALLING, COPYING, ACCESSING, CLICKING ON AN "ACCEPT" BUTTON, OR OTHERWISE USING THE PROGRAM, LICENSEE AGREES TO THE TERMS OF THIS AGREEMENT. IF YOU ARE ACCEPTING THESE TERMS ON BEHALF OF LICENSEE, YOU REPRESENT AND WARRANT THAT YOU HAVE FULL AUTHORITY TO BIND LICENSEE TO THESE TERMS. IF YOU DO NOT AGREE TO THESE TERMS,
                       * DO NOT DOWNLOAD, INSTALL, COPY, ACCESS, CLICK ON AN "ACCEPT" BUTTON, OR USE THE PROGRAM; AND
                       * PROMPTLY RETURN THE UNUSED MEDIA AND DOCUMENTATION TO THE PARTY FROM WHOM IT WAS OBTAINED FOR A REFUND OF THE AMOUNT PAID. IF THE PROGRAM WAS DOWNLOADED, DESTROY ALL COPIES OF THE PROGRAM.
@@ -7325,8 +7325,7 @@ spec:
               skipVerify:
                 description: |-
                   skipVerify controls whether a device is verified before it is used as a Storage Scale disk. The verification checks if the device is already in use.
-                  For example, the verification fails if the device has partitions. The verification prevents that a device with data (like the operating system disk) is specified by mistake.
-                  If false, a "DeviceVerifyFailed" or a "DeviceInUse" event is displayed if the device verification fails. Set skipVerify to true only if you know what you do.
+                  Set skipVerify to true only if you know what you do.
                 type: boolean
               thinDiskType:
                 default: "no"
@@ -10222,24 +10221,24 @@ data:
     apiVersion: scale.spectrum.ibm.com/v1alpha1
     kind: ClusterManagerConfig
     images:
-      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:6.0.0.2_2026_02_10.11_02_16
-      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:6.0.0.2_2026_02_10.11_02_16
-      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:6.0.0.2_2026_02_10.11_02_16
-      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:6.0.0.2_2026_02_10.11_02_16
-      postgres: quay.io/openshift-storage-scale/postgres:6.0.0.2_2026_02_10.11_02_16
-      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:6.0.0.2_2026_02_10.11_02_16
-      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:6.0.0.2_2026_02_10.11_02_16
-      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:6.0.0.2_2026_02_10.11_02_16
-      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:6.0.0.2_2026_02_10.11_02_16
-      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:6.0.0.2_2026_02_10.11_02_16
-      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:6.0.0.2_2026_02_10.11_02_16
-      csiSnapshotter: quay.io/openshift-storage-scale/csi/csi-snapshotter:6.0.0.2_2026_02_10.11_02_16
-      csiAttacher: quay.io/openshift-storage-scale/csi/csi-attacher:6.0.0.2_2026_02_10.11_02_16
-      csiProvisioner: quay.io/openshift-storage-scale/csi/csi-provisioner:6.0.0.2_2026_02_10.11_02_16
-      csiLivenessprobe: quay.io/openshift-storage-scale/csi/livenessprobe:6.0.0.2_2026_02_10.11_02_16
-      csiNodeRegistrar: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:6.0.0.2_2026_02_10.11_02_16
-      csiResizer: quay.io/openshift-storage-scale/csi/csi-resizer:6.0.0.2_2026_02_10.11_02_16
-      csiDriver: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:6.0.0.2_2026_02_10.11_02_16
+      coreDME: quay.io/openshift-storage-scale/data-management/ibm-spectrum-scale-daemon:6.0.0.2.1
+      coreDAE: quay.io/openshift-storage-scale/data-access/ibm-spectrum-scale-daemon:6.0.0.2.1
+      coreInit: quay.io/openshift-storage-scale/ibm-spectrum-scale-core-init:6.0.0.2.1
+      gui: quay.io/openshift-storage-scale/ibm-spectrum-scale-gui:6.0.0.2.1
+      postgres: quay.io/openshift-storage-scale/postgres:6.0.0.2.1
+      logs: quay.io/openshift-storage-scale/ibm-spectrum-scale-logs:6.0.0.2.1
+      pmcollector: quay.io/openshift-storage-scale/ibm-spectrum-scale-pmcollector:6.0.0.2.1
+      sysmon: quay.io/openshift-storage-scale/ibm-spectrum-scale-monitor:6.0.0.2.1
+      grafanaBridge: quay.io/openshift-storage-scale/ibm-spectrum-scale-grafana-bridge:6.0.0.2.1
+      coreDNS: quay.io/openshift-storage-scale/ibm-spectrum-scale-coredns:6.0.0.2.1
+      mustGather: quay.io/openshift-storage-scale/ibm-spectrum-scale-must-gather:6.0.0.2.1
+      csiSnapshotter: quay.io/openshift-storage-scale/csi/csi-snapshotter:6.0.0.2.1
+      csiAttacher: quay.io/openshift-storage-scale/csi/csi-attacher:6.0.0.2.1
+      csiProvisioner: quay.io/openshift-storage-scale/csi/csi-provisioner:6.0.0.2.1
+      csiLivenessprobe: quay.io/openshift-storage-scale/csi/livenessprobe:6.0.0.2.1
+      csiNodeRegistrar: quay.io/openshift-storage-scale/csi/csi-node-driver-registrar:6.0.0.2.1
+      csiResizer: quay.io/openshift-storage-scale/csi/csi-resizer:6.0.0.2.1
+      csiDriver: quay.io/openshift-storage-scale/csi/ibm-spectrum-scale-csi-driver:6.0.0.2.1
 kind: ConfigMap
 metadata:
   labels:
@@ -10358,7 +10357,7 @@ spec:
               resource: limits.memory
         - name: MM_DISABLE_MODULE_MANAGEMENT
           value: "1"
-        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:6.0.0.2_2026_02_10.11_02_16
+        image: quay.io/openshift-storage-scale/ibm-spectrum-scale-operator:6.0.0.2.1
         livenessProbe:
           httpGet:
             path: /healthz
