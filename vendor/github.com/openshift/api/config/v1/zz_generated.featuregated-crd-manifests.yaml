@@ -8,7 +8,6 @@ apiservers.config.openshift.io:
   FeatureGates:
   - KMSEncryption
   - KMSEncryptionProvider
-  - TLSAdherence
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
