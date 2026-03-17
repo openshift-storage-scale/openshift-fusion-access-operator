@@ -10,7 +10,7 @@ require (
 	github.com/manifestival/manifestival v0.7.2
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20260317095243-5c75e62da3e7
+	github.com/openshift/api v0.0.0-20260309155933-45fd88d185dd
 	github.com/openshift/client-go v0.0.0-20260306160707-3935d929fc7d
 	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20260308105515-f8bf38859ca6
 	gopkg.in/yaml.v3 v3.0.1
