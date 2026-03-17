@@ -6,7 +6,7 @@ This is totally temporary for now. We'll automate this later
 
 1. Merge the PR to *main*. It isn't necessary to wait for the three konflux PRs that change the nudges on the three containers before moving on the next step.
 
-1. Merge *main* via a PR into branch *v1*. _(Eventually we may wish to cherry-pick from main into v1)_
+1. Merge *main* via a PR into branch *v1*. Note that it is normal for there to be merge conflicts in the Konflux nudges and you can just accept the v1 changes.
 
 1. Wait for the three Konflux PRs in the [operator (release-1-0) application](https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/storage-scale-releng-tenant/applications/operator-1-0/), and then take the commit of the last nudge konflux commit and pass it to run
    ```
@@ -37,32 +37,99 @@ This is totally temporary for now. We'll automate this later
 
 1. Ensure that the images are tagged in `quay.io/openshift-storage-scale` with the release version number. This is so they won't be garbage collected.
 
-1. Poke Socheat Sou _(IBM associate @ssou in #scale-cnsa-redhat-guest)_ to pull them by digest and upload them to the icr.io registry. The commands will be something like:
+1. Ask Red Hat associate (@branto) to copy the images from quay.io to the IBM registry icr.io. To generate the copy commands for him to use, run
    ```
-   skopeo copy docker://quay.io/openshift-storage-scale/devicefinder-rhel9@sha256:.... docker://icr.io/cpopen/fusion-access/devicefinder-rhel9
-   skopeo copy docker://quay.io/openshift-storage-scale/console-plugin-rhel9@sha256:.... docker://icr.io/cpopen/fusion-access/console-plugin-rhel9
-   skopeo copy docker://quay.io/openshift-storage-scale/controller-rhel9-operator@sha256:.... docker://icr.io/cpopen/controller-rhel9-operator
-   ```
-   The image digest for the devicefinder image can be obtained like this and the digests for the other images similarly:
-   ```
-   skopeo inspect docker://quay.io/openshift-storage-scale/devicefinder-rhel9:$(cat VERSION.txt) | jq -r .Digest
+   ./scripts/fusion-image-tool.sh -c -t $(cat VERSION.txt)
    ```
 
 1. Once the images have been uploaded to icr.io, generate a bundle/folder + image which points to the icr.io images.
-Then we rebuild the latest catalog and do a smoke test, so we can also have qe take a look. Once everything is okay
-we commit the released-bundle and use that to generate a PR for their certified-operators repo
+    First we get the contents of the build bundle.
+    ```
+    rm -rf ./bundle
+    ./scripts/get-bundle-image-contents.sh quay.io/openshift-storage-scale/openshift-fusion-access-bundle:$(cat VERSION.txt) ./bundle
+    cp -a ./bundle released-bundles/$(cat VERSION.txt)
+    ```
+    and then we change the image locations to the icr.io ones.
+    ```
+    ./scripts/released-bundle-to-certified.sh ./bundle
+    cp -a ./bundle certified-bundles/$(cat VERSION.txt)
+    ```
 
-1. Then we can do the ISV release on the web page:
+1. Now we can rebuild the latest catalog and do a smoke test. We can also have QE take a look if desired.
+    ```
+    podman build -f bundle.Dockerfile -t quay.io/openshift-storage-scale/openshift-fusion-access-bundle:latest
+    podman push quay.io/openshift-storage-scale/openshift-fusion-access-bundle:latest
+    ```
 
-   - Run the preflight checks for all three images:
-      ```
-      preflight-linux-amd64 check container icr.io/cpopen/fusion-access/devicefinder-rhel9@sha256:fef20a... \
-      --pyxis-api-token= --certification-component-id=... \
-      --certification-project-id=... --submit --loglevel trace
-      ```
-   - After the preflight is submitted we can create the PR to the certified-operators
-   - Once the PR is merged we can publish (or it might happen automatically, to be checked)
+1. Once everything is verified we run and submit the preflight checks for all three images.
+    Before doing this ensure that a recent version of the `preflight` tool is installed in your PATH.
+    The tool can be obtained from [openshift-preflight](https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases). Also the environment variable PYXIS_API_TOKEN must be set. Until such time as a team Bitwarden vault is set up you can ask @nnevin for the required value.
+    ```
+    ./scripts/fusion-image-tool.sh -t $(cat VERSION.txt) -s
+    ```
 
+1. Verify the preflight checks in the Red Hat Partner Connect portal. Go to the [Components page](https://connect.redhat.com/manage/products/68144ebca272669e1af10337/components) for Fusion Access for SAN (Incognito mode is recommended), logging in if necessary.
+Go to each of the components other the *Fusion Access Bundle* and verify that the new version is certified (green check) and if the *Publish* button for the new version is enabled, click it to publish.
+
+1. Once the preflight checks pass we can move on to generating a certified release bundle in *registry.connect.redhat.com* and updating the Certified Operators catalog to include the release. Both of these tasks are done via submitting pull requests to the [redhat-openshift-ecosystem/certified-operators](git@github.com:redhat-openshift-ecosystem/certified-operators.git) repository.
+    1. *Generating the certified release bundle*
+
+        In your fork of [redhat-openshift-ecosystem/certified-operators](git@github.com:redhat-openshift-ecosystem/certified-operators.git) create a branch from upstream/main.
+
+        ```
+        git fetch --all
+        git checkout -b fusion-access-<VERSION> upstream/main
+        ```
+        and then copy the certified bundle created earlier in your Fusion Access operator repo to *operators/openshift-fusion-access-operator/\<VERSION\>/* and add the new files.
+        ```
+        cp -a /.../bundle/ ./operators/openshift-fusion-access-operator/<VERSION>/
+        git add ./operators/openshift-fusion-access-operator/<VERSION>/
+        ```
+        Create a commit with a message following the format below. The message format is significant so don't deviate from it.
+        ```
+        operator openshift-fusion-access-operator (<VERSION>)
+
+        Add bundle for version <VERSION>.
+        ```
+        Push the commit to your fork and then submit a PR from it to upstream. Use the suggested PR title and description. For an example PR from a previous release see https://github.com/redhat-openshift-ecosystem/certified-operators/pull/7545.
+
+        Now wait for the PR to be merged. This should happen automatically and it can take a while - as long as 1/2 hour or so.
+
+    1. *Updating the Certified Operators catalog*
+
+        In your fork of [redhat-openshift-ecosystem/certified-operators](git@github.com:redhat-openshift-ecosystem/certified-operators.git) create a branch from upstream/main.
+
+        ```
+        git fetch --all
+        git checkout -b fusion-access-catalogs-<VERSION> upstream/main
+        ```
+        and then edit the catalog templates in *operators/openshift-fusion-access-operator/catalog-templates*.
+        The templates are all the same so you can edit one and then copy it over the others.
+        Edit the templates following the existing structure to add entries for the new release. The digest for the new release bundle can be found with the command
+        ```
+        skopeo inspect docker://registry.connect.redhat.com/ibm/fusion-access-bundle:<VERSION> | jq -r .Digest
+        ```
+        Note that it can take a little while for the bundle to exist once the PR above has merged.
+
+        Once the templates have been updated, generate new catalogs from the templates.
+        ```
+        make -C operators/openshift-fusion-access-operator catalogs
+        ```
+        Now commit all the changes with a commit message following the format below.
+        ```
+        Catalog update [openshift-fusion-access-operator] [v4.19,v4.20,v4.21]
+
+        Add version <VERSION>.
+        ```
+        Push the commit to your fork and then submit a PR from it to upstream. Use the suggested PR title and description. For an example PR from a previous release see https://github.com/redhat-openshift-ecosystem/certified-operators/pull/7549.
+
+        Now wait for the PR to be merged which should happen automatically. Once the PR has merged, the Certified Operators catalog will be updated to include the new release bundle. This can take a little while. You can check for it something like this or wait for it to show up in the UI.
+        ```
+        image=$(kubectl get catalogsources -n openshift-marketplace certified-operators -o json | jq -r .spec.image)
+        podman pull $image
+        podman run --rm -p 50051:50051 $image
+        grpcurl -plaintext localhost:50051 api.Registry/ListBundles | jq .csvName | grep fusion-access
+        ```
 
 # Releasing a new locally built internal release with a new Storage Scale drop
 
