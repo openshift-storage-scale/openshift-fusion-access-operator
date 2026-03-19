@@ -33,6 +33,9 @@ This is totally temporary for now. We'll automate this later
 
 # Releasing a new official release in the Certified Operators catalog
 
+1. Ensure that the CNSA install manifest in ./files is for a GA version of CNSA and not an internal release that was uploaded to quay.io. There should be no references in it to quay.io other
+than to the `quay.io/operator-framework/scorecard-test` image.
+
 1. Do a build following the same steps as for a new internal release. This is necessary to get the release version reflected in the metadata.
 
 1. Ensure that the images are tagged in `quay.io/openshift-storage-scale` with the release version number. This is so they won't be garbage collected.
@@ -101,7 +104,7 @@ Go to each of the components other the *Fusion Access Bundle* and verify that th
 
         ```
         git fetch --all
-        git checkout -b fusion-access-catalogs-<VERSION> upstream/main
+        git checkout --no-track -b fusion-access-catalogs-<VERSION> upstream/main
         ```
         and then edit the catalog templates in *operators/openshift-fusion-access-operator/catalog-templates*.
         The templates are all the same so you can edit one and then copy it over the others.
