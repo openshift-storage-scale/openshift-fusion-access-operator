@@ -17,6 +17,13 @@ function usage {
         exit 1
 }
 
+function ensure_pyxis_token {
+    if [[ -z $PYXIS_API_TOKEN ]]; then
+        echo "the env var PYXIS_API_TOKEN must be set"
+        exit 1
+    fi
+}
+
 preflight=n
 submit=n
 inspect=n
