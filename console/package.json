@@ -55,7 +55,7 @@
     "@types/react-helmet": "^6.1.4",
     "@types/react-router-dom": "^5.3.2",
     "babel-loader": "^8.0.2",
-    "concurrently": "^9.1.2",
+    "concurrently": "^10.0.0",
     "copy-webpack-plugin": "^6.4.1",
     "css-loader": "^6.7.1",
     "cypress": "^12.17.4",
