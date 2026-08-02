@@ -65,7 +65,7 @@
     "i18next-parser": "^9.3.0",
     "mocha": "^10.5.1",
     "mocha-junit-reporter": "^2.2.0",
-    "mochawesome": "^7.1.3",
+    "mochawesome": "^8.0.0",
     "mochawesome-merge": "^4.3.0",
     "msw": "^2.8.6",
     "pluralize": "^8.0.0",
