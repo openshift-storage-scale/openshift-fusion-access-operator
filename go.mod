@@ -3,7 +3,7 @@ module github.com/openshift-storage-scale/openshift-fusion-access-operator
 go 1.25.0
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/go-logr/logr v1.4.3
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
 	github.com/manifestival/controller-runtime-client v0.4.0
