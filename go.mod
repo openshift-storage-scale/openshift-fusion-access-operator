@@ -1,6 +1,6 @@
 module github.com/openshift-storage-scale/openshift-fusion-access-operator
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -19,7 +19,7 @@ require (
 	k8s.io/client-go v0.35.2
 	k8s.io/component-helpers v0.35.2
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
